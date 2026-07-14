@@ -1,0 +1,11 @@
+{
+  "id": "vault-control-center",
+  "name": "Vault Control Center",
+  "version": "0.1.0",
+  "minAppVersion": "1.12.7",
+  "description": "A native operational dashboard for programs, AI queues, recent files, people, bookmarks, capture, and templates.",
+  "author": "Franklin Garrett",
+  "authorUrl": "https://github.com/jajuangarrett-ctrl",
+  "isDesktopOnly": false
+}
+

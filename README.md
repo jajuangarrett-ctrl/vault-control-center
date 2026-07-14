@@ -1,0 +1,109 @@
+# Vault Control Center
+
+Vault Control Center is a native Obsidian dashboard for operating a structured vault. It replaces a static HTML Viewer/local-server workflow with a live `ItemView`: files, folders, queues, bookmarks, people, tasks, capture actions, and templates all work through Obsidian itself.
+
+![Illustrative dark-mode design concept](docs/design/vault-control-center-dark-concept.png)
+
+> The image above is an illustrative design concept. The plugin renders your own live vault data.
+
+## What it includes
+
+The dashboard keeps eight views in one consistent navy-and-orange interface:
+
+| View | Purpose |
+| --- | --- |
+| Home | Capture actions, live signals, current programs, recent files, people, and task status |
+| Programs | Program folders, activity groups, recent files, and quick folder access |
+| AI Team | Four configurable operational queues with live file counts |
+| Recent | Searchable recent activity with category filters |
+| Bookmarks | Filtered Obsidian bookmarks; vault targets open natively and HTTP(S) links open externally |
+| People | Agenda files, recency, and contact-list access |
+| Clipboard | Editable, copyable, resettable templates |
+| Settings | Theme, source health, privacy boundary, and native plugin settings |
+
+Additional features:
+
+- Native ribbon icon and command-palette actions
+- Coordinated dark and light themes
+- Optional Obsidian shell theming that is removed cleanly when disabled or unloaded
+- Responsive layouts for desktop, split panes, tablets, and phones
+- Live refresh after vault changes, with a manual force-refresh action
+- `/` to focus search while the dashboard is active, with the native search clear control
+- In-memory indexing only—derived dashboard records are not persisted
+
+## Installation
+
+### BRAT
+
+1. Install and enable BRAT in Obsidian.
+2. Choose **Add Beta plugin**.
+3. Enter `jajuangarrett-ctrl/vault-control-center`.
+4. Enable **Vault Control Center** in Community plugins.
+
+### Manual
+
+Download `main.js`, `manifest.json`, and `styles.css` from the latest release. Place them together in `<vault>/.obsidian/plugins/vault-control-center/`, then reload Obsidian and enable the plugin.
+
+Vault Control Center requires Obsidian 1.12.7 or newer and is not desktop-only.
+
+## First-run setup
+
+Open **Settings → Community plugins → Vault Control Center** and configure the vault-relative paths for:
+
+- Programs
+- People agendas and contacts
+- Tasks
+- Four operational queues
+- Recent-view roots
+
+The bundled defaults are generic examples. Missing sources are reported in the dashboard instead of causing the view to fail.
+
+Capture buttons dispatch commands from companion capture plugins. Install and enable the corresponding Thought Capture, Email Capture, Agenda Capture, and Program Update Capture plugins for those buttons to work. Vault Control Center does not register the displayed actions as global hotkeys.
+
+## Optional taskboard integration
+
+Network access is disabled by default. If enabled, the taskboard panel makes a read-only `GET /api/tasks` request through Obsidian's `requestUrl` API and sends the selected credential in the `X-Dashboard-Password` header.
+
+Two opt-in connection modes are available:
+
+- A separate HTTPS endpoint with a credential selected from Obsidian Secret Storage
+- Best-effort reuse of an enabled Task Capture plugin's existing connection
+
+The separate connection takes precedence when both options are enabled. Secret values are read only in memory; Vault Control Center persists only the Secret Storage ID. Remote results are cached for five minutes during automatic vault refreshes, while the Refresh button and command force a new request.
+
+## Privacy and external-access disclosure
+
+Vault Control Center reads the vault-relative folders and files configured in its settings plus Obsidian's bookmarks configuration file. It does not access files outside the vault.
+
+Before display, the index excludes hidden/internal folders, archived paths, and names that look like passwords, API keys, secrets, credentials, tokens, or private keys. Bookmark URLs containing basic-auth credentials or obvious sensitive query keys are withheld; visible URL metadata is reduced to the origin while the original URL is retained only for opening.
+
+Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, task records, and secret values are not saved there.
+
+## Replacing the legacy launcher
+
+The native plugin and an older HTML-launcher plugin can coexist during migration. Once the native dashboard is configured and verified, disable the legacy launcher to avoid two ribbon buttons with similar names. No HTML Viewer plugin or local web server is required by Vault Control Center.
+
+## Development
+
+```bash
+npm ci
+npm run check
+```
+
+`npm run check` runs the Vitest suite, strict TypeScript validation, and the production esbuild bundle.
+
+## Troubleshooting
+
+- **A source shows Missing:** confirm its vault-relative path in plugin settings, then use Refresh.
+- **A capture action reports that it is not enabled:** install and enable the corresponding companion capture plugin.
+- **The taskboard falls back to local counts:** confirm the HTTPS endpoint, select a valid Obsidian Secret Storage value, enable the separate connection, and force Refresh. The Task Capture adapter also requires that plugin to have a complete connection.
+- **BRAT cannot install or update:** confirm the GitHub release includes `main.js`, `manifest.json`, and `styles.css` and that its tag matches the manifest version.
+- **The old dashboard still opens:** disable the legacy launcher after confirming the native plugin is configured.
+
+## Design notes
+
+The interface follows a reference-driven workflow: one stable information architecture, coordinated dark/light token sets, dense operational rows, and responsive behavior verified at both pane and viewport widths. See [the design system](docs/design/DESIGN.md) and [the fidelity ledger](tests/visual/FIDELITY.md).
+
+## License
+
+MIT © Franklin Garrett

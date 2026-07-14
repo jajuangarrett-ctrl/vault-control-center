@@ -1,0 +1,84 @@
+export const DASHBOARD_VIEW_TYPE = "fjg-vault-control-center";
+
+export const ROUTES = [
+  "home",
+  "programs",
+  "ai-team",
+  "recent",
+  "bookmarks",
+  "people",
+  "clipboard",
+  "settings",
+] as const;
+
+export type DashboardRoute = (typeof ROUTES)[number];
+export type DashboardTheme = "dark" | "light";
+export type ClipboardTemplateId = "meetingFollowUp" | "programUpdate" | "emailHandoff";
+
+export interface DashboardSettings {
+  schemaVersion: number;
+  theme: DashboardTheme;
+  applyShellTheme: boolean;
+  programsFolder: string;
+  contactListPath: string;
+  peopleFolder: string;
+  tasksFilePath: string;
+  aiFolders: {
+    emailQueue: string;
+    formattedNotes: string;
+    ownerInbox: string;
+    teamInbox: string;
+  };
+  recentRoots: string[];
+  reuseTaskCaptureConnection: boolean;
+  enableRemoteTaskboard: boolean;
+  taskboardUrl: string;
+  taskboardSecretId: string;
+  clipboardTemplates: Record<ClipboardTemplateId, string>;
+}
+
+export interface RouteDefinition {
+  id: DashboardRoute;
+  label: string;
+  icon: string;
+}
+
+export const ROUTE_DEFINITIONS: readonly RouteDefinition[] = [
+  { id: "home", label: "Home", icon: "home" },
+  { id: "programs", label: "Programs", icon: "folder" },
+  { id: "ai-team", label: "AI Team", icon: "bot" },
+  { id: "recent", label: "Recent", icon: "clock-3" },
+  { id: "bookmarks", label: "Bookmarks", icon: "bookmark" },
+  { id: "people", label: "People", icon: "users" },
+  { id: "clipboard", label: "Clipboard", icon: "clipboard-copy" },
+  { id: "settings", label: "Settings", icon: "settings-2" },
+] as const;
+
+export const DEFAULT_SETTINGS: DashboardSettings = {
+  schemaVersion: 3,
+  theme: "dark",
+  applyShellTheme: true,
+  programsFolder: "Programs",
+  contactListPath: "People/Contacts.md",
+  peopleFolder: "People/Agenda",
+  tasksFilePath: "Tasks/Tasks.md",
+  aiFolders: {
+    emailQueue: "Operations/Email Queue",
+    formattedNotes: "Operations/Formatted Notes",
+    ownerInbox: "Operations/Owner Inbox",
+    teamInbox: "Operations/Team Inbox",
+  },
+  recentRoots: ["Programs", "Operations", "People", "Tasks", "Resources"],
+  reuseTaskCaptureConnection: false,
+  enableRemoteTaskboard: false,
+  taskboardUrl: "",
+  taskboardSecretId: "",
+  clipboardTemplates: {
+    meetingFollowUp:
+      "Subject: Follow-up — [meeting]\n\nHi [name],\n\nThank you for meeting today. Here are the decisions and next steps:\n\n- Decision:\n- Owner:\n- Due date:\n\nFranklin",
+    programUpdate:
+      "Program: [program]\nStatus: [on track / needs attention]\n\nProgress\n- \n\nRisks or decisions needed\n- \n\nNext milestone\n- ",
+    emailHandoff:
+      "To: [recipient]\nSubject: [clear subject]\n\nPurpose:\n\nKey context:\n- \n\nRequested action and deadline:\n- \n\nFranklin",
+  },
+};

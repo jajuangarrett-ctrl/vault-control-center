@@ -1,0 +1,10 @@
+node_modules/
+*.js.map
+data.json
+.env
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+coverage/
+tests/visual/*.jpg

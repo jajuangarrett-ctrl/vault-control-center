@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vault Control Center visual fixture</title>
+    <link rel="stylesheet" href="../../styles.css">
+    <style>
+      html, body { margin: 0; min-height: 100%; }
+      body { background: #071826; }
+      .preview-icon { display: inline-grid; width: 1.4em; height: 1.4em; place-items: center; font-size: .8em; font-weight: 800; }
+      .capture-scale .fjg-vcc { width: 1600px; min-height: 1000px; }
+    </style>
+  </head>
+  <body class="fjg-vcc-shell-enabled fjg-vcc-theme-dark">
+    <div class="fjg-vcc" data-theme="dark">
+      <header class="fjg-vcc-header">
+        <div class="fjg-vcc-title-group">
+          <h1 class="fjg-vcc-title">Vault Control Center</h1>
+          <p class="fjg-vcc-subtitle">Live vault operations</p>
+        </div>
+        <div class="fjg-vcc-header-actions">
+          <label class="fjg-vcc-search"><span class="preview-icon">⌕</span><input type="search" placeholder="Search vault" aria-label="Search the current dashboard view"></label>
+          <button class="fjg-vcc-button" type="button"><span class="preview-icon">↻</span><span>Refresh</span></button>
+          <button class="fjg-vcc-theme-toggle" type="button" id="theme-toggle"><span class="preview-icon">☀</span><span>Light mode</span></button>
+        </div>
+      </header>
+      <nav class="fjg-vcc-route-tabs" aria-label="Dashboard views">
+        <button class="fjg-vcc-route-tab is-active" aria-selected="true">Home</button>
+        <button class="fjg-vcc-route-tab">Programs</button>
+        <button class="fjg-vcc-route-tab">AI Team</button>
+        <button class="fjg-vcc-route-tab">Recent</button>
+        <button class="fjg-vcc-route-tab">Bookmarks</button>
+        <button class="fjg-vcc-route-tab">People</button>
+        <button class="fjg-vcc-route-tab">Clipboard</button>
+        <button class="fjg-vcc-route-tab">Settings</button>
+      </nav>
+      <main class="fjg-vcc-content">
+        <div class="fjg-vcc-route-view" data-route="home">
+          <div class="fjg-vcc-capture-grid">
+            <button class="fjg-vcc-capture-action"><span class="preview-icon">✎</span><span class="fjg-vcc-capture-label">Thought</span><span class="fjg-vcc-capture-open">Open</span></button>
+            <button class="fjg-vcc-capture-action"><span class="preview-icon">✉</span><span class="fjg-vcc-capture-label">Email</span><span class="fjg-vcc-capture-open">Open</span></button>
+            <button class="fjg-vcc-capture-action"><span class="preview-icon">☷</span><span class="fjg-vcc-capture-label">Agenda item</span><span class="fjg-vcc-capture-open">Open</span></button>
+            <button class="fjg-vcc-capture-action"><span class="preview-icon">◖</span><span class="fjg-vcc-capture-label">Program update</span><span class="fjg-vcc-capture-open">Open</span></button>
+          </div>
+          <div class="fjg-vcc-signal-strip">
+            <button class="fjg-vcc-signal"><span class="preview-icon">▱</span><span class="fjg-vcc-signal-copy"><span class="fjg-vcc-signal-label">Programs</span><span class="fjg-vcc-signal-value">12</span></span></button>
+            <button class="fjg-vcc-signal"><span class="preview-icon">⌘</span><span class="fjg-vcc-signal-copy"><span class="fjg-vcc-signal-label">AI queues</span><span class="fjg-vcc-signal-value">24 <i class="fjg-vcc-attention-dot"></i></span></span></button>
+            <button class="fjg-vcc-signal"><span class="preview-icon">▤</span><span class="fjg-vcc-signal-copy"><span class="fjg-vcc-signal-label">Agenda files</span><span class="fjg-vcc-signal-value">8</span></span></button>
+            <button class="fjg-vcc-signal"><span class="preview-icon">✓</span><span class="fjg-vcc-signal-copy"><span class="fjg-vcc-signal-label">Open tasks</span><span class="fjg-vcc-signal-value">31 <i class="fjg-vcc-attention-dot"></i></span></span></button>
+          </div>
+          <div class="fjg-vcc-work-grid">
+            <section class="fjg-vcc-panel">
+              <header class="fjg-vcc-panel-header"><h2>Current work</h2><button class="fjg-vcc-text-action">All programs →</button></header>
+              <div class="fjg-vcc-panel-body">
+                <div class="fjg-vcc-group" data-status="positive">
+                  <button class="fjg-vcc-group-header" aria-expanded="true"><span>⌄</span><span>Active this week</span><span class="fjg-vcc-group-count">3</span></button>
+                  <div class="fjg-vcc-group-body">
+                    <button class="fjg-vcc-progress-row" data-status="positive"><span class="fjg-vcc-progress-name">Access &amp; Outreach</span><span class="fjg-vcc-progress-track"><i class="fjg-vcc-progress-bar" style="width:78%"></i></span><span class="fjg-vcc-progress-value">2h ago</span><span class="fjg-vcc-progress-count">6</span></button>
+                    <button class="fjg-vcc-progress-row" data-status="positive"><span class="fjg-vcc-progress-name">Advising &amp; Retention</span><span class="fjg-vcc-progress-track"><i class="fjg-vcc-progress-bar" style="width:64%"></i></span><span class="fjg-vcc-progress-value">1d ago</span><span class="fjg-vcc-progress-count">5</span></button>
+                    <button class="fjg-vcc-progress-row" data-status="positive"><span class="fjg-vcc-progress-name">Basic Needs</span><span class="fjg-vcc-progress-track"><i class="fjg-vcc-progress-bar" style="width:82%"></i></span><span class="fjg-vcc-progress-value">3d ago</span><span class="fjg-vcc-progress-count">4</span></button>
+                  </div>
+                </div>
+                <div class="fjg-vcc-group" data-status="warning">
+                  <button class="fjg-vcc-group-header" aria-expanded="true"><span>⌄</span><span>Needs a look</span><span class="fjg-vcc-group-count">3</span></button>
+                  <div class="fjg-vcc-group-body">
+                    <button class="fjg-vcc-progress-row" data-status="warning"><span class="fjg-vcc-progress-name">Crisis Support</span><span class="fjg-vcc-progress-track"><i class="fjg-vcc-progress-bar" style="width:42%"></i></span><span class="fjg-vcc-progress-value">12d ago</span><span class="fjg-vcc-progress-count">3</span></button>
+                    <button class="fjg-vcc-progress-row" data-status="warning"><span class="fjg-vcc-progress-name">CARE Team</span><span class="fjg-vcc-progress-track"><i class="fjg-vcc-progress-bar" style="width:36%"></i></span><span class="fjg-vcc-progress-value">18d ago</span><span class="fjg-vcc-progress-count">6</span></button>
+                    <button class="fjg-vcc-progress-row" data-status="warning"><span class="fjg-vcc-progress-name">Student Conduct</span><span class="fjg-vcc-progress-track"><i class="fjg-vcc-progress-bar" style="width:28%"></i></span><span class="fjg-vcc-progress-value">24d ago</span><span class="fjg-vcc-progress-count">4</span></button>
+                  </div>
+                </div>
+                <div class="fjg-vcc-group" data-status="planning">
+                  <button class="fjg-vcc-group-header" aria-expanded="true"><span>⌄</span><span>Planning</span><span class="fjg-vcc-group-count">2</span></button>
+                  <div class="fjg-vcc-group-body">
+                    <button class="fjg-vcc-progress-row" data-status="planning"><span class="fjg-vcc-progress-name">Testing Services</span><span class="fjg-vcc-progress-track"><i class="fjg-vcc-progress-bar" style="width:20%"></i></span><span class="fjg-vcc-progress-value">May 11</span><span class="fjg-vcc-progress-count">2</span></button>
+                    <button class="fjg-vcc-progress-row" data-status="planning"><span class="fjg-vcc-progress-name">Case Management</span><span class="fjg-vcc-progress-track"><i class="fjg-vcc-progress-bar" style="width:12%"></i></span><span class="fjg-vcc-progress-value">May 8</span><span class="fjg-vcc-progress-count">1</span></button>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="fjg-vcc-panel">
+              <header class="fjg-vcc-panel-header"><h2>Latest files</h2><button class="fjg-vcc-text-action">View all →</button></header>
+              <div class="fjg-vcc-panel-body">
+                <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Daily Note — Monday</span><span class="fjg-vcc-row-path">Daily Notes/Monday.md</span></span><span class="fjg-vcc-row-end">9:20 AM</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Program Leads Meeting</span><span class="fjg-vcc-row-path">Meetings/Program Leads.md</span></span><span class="fjg-vcc-row-end">8:05 AM</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">CARE Team Dashboard</span><span class="fjg-vcc-row-path">Dashboards/CARE Team.md</span></span><span class="fjg-vcc-row-end">Yesterday</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Basic Needs Intake Trends</span><span class="fjg-vcc-row-path">Reports/Intake Trends.md</span></span><span class="fjg-vcc-row-end">Yesterday</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Advising Waitlist Log</span><span class="fjg-vcc-row-path">Advising/Waitlist Log.md</span></span><span class="fjg-vcc-row-end">May 12</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Testing Center Schedule</span><span class="fjg-vcc-row-path">Testing/Schedule.md</span></span><span class="fjg-vcc-row-end">May 11</span></button>
+              </div>
+            </section>
+            <section class="fjg-vcc-panel">
+              <header class="fjg-vcc-panel-header"><h2>People radar</h2><button class="fjg-vcc-text-action">Contact list →</button></header>
+              <div class="fjg-vcc-panel-body">
+                <button class="fjg-vcc-row"><span class="fjg-vcc-avatar">AR</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Alex Rivera</span><span class="fjg-vcc-row-meta">Agenda file</span></span><span class="fjg-vcc-row-end">Today</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-avatar">JL</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Jordan Lee</span><span class="fjg-vcc-row-meta">Agenda file</span></span><span class="fjg-vcc-row-end">Yesterday</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-avatar">SW</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Sam Williams</span><span class="fjg-vcc-row-meta">Agenda file</span></span><span class="fjg-vcc-row-end">3d ago</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-avatar">KC</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Kim Cooper</span><span class="fjg-vcc-row-meta">Agenda file</span></span><span class="fjg-vcc-row-end">May 9</span></button>
+                <button class="fjg-vcc-row"><span class="fjg-vcc-avatar">MD</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Maya Delgado</span><span class="fjg-vcc-row-meta">Agenda file</span></span><span class="fjg-vcc-row-end">May 8</span></button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+      <nav class="fjg-vcc-mobile-dock"><button class="fjg-vcc-mobile-dock-item is-active">⌂<span>Home</span></button><button class="fjg-vcc-mobile-dock-item">▱<span>Programs</span></button><button class="fjg-vcc-mobile-dock-item">＋<span>Capture</span></button><button class="fjg-vcc-mobile-dock-item">◷<span>Recent</span></button><button class="fjg-vcc-mobile-dock-item">•••<span>More</span></button></nav>
+    </div>
+    <script>
+      const previewParams = new URLSearchParams(location.search);
+      if (previewParams.has('capture')) document.documentElement.classList.add('capture-scale');
+      if (previewParams.get('theme') === 'light') {
+        document.querySelector('.fjg-vcc').dataset.theme = 'light';
+        document.body.className = 'fjg-vcc-shell-enabled fjg-vcc-theme-light';
+        document.querySelector('#theme-toggle').lastElementChild.textContent = 'Dark mode';
+      }
+      document.querySelector('#theme-toggle').addEventListener('click', (event) => {
+        const root = document.querySelector('.fjg-vcc');
+        const light = root.dataset.theme === 'light';
+        root.dataset.theme = light ? 'dark' : 'light';
+        document.body.className = `fjg-vcc-shell-enabled fjg-vcc-theme-${light ? 'dark' : 'light'}`;
+        event.currentTarget.lastElementChild.textContent = light ? 'Light mode' : 'Dark mode';
+      });
+    </script>
+  </body>
+</html>
