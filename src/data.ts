@@ -10,6 +10,7 @@ export const AI_FOLDER_KEYS = [
 export type AiFolderKey = (typeof AI_FOLDER_KEYS)[number];
 
 export interface DashboardDataSettings {
+  areasFolder: string;
   programsFolder: string;
   peopleFolder: string;
   aiFolders: Record<AiFolderKey, string>;
@@ -48,12 +49,17 @@ export interface DashboardFileItem {
   category: DashboardFileCategory;
 }
 
-export interface DashboardProgram {
+export interface DashboardFolderRoot {
   name: string;
   path: string;
   count: number;
   files: DashboardFileItem[];
+  folderPaths?: string[];
 }
+
+export interface DashboardProgram extends DashboardFolderRoot {}
+
+export interface DashboardArea extends DashboardFolderRoot {}
 
 export interface DashboardAiQueue {
   key: AiFolderKey;
@@ -104,6 +110,7 @@ export interface DashboardSourceState {
 }
 
 export interface DashboardDataSources {
+  areasFolder: DashboardSourceState;
   programsFolder: DashboardSourceState;
   peopleFolder: DashboardSourceState;
   aiFolders: Record<AiFolderKey, DashboardSourceState>;
@@ -112,6 +119,7 @@ export interface DashboardDataSources {
 }
 
 export interface DashboardMetrics {
+  areas: number;
   programs: number;
   aiQueues: number;
   agenda: number;
@@ -124,6 +132,8 @@ export interface DashboardMetrics {
 export interface DashboardData {
   generatedAt: string;
   metrics: DashboardMetrics;
+  areasRoot: DashboardArea;
+  areas: DashboardArea[];
   programs: DashboardProgram[];
   aiQueues: Record<AiFolderKey, DashboardAiQueue>;
   people: DashboardPeopleData;
@@ -134,6 +144,7 @@ export interface DashboardData {
 }
 
 export const DEFAULT_DASHBOARD_DATA_SETTINGS: DashboardDataSettings = {
+  areasFolder: "03 Areas",
   programsFolder: "Programs",
   peopleFolder: "People/Agenda",
   aiFolders: {
@@ -146,7 +157,7 @@ export const DEFAULT_DASHBOARD_DATA_SETTINGS: DashboardDataSettings = {
     "Inbox",
     "Daily Notes",
     "Programs",
-    "Areas",
+    "03 Areas",
     "Resources",
     "People",
     "Projects",
@@ -369,6 +380,7 @@ export async function buildDashboardData(
   const vaultFiles = safeVaultFiles(app)
     .filter((file) => isVisibleFile(file.path, file.extension))
     .map((file) => ({ raw: file, item: toDashboardFile(file, context) }));
+  const vaultFolderPaths = safeVaultFolderPaths(app);
 
   const programMap = new Map<string, DashboardFileItem[]>();
   for (const { item } of vaultFiles) {
@@ -387,6 +399,55 @@ export async function buildDashboardData(
         path: `${normalizedSettings.programsFolder}/${name}`,
         count: sorted.length,
         files: sorted,
+      };
+    })
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
+
+  const areaFiles = sortFiles(
+    vaultFiles
+      .filter(({ item }) => pathIsWithin(item.path, normalizedSettings.areasFolder))
+      .map(({ item }) => item)
+  );
+  const areasRoot: DashboardArea = {
+    name: "All Areas",
+    path: normalizedSettings.areasFolder,
+    count: areaFiles.length,
+    files: areaFiles,
+    folderPaths: vaultFolderPaths.filter(
+      (path) =>
+        path !== normalizedSettings.areasFolder &&
+        pathIsWithin(path, normalizedSettings.areasFolder)
+    ),
+  };
+  const areaMap = new Map<string, DashboardFileItem[]>();
+  for (const item of areaFiles) {
+    const areaName = firstChildSegment(item.path, normalizedSettings.areasFolder);
+    if (!areaName) continue;
+    const files = areaMap.get(areaName) ?? [];
+    files.push(item);
+    areaMap.set(areaName, files);
+  }
+  const areaNames = new Set(areaMap.keys());
+  for (const folderPath of areasRoot.folderPaths ?? []) {
+    const areaName = firstDescendantSegment(
+      folderPath,
+      normalizedSettings.areasFolder
+    );
+    if (areaName) areaNames.add(areaName);
+  }
+  const areas = [...areaNames]
+    .map((name): DashboardArea => {
+      const files = areaMap.get(name) ?? [];
+      const sorted = sortFiles(files);
+      const path = `${normalizedSettings.areasFolder}/${name}`;
+      return {
+        name,
+        path,
+        count: sorted.length,
+        files: sorted,
+        folderPaths: (areasRoot.folderPaths ?? []).filter((folderPath) =>
+          pathIsWithin(folderPath, path)
+        ),
       };
     })
     .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
@@ -437,11 +498,19 @@ export async function buildDashboardData(
     ({ item }) => item.path === normalizedSettings.tasksFilePath
   )?.raw;
 
-  const [bookmarksResult, tasksResult, programsSource, peopleSource, ...aiSources] =
+  const [
+    bookmarksResult,
+    tasksResult,
+    programsSource,
+    areasSource,
+    peopleSource,
+    ...aiSources
+  ] =
     await Promise.all([
       readBookmarks(app, bookmarksPath),
       readTasks(app, normalizedSettings.tasksFilePath, taskFile),
       inspectSource(app, normalizedSettings.programsFolder),
+      inspectSource(app, normalizedSettings.areasFolder),
       inspectSource(app, normalizedSettings.peopleFolder),
       ...AI_FOLDER_KEYS.map((key) =>
         inspectSource(app, normalizedSettings.aiFolders[key])
@@ -459,6 +528,7 @@ export async function buildDashboardData(
   return {
     generatedAt: validDate(now).toISOString(),
     metrics: {
+      areas: areas.length,
       programs: programs.length,
       aiQueues: aiQueueCount,
       agenda: people.count,
@@ -467,6 +537,8 @@ export async function buildDashboardData(
       openTasks: tasksResult.tasks.open,
       totalTasks: tasksResult.tasks.total,
     },
+    areasRoot,
+    areas,
     programs,
     aiQueues,
     people,
@@ -474,6 +546,7 @@ export async function buildDashboardData(
     bookmarks: bookmarksResult.bookmarks.visible,
     tasks: tasksResult.tasks,
     sources: {
+      areasFolder: areasSource,
       programsFolder: programsSource,
       peopleFolder: peopleSource,
       aiFolders: aiSourceMap,
@@ -485,6 +558,7 @@ export async function buildDashboardData(
 
 function normalizeSettings(settings: DashboardDataSettings): DashboardDataSettings {
   return {
+    areasFolder: normalizeVaultPath(settings.areasFolder),
     programsFolder: normalizeVaultPath(settings.programsFolder),
     peopleFolder: normalizeVaultPath(settings.peopleFolder),
     aiFolders: Object.fromEntries(
@@ -524,6 +598,31 @@ function safeVaultFiles(app: App): TFile[] {
   }
 }
 
+function safeVaultFolderPaths(app: App): string[] {
+  type FolderLike = { path?: unknown; children?: unknown };
+  type VaultWithLoadedFiles = {
+    getAllLoadedFiles?: () => FolderLike[];
+  };
+
+  try {
+    const loadedFiles = (app.vault as unknown as VaultWithLoadedFiles)
+      .getAllLoadedFiles?.() ?? [];
+    return [...new Set(
+      loadedFiles
+        .filter((entry) => Array.isArray(entry.children))
+        .map((entry) => normalizeVaultPath(String(entry.path ?? "")))
+        .filter(
+          (path) =>
+            Boolean(path) &&
+            !isExcludedPath(path) &&
+            !isSensitivePath(path)
+        )
+    )];
+  } catch {
+    return [];
+  }
+}
+
 function isVisibleFile(path: string, extension: string): boolean {
   return (
     ALLOWED_EXTENSIONS.has(String(extension ?? "").toLocaleLowerCase()) &&
@@ -549,10 +648,10 @@ function toDashboardFile(file: TFile, context: FileContext): DashboardFileItem {
 
 function categoryForPath(path: string, context: FileContext): DashboardFileCategory {
   if (pathIsWithin(path, context.settings.programsFolder)) return "programs";
+  if (pathIsWithin(path, context.settings.areasFolder)) return "areas";
   if (context.aiPaths.some((root) => pathIsWithin(path, root))) return "ai";
   if (pathIsWithin(path, context.settings.peopleFolder)) return "people";
   if (normalizeVaultPath(path) === context.settings.tasksFilePath) return "tasks";
-  if (/^(?:\d+\s+)?areas(?:\/|$)/i.test(normalizeVaultPath(path))) return "areas";
   return "vault";
 }
 
@@ -563,6 +662,13 @@ function firstChildSegment(path: string, root: string): string {
   const relativePath = normalizedPath.slice(normalizedRoot.length + 1);
   const slashIndex = relativePath.indexOf("/");
   return slashIndex > 0 ? relativePath.slice(0, slashIndex) : "";
+}
+
+function firstDescendantSegment(path: string, root: string): string {
+  const normalizedPath = normalizeVaultPath(path);
+  const normalizedRoot = normalizeVaultPath(root);
+  if (!normalizedRoot || !normalizedPath.startsWith(`${normalizedRoot}/`)) return "";
+  return normalizedPath.slice(normalizedRoot.length + 1).split("/")[0] ?? "";
 }
 
 function sortFiles(files: DashboardFileItem[]): DashboardFileItem[] {

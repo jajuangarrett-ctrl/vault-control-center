@@ -41,6 +41,8 @@ import {
 
 interface PersistedViewState {
   route?: unknown;
+  selectedAreaPath?: unknown;
+  selectedAreaFolderPath?: unknown;
   selectedProgramPath?: unknown;
   selectedProgramFolderPath?: unknown;
   selectedAiQueue?: unknown;
@@ -76,6 +78,8 @@ export class VaultControlCenterView extends ItemView {
   };
   private renderState: DashboardRenderState = {
     query: "",
+    selectedAreaPath: "",
+    selectedAreaFolderPath: "",
     selectedProgramPath: "",
     selectedProgramFolderPath: "",
     selectedAiQueue: "emailQueue",
@@ -135,6 +139,8 @@ export class VaultControlCenterView extends ItemView {
     return {
       ...super.getState(),
       route: this.route,
+      selectedAreaPath: this.renderState.selectedAreaPath,
+      selectedAreaFolderPath: this.renderState.selectedAreaFolderPath,
       selectedProgramPath: this.renderState.selectedProgramPath,
       selectedProgramFolderPath: this.renderState.selectedProgramFolderPath,
       selectedAiQueue: this.renderState.selectedAiQueue,
@@ -148,6 +154,12 @@ export class VaultControlCenterView extends ItemView {
     const saved = (state && typeof state === "object" ? state : {}) as PersistedViewState;
     if (typeof saved.route === "string" && ROUTES.includes(saved.route as DashboardRoute)) {
       this.route = saved.route as DashboardRoute;
+    }
+    if (typeof saved.selectedAreaPath === "string") {
+      this.renderState.selectedAreaPath = saved.selectedAreaPath;
+    }
+    if (typeof saved.selectedAreaFolderPath === "string") {
+      this.renderState.selectedAreaFolderPath = saved.selectedAreaFolderPath;
     }
     if (typeof saved.selectedProgramPath === "string") {
       this.renderState.selectedProgramPath = saved.selectedProgramPath;
@@ -167,6 +179,7 @@ export class VaultControlCenterView extends ItemView {
     }
 
     if (this.rootEl) {
+      this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
       this.renderRouteTabs();
       this.renderContent();
@@ -211,6 +224,7 @@ export class VaultControlCenterView extends ItemView {
         this.taskboardFetchedAt = Date.now();
         this.taskboardSettingsKey = taskboardSettingsKey;
       }
+      this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
       this.renderContent();
     } catch (error) {
@@ -249,12 +263,15 @@ export class VaultControlCenterView extends ItemView {
       const previousQuery = this.renderState.query;
       this.renderState.query = this.searchInputEl?.value ?? "";
       if (
-        this.route === "programs" &&
+        (this.route === "areas" || this.route === "programs") &&
         !previousQuery.trim() &&
         this.renderState.query.trim()
       ) {
-        this.renderState.selectedProgramFolderPath =
-          this.renderState.selectedProgramPath;
+        if (this.route === "areas") {
+          this.renderState.selectedAreaFolderPath = this.renderState.selectedAreaPath;
+        } else {
+          this.renderState.selectedProgramFolderPath = this.renderState.selectedProgramPath;
+        }
       }
       this.renderContent();
     });
@@ -316,6 +333,12 @@ export class VaultControlCenterView extends ItemView {
       action: () => void;
     }> = [
       { label: "Home", icon: "home", active: this.route === "home", action: () => this.navigate("home") },
+      {
+        label: "Areas",
+        icon: "folders",
+        active: this.route === "areas",
+        action: () => this.navigate("areas"),
+      },
       {
         label: "Programs",
         icon: "folder",
@@ -383,6 +406,19 @@ export class VaultControlCenterView extends ItemView {
       : "";
   }
 
+  private canonicalizeAreaSelection(): void {
+    if (!this.data) return;
+    const roots = [this.data.areasRoot, ...this.data.areas];
+    const selectedArea =
+      roots.find((area) => area.path === this.renderState.selectedAreaPath) ??
+      this.data.areasRoot;
+    this.renderState.selectedAreaPath = selectedArea.path;
+    this.renderState.selectedAreaFolderPath = resolveProgramFolderPath(
+      selectedArea,
+      this.renderState.selectedAreaFolderPath || selectedArea.path
+    );
+  }
+
   private renderContext(): DashboardRenderContext {
     if (!this.data) throw new Error("Dashboard data is not ready.");
     return {
@@ -395,11 +431,34 @@ export class VaultControlCenterView extends ItemView {
       openBookmark: (bookmark) => void this.openBookmark(bookmark),
       openExternal: (url) => this.openExternal(url),
       capture: (commandId, label) => this.plugin.executeCapture(commandId, label),
+      selectArea: (path) => {
+        const area = [this.data?.areasRoot, ...(this.data?.areas ?? [])].find(
+          (candidate) => candidate?.path === path
+        );
+        if (!area) return;
+        this.renderState.selectedAreaPath = area.path;
+        this.renderState.selectedAreaFolderPath = area.path;
+        this.renderContent();
+        this.focusFolderHeading();
+      },
+      selectAreaFolder: (path) => {
+        const areaRoots = this.data
+          ? [...this.data.areas, this.data.areasRoot]
+          : [];
+        const area = areaRoots
+          .sort((left, right) => right.path.length - left.path.length)
+          .find((candidate) => pathIsWithin(path, candidate.path));
+        if (!area) return;
+        this.renderState.selectedAreaPath = area.path;
+        this.renderState.selectedAreaFolderPath = resolveProgramFolderPath(area, path);
+        this.renderContent();
+        this.focusFolderHeading();
+      },
       selectProgram: (path) => {
         this.renderState.selectedProgramPath = path;
         this.renderState.selectedProgramFolderPath = path;
         this.renderContent();
-        this.focusProgramFolderHeading();
+        this.focusFolderHeading();
       },
       selectProgramFolder: (path) => {
         const program = this.data?.programs.find((candidate) =>
@@ -412,7 +471,7 @@ export class VaultControlCenterView extends ItemView {
           path
         );
         this.renderContent();
-        this.focusProgramFolderHeading();
+        this.focusFolderHeading();
       },
       selectAiQueue: (key) => {
         this.renderState.selectedAiQueue = key;
@@ -444,7 +503,7 @@ export class VaultControlCenterView extends ItemView {
     this.contentRegionEl?.scrollTo({ top: 0 });
   }
 
-  private focusProgramFolderHeading(): void {
+  private focusFolderHeading(): void {
     window.setTimeout(() => {
       this.contentRegionEl
         ?.querySelector<HTMLElement>(".fjg-vcc-folder-heading")
@@ -458,7 +517,7 @@ export class VaultControlCenterView extends ItemView {
     const state = this.contentRegionEl.createDiv({ cls: "fjg-vcc-loading", attr: { role: "status" } });
     createIcon(state, "loader-circle");
     state.createEl("strong", { text: "Indexing live vault data" });
-    state.createEl("p", { text: "Programs, queues, files, bookmarks, people, and tasks are being refreshed." });
+    state.createEl("p", { text: "Areas, programs, queues, files, bookmarks, people, and tasks are being refreshed." });
   }
 
   private renderFailure(message: string): void {

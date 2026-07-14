@@ -46,6 +46,7 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl).setName("Vault sources").setHeading();
+    this.addPathSetting("Areas folder", "Top-level folders become Area records with recursive navigation.", "areasFolder");
     this.addPathSetting("Programs folder", "Top-level folders become program records.", "programsFolder");
     this.addPathSetting("People agenda folder", "Markdown files become people and agenda records.", "peopleFolder");
     this.addPathSetting("Contact list", "Opened by the dashboard contact action.", "contactListPath");
@@ -116,7 +117,7 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
   private addPathSetting(
     name: string,
     description: string,
-    key: "programsFolder" | "peopleFolder" | "contactListPath" | "tasksFilePath" | "taskboardUrl"
+    key: "areasFolder" | "programsFolder" | "peopleFolder" | "contactListPath" | "tasksFilePath" | "taskboardUrl"
   ): void {
     new Setting(this.containerEl)
       .setName(name)

@@ -42,8 +42,13 @@ export function programMatchesNavigationQuery(
     return true;
   }
   const rootPath = normalizeVaultPath(program.path);
-  return safeProgramFiles(program, rootPath).some((file) =>
-    fileMatchesQuery(file, normalizedQuery)
+  return (
+    safeProgramFiles(program, rootPath).some((file) =>
+      fileMatchesQuery(file, normalizedQuery)
+    ) ||
+    safeProgramFolders(program, rootPath).some((path) =>
+      valuesMatch(normalizedQuery, lastPathSegment(path), path)
+    )
   );
 }
 
@@ -58,10 +63,17 @@ export function programFolderMatchesNavigationQuery(
     return true;
   }
   const rootPath = normalizeVaultPath(program.path);
-  return safeProgramFiles(program, rootPath).some(
-    (file) =>
-      pathIsWithin(file.path, folder.path) &&
-      fileMatchesQuery(file, normalizedQuery)
+  return (
+    safeProgramFiles(program, rootPath).some(
+      (file) =>
+        pathIsWithin(file.path, folder.path) &&
+        fileMatchesQuery(file, normalizedQuery)
+    ) ||
+    safeProgramFolders(program, rootPath).some(
+      (path) =>
+        pathIsWithin(path, folder.path) &&
+        valuesMatch(normalizedQuery, lastPathSegment(path), path)
+    )
   );
 }
 
@@ -76,12 +88,20 @@ export function resolveProgramFolderPath(
 ): string {
   const rootPath = normalizeVaultPath(program.path);
   const safeFiles = safeProgramFiles(program, rootPath);
+  const safeFolders = safeProgramFolders(program, rootPath);
   let currentPath = normalizeVaultPath(candidatePath) || rootPath;
 
   if (!pathIsWithin(currentPath, rootPath)) return rootPath;
 
   while (currentPath !== rootPath) {
-    if (safeFiles.some((file) => file.path.startsWith(`${currentPath}/`))) {
+    if (
+      safeFolders.some(
+        (folderPath) =>
+          folderPath === currentPath ||
+          folderPath.startsWith(`${currentPath}/`)
+      ) ||
+      safeFiles.some((file) => file.path.startsWith(`${currentPath}/`))
+    ) {
       return currentPath;
     }
     const parentPath = parentFolderPath(currentPath);
@@ -100,6 +120,7 @@ export function buildProgramFolderView(
   const rootPath = normalizeVaultPath(program.path);
   const path = resolveProgramFolderPath(program, candidatePath);
   const safeFiles = safeProgramFiles(program, rootPath);
+  const safeFolders = safeProgramFolders(program, rootPath);
   const descendantFiles = sortFiles(
     safeFiles.filter((file) => file.path.startsWith(`${path}/`))
   );
@@ -120,6 +141,22 @@ export function buildProgramFolderView(
       count: (existing?.count ?? 0) + 1,
       latestModifiedAt: Math.max(existing?.latestModifiedAt ?? 0, file.modifiedAt),
     });
+  }
+
+  for (const folderPath of safeFolders) {
+    if (folderPath === path || !pathIsWithin(folderPath, path)) continue;
+    const relativePath = folderPath.slice(path.length + 1);
+    const name = relativePath.split("/")[0] ?? "";
+    if (!name) continue;
+    const childPath = `${path}/${name}`;
+    if (!folderMap.has(childPath)) {
+      folderMap.set(childPath, {
+        name,
+        path: childPath,
+        count: 0,
+        latestModifiedAt: 0,
+      });
+    }
   }
 
   const folders = [...folderMap.values()].sort(
@@ -153,6 +190,21 @@ function safeProgramFiles(
         pathIsWithin(file.path, rootPath) &&
         !isExcludedPath(file.path) &&
         !isSensitivePath(file.path)
+    );
+}
+
+function safeProgramFolders(
+  program: DashboardProgram,
+  rootPath: string
+): string[] {
+  return [...new Set(program.folderPaths ?? [])]
+    .map(normalizeVaultPath)
+    .filter(
+      (path) =>
+        path !== rootPath &&
+        pathIsWithin(path, rootPath) &&
+        !isExcludedPath(path) &&
+        !isSensitivePath(path)
     );
 }
 

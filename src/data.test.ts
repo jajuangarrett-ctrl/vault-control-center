@@ -14,6 +14,7 @@ import {
 
 const SETTINGS: DashboardDataSettings = {
   programsFolder: "Programs",
+  areasFolder: "03 Areas",
   peopleFolder: "People/Agenda",
   aiFolders: {
     emailQueue: "Operations/Email Queue",
@@ -200,15 +201,150 @@ describe("buildDashboardData", () => {
     );
   });
 
+  it("groups every safe top-level Areas folder with its full nested inventory", async () => {
+    const studentSupportFiles = Array.from({ length: 15 }, (_, index) =>
+      file(
+        `03 Areas/Student-Support/Department-Meetings/Record ${String(index + 1).padStart(2, "0")}.md`,
+        index + 1
+      )
+    );
+    const files = [
+      ...studentSupportFiles,
+      file("03 Areas/03 Areas.md", 110),
+      file("03 Areas/Student-Support/Overview.md", 100),
+      file("03 Areas/How-To/Obsidian/Guide.md", 90),
+      file("03 Areas/How-To/Claude Code/Deep/Reference.pdf", 80),
+      file("03 Areas/Reference/Job-Aids/Payroll.pdf", 70),
+      file("03 Areas/Student-Support/Archived/Old.md", 1_000),
+      file("03 Areas/Student-Support/Passwords/Account.md", 990),
+      file("03 Areas/Passwords/Dashboard.md", 980),
+      file("03 Areas/.private/Hidden.md", 970),
+      file("03 Areas Archive/How-To/Outside.md", 960),
+      file("03 Areas/Student-Support/Image.png", 950),
+    ];
+
+    const data = await buildDashboardData(fakeApp(files, {}), SETTINGS);
+
+    expect(data.areasRoot).toMatchObject({
+      name: "All Areas",
+      path: "03 Areas",
+      count: 20,
+    });
+    expect(data.areasRoot.files).toHaveLength(20);
+    expect(data.areasRoot.files[0].path).toBe("03 Areas/03 Areas.md");
+    expect(data.areasRoot.files.every((entry) => entry.category === "areas")).toBe(
+      true
+    );
+
+    expect(
+      data.areas.map(({ name, path, count }) => ({ name, path, count }))
+    ).toEqual([
+      {
+        name: "Student-Support",
+        path: "03 Areas/Student-Support",
+        count: 16,
+      },
+      { name: "How-To", path: "03 Areas/How-To", count: 2 },
+      { name: "Reference", path: "03 Areas/Reference", count: 1 },
+    ]);
+
+    const studentSupport = data.areas.find(
+      (area) => area.path === "03 Areas/Student-Support"
+    );
+    expect(studentSupport?.files).toHaveLength(16);
+    expect(studentSupport?.files[0].path).toBe(
+      "03 Areas/Student-Support/Overview.md"
+    );
+    expect(studentSupport?.files.every((entry) => entry.category === "areas")).toBe(
+      true
+    );
+    expect(JSON.stringify({ root: data.areasRoot, areas: data.areas })).not.toMatch(
+      /Archived|Passwords|\.private|Areas Archive|Image\.png/
+    );
+    expect(data.sources.areasFolder).toEqual({
+      path: "03 Areas",
+      status: "available",
+    });
+  });
+
+  it("does not cap the number of top-level Areas folders", async () => {
+    const files = Array.from({ length: 20 }, (_, index) =>
+      file(
+        `03 Areas/Area ${String(index + 1).padStart(2, "0")}/Overview.md`,
+        index + 1
+      )
+    );
+
+    const data = await buildDashboardData(fakeApp(files, {}), SETTINGS);
+
+    expect(data.areas).toHaveLength(20);
+    expect(data.areas.map((area) => area.name)).toEqual(
+      Array.from(
+        { length: 20 },
+        (_, index) => `Area ${String(index + 1).padStart(2, "0")}`
+      )
+    );
+    expect(data.areasRoot.count).toBe(20);
+  });
+
+  it("indexes safe empty Areas folders even when they contain no files", async () => {
+    const data = await buildDashboardData(
+      fakeApp(
+        [file("03 Areas/Student-Support/Overview.md", 100)],
+        {},
+        true,
+        [
+          "03 Areas",
+          "03 Areas/Empty Area",
+          "03 Areas/Empty Area/Planning",
+          "03 Areas/Student-Support",
+          "03 Areas/Student-Support/Empty Branch",
+          "03 Areas/Student-Support/Empty Branch/Next Level",
+          "03 Areas/Passwords/Empty",
+          "03 Areas/Student-Support/Archived/Empty",
+          "03 Areas Archive/Outside",
+        ]
+      ),
+      SETTINGS
+    );
+
+    expect(data.areas.map(({ name, count }) => ({ name, count }))).toEqual([
+      { name: "Student-Support", count: 1 },
+      { name: "Empty Area", count: 0 },
+    ]);
+    expect(data.areasRoot.folderPaths).toEqual([
+      "03 Areas/Empty Area",
+      "03 Areas/Empty Area/Planning",
+      "03 Areas/Student-Support",
+      "03 Areas/Student-Support/Empty Branch",
+      "03 Areas/Student-Support/Empty Branch/Next Level",
+    ]);
+    expect(
+      data.areas.find((area) => area.name === "Empty Area")?.folderPaths
+    ).toEqual([
+      "03 Areas/Empty Area",
+      "03 Areas/Empty Area/Planning",
+    ]);
+  });
+
   it("returns empty data and source states when configured paths are missing", async () => {
     const app = fakeApp([], {}, false);
     const data = await buildDashboardData(app, SETTINGS);
 
     expect(data.programs).toEqual([]);
+    expect(data.areas).toEqual([]);
+    expect(data.areasRoot).toEqual({
+      name: "All Areas",
+      path: "03 Areas",
+      count: 0,
+      files: [],
+      folderPaths: [],
+    });
     expect(data.recent).toEqual([]);
     expect(data.bookmarks).toEqual([]);
     expect(data.tasks.total).toBe(0);
     expect(data.sources.programsFolder.status).toBe("missing");
+    expect(data.sources.areasFolder.status).toBe("missing");
     expect(data.sources.bookmarks.status).toBe("missing");
   });
 
@@ -238,12 +374,21 @@ function file(path: string, mtime: number): TFile {
 function fakeApp(
   files: TFile[],
   contents: Record<string, string>,
-  foldersExist = true
+  foldersExist = true,
+  folderPaths: string[] = []
 ): App {
   return {
     vault: {
       configDir: ".config",
       getFiles: () => files,
+      getAllLoadedFiles: () => [
+        ...folderPaths.map((path) => ({
+          path,
+          name: path.split("/").at(-1) ?? path,
+          children: [],
+        })),
+        ...files,
+      ],
       cachedRead: async (target: TFile) => contents[target.path] ?? "",
       adapter: {
         exists: async (path: string) =>

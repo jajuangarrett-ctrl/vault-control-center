@@ -2,6 +2,7 @@ export const DASHBOARD_VIEW_TYPE = "fjg-vault-control-center";
 
 export const ROUTES = [
   "home",
+  "areas",
   "programs",
   "ai-team",
   "recent",
@@ -19,6 +20,7 @@ export interface DashboardSettings {
   schemaVersion: number;
   theme: DashboardTheme;
   applyShellTheme: boolean;
+  areasFolder: string;
   programsFolder: string;
   contactListPath: string;
   peopleFolder: string;
@@ -45,6 +47,7 @@ export interface RouteDefinition {
 
 export const ROUTE_DEFINITIONS: readonly RouteDefinition[] = [
   { id: "home", label: "Home", icon: "home" },
+  { id: "areas", label: "Areas", icon: "folders" },
   { id: "programs", label: "Programs", icon: "folder" },
   { id: "ai-team", label: "AI Team", icon: "bot" },
   { id: "recent", label: "Recent", icon: "clock-3" },
@@ -55,9 +58,10 @@ export const ROUTE_DEFINITIONS: readonly RouteDefinition[] = [
 ] as const;
 
 export const DEFAULT_SETTINGS: DashboardSettings = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   theme: "dark",
   applyShellTheme: true,
+  areasFolder: "03 Areas",
   programsFolder: "Programs",
   contactListPath: "People/Contacts.md",
   peopleFolder: "People/Agenda",
@@ -68,7 +72,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
     ownerInbox: "Operations/Owner Inbox",
     teamInbox: "Operations/Team Inbox",
   },
-  recentRoots: ["Programs", "Operations", "People", "Tasks", "Resources"],
+  recentRoots: ["Programs", "03 Areas", "Operations", "People", "Tasks", "Resources"],
   reuseTaskCaptureConnection: false,
   enableRemoteTaskboard: false,
   taskboardUrl: "",

@@ -8,11 +8,12 @@ Vault Control Center is a native Obsidian dashboard for operating a structured v
 
 ## What it includes
 
-The dashboard keeps eight views in one consistent navy-and-orange interface:
+The dashboard keeps nine views in one consistent navy-and-orange interface:
 
 | View | Purpose |
 | --- | --- |
 | Home | Capture actions, live signals, current programs, recent files, people, and task status |
+| Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with recursive drill-down, breadcrumbs, and native file opening |
 | Programs | Program folders, activity groups, recursive subfolder drill-down, breadcrumbs, and native file opening |
 | AI Team | Four configurable operational queues with live file counts |
 | Recent | Searchable recent activity with category filters |
@@ -50,6 +51,7 @@ Vault Control Center requires Obsidian 1.12.7 or newer and is not desktop-only.
 
 Open **Settings → Community plugins → Vault Control Center** and configure the vault-relative paths for:
 
+- Areas
 - Programs
 - People agendas and contacts
 - Tasks

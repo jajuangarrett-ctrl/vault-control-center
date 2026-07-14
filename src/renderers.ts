@@ -5,6 +5,7 @@ import type {
   DashboardData,
   DashboardFileCategory,
   DashboardFileItem,
+  DashboardFolderRoot,
   DashboardProgram,
 } from "./data";
 import {
@@ -35,6 +36,8 @@ export type BookmarkFilter = "all" | DashboardBookmark["type"];
 
 export interface DashboardRenderState {
   query: string;
+  selectedAreaPath: string;
+  selectedAreaFolderPath: string;
   selectedProgramPath: string;
   selectedProgramFolderPath: string;
   selectedAiQueue: AiFolderKey;
@@ -52,6 +55,8 @@ export interface DashboardRenderContext {
   openBookmark: (bookmark: DashboardBookmark) => void;
   openExternal: (url: string) => void;
   capture: (commandId: string, label: string) => void;
+  selectArea: (path: string) => void;
+  selectAreaFolder: (path: string) => void;
   selectProgram: (path: string) => void;
   selectProgramFolder: (path: string) => void;
   selectAiQueue: (key: AiFolderKey) => void;
@@ -90,6 +95,9 @@ export function renderRoute(
   switch (route) {
     case "home":
       renderHome(view, context);
+      break;
+    case "areas":
+      renderAreas(view, context);
       break;
     case "programs":
       renderPrograms(view, context);
@@ -316,40 +324,91 @@ function renderTaskManagement(parent: HTMLElement, context: DashboardRenderConte
   }
 }
 
+interface FolderCollectionOptions {
+  roots: DashboardFolderRoot[];
+  selectedRootPath: string;
+  selectedFolderPath: string;
+  title: string;
+  article: "a" | "an";
+  singular: string;
+  sourceName: string;
+  listCount?: number;
+  selectRoot: (path: string) => void;
+  selectFolder: (path: string) => void;
+}
+
+function renderAreas(parent: HTMLElement, context: DashboardRenderContext): void {
+  renderFolderCollection(parent, context, {
+    roots: [context.data.areasRoot, ...context.data.areas],
+    selectedRootPath: context.state.selectedAreaPath,
+    selectedFolderPath: context.state.selectedAreaFolderPath,
+    title: "Areas",
+    article: "an",
+    singular: "area",
+    sourceName: "Areas",
+    listCount: context.data.areas.length,
+    selectRoot: context.selectArea,
+    selectFolder: context.selectAreaFolder,
+  });
+}
+
 function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): void {
-  const matches = context.data.programs.filter((program) =>
-    programMatchesNavigationQuery(program, context.state.query)
+  renderFolderCollection(parent, context, {
+    roots: context.data.programs,
+    selectedRootPath: context.state.selectedProgramPath,
+    selectedFolderPath: context.state.selectedProgramFolderPath,
+    title: "Programs",
+    article: "a",
+    singular: "program",
+    sourceName: "Programs",
+    selectRoot: context.selectProgram,
+    selectFolder: context.selectProgramFolder,
+  });
+}
+
+function renderFolderCollection(
+  parent: HTMLElement,
+  context: DashboardRenderContext,
+  options: FolderCollectionOptions
+): void {
+  const matches = options.roots.filter((root) =>
+    programMatchesNavigationQuery(root, context.state.query)
   );
   const selected =
-    matches.find((program) => program.path === context.state.selectedProgramPath) ?? matches[0];
+    matches.find((root) => root.path === options.selectedRootPath) ?? matches[0];
   const layout = parent.createDiv({ cls: "fjg-vcc-page-layout fjg-vcc-program-layout" });
-  const listPanel = createPanel(layout, `Programs · ${matches.length}`);
+  const listPanel = createPanel(layout, `${options.title} · ${options.listCount ?? matches.length}`);
 
   if (!matches.length) {
-    createEmptyState(listPanel.body, "No programs match", "Clear search or verify the Programs folder.", "folder-search");
+    createEmptyState(
+      listPanel.body,
+      `No ${options.title.toLowerCase()} match`,
+      `Clear search or verify the ${options.sourceName} folder.`,
+      "folder-search"
+    );
   } else {
     const list = listPanel.body.createDiv({ cls: "fjg-vcc-select-list" });
-    for (const program of matches) {
+    for (const root of matches) {
       const row = list.createEl("button", {
-        cls: `fjg-vcc-row fjg-vcc-select-row${program.path === selected?.path ? " is-selected" : ""}`,
-        attr: { type: "button", "aria-pressed": String(program.path === selected?.path) },
+        cls: `fjg-vcc-row fjg-vcc-select-row${root.path === selected?.path ? " is-selected" : ""}`,
+        attr: { type: "button", "aria-pressed": String(root.path === selected?.path) },
       });
       createIcon(row, "folder", "fjg-vcc-row-icon");
       const main = row.createDiv({ cls: "fjg-vcc-row-main" });
-      main.createSpan({ cls: "fjg-vcc-row-title", text: program.name });
-      main.createSpan({ cls: "fjg-vcc-row-meta", text: `${program.count} files` });
-      row.createSpan({ cls: "fjg-vcc-row-end", text: formatRelativeTime(programModifiedAt(program)) });
-      row.addEventListener("click", () => context.selectProgram(program.path));
+      main.createSpan({ cls: "fjg-vcc-row-title", text: root.name });
+      main.createSpan({ cls: "fjg-vcc-row-meta", text: `${root.count} files` });
+      row.createSpan({ cls: "fjg-vcc-row-end", text: formatRelativeTime(programModifiedAt(root)) });
+      row.addEventListener("click", () => options.selectRoot(root.path));
     }
   }
 
   const folderView = selected
     ? buildProgramFolderView(
         selected,
-        context.state.selectedProgramFolderPath || selected.path
+        options.selectedFolderPath || selected.path
       )
     : null;
-  const detail = createPanel(layout, selected?.name ?? "Program detail", {
+  const detail = createPanel(layout, selected?.name ?? `${options.title} detail`, {
     actionLabel: folderView?.latestFile ? "Open latest" : undefined,
     actionIcon: "file-up",
     onAction: folderView?.latestFile
@@ -357,7 +416,12 @@ function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): v
       : undefined,
   });
   if (!selected || !folderView) {
-    createEmptyState(detail.body, "Choose a program", "Select a program to inspect its files.", "folder-open");
+    createEmptyState(
+      detail.body,
+      `Choose ${options.article} ${options.singular}`,
+      `Select ${options.article} ${options.singular} to inspect its files.`,
+      "folder-open"
+    );
     return;
   }
 
@@ -369,7 +433,7 @@ function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): v
     text:
       folderView.path === selected.path
         ? `Latest activity ${formatRelativeTime(folderView.latestModifiedAt)}`
-        : `${selected.count} in program · Latest activity ${formatRelativeTime(folderView.latestModifiedAt)}`,
+        : `${selected.count} in ${selected.name} · Latest activity ${formatRelativeTime(folderView.latestModifiedAt)}`,
   });
 
   const browser = detail.body.createDiv({ cls: "fjg-vcc-program-browser" });
@@ -380,12 +444,12 @@ function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): v
       icon: "arrow-up",
       className: "fjg-vcc-folder-up",
       ariaLabel: `Go up from ${folderView.name}`,
-      onClick: () => context.selectProgramFolder(folderView.parentPath ?? selected.path),
+      onClick: () => options.selectFolder(folderView.parentPath ?? selected.path),
     });
   }
   const breadcrumbs = toolbar.createEl("nav", {
     cls: "fjg-vcc-folder-breadcrumbs",
-    attr: { "aria-label": "Program folder path" },
+    attr: { "aria-label": `${options.title} folder path` },
   });
   for (const [index, breadcrumb] of folderView.breadcrumbs.entries()) {
     if (index > 0) {
@@ -406,7 +470,7 @@ function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): v
       createButton(breadcrumbs, {
         label: breadcrumb.name,
         className: "fjg-vcc-folder-crumb",
-        onClick: () => context.selectProgramFolder(breadcrumb.path),
+        onClick: () => options.selectFolder(breadcrumb.path),
       });
     }
   }
@@ -441,7 +505,7 @@ function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): v
       createIcon(button, "folder-closed");
       button.createSpan({ cls: "fjg-vcc-folder-name", text: folder.name });
       button.createSpan({ cls: "fjg-vcc-folder-count", text: String(folder.count) });
-      button.addEventListener("click", () => context.selectProgramFolder(folder.path));
+      button.addEventListener("click", () => options.selectFolder(folder.path));
     }
   }
 
@@ -626,6 +690,7 @@ function renderSettings(parent: HTMLElement, context: DashboardRenderContext): v
     onClick: context.openNativeSettings,
   });
   const sourceList = sources.createDiv({ cls: "fjg-vcc-source-list" });
+  renderSourceRow(sourceList, "Areas", context.data.sources.areasFolder.path, context.data.sources.areasFolder.status);
   renderSourceRow(sourceList, "Programs", context.data.sources.programsFolder.path, context.data.sources.programsFolder.status);
   renderSourceRow(sourceList, "People", context.data.sources.peopleFolder.path, context.data.sources.peopleFolder.status);
   for (const key of AI_QUEUE_ORDER) {
@@ -726,7 +791,7 @@ function fileMatches(file: DashboardFileItem, query: string): boolean {
   return matchesQuery(query, file.title, file.path, file.extension, file.category);
 }
 
-function programModifiedAt(program: DashboardProgram): number {
+function programModifiedAt(program: DashboardFolderRoot): number {
   return program.files.reduce((latest, file) => Math.max(latest, file.modifiedAt), 0);
 }
 

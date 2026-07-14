@@ -69,6 +69,7 @@ export default class VaultControlCenterPlugin extends Plugin {
       schemaVersion: DEFAULT_SETTINGS.schemaVersion,
       theme: saved.theme === "light" ? "light" : "dark",
       applyShellTheme: booleanSetting(saved.applyShellTheme, DEFAULT_SETTINGS.applyShellTheme),
+      areasFolder: stringSetting(saved.areasFolder, DEFAULT_SETTINGS.areasFolder),
       programsFolder: stringSetting(saved.programsFolder, DEFAULT_SETTINGS.programsFolder),
       contactListPath: stringSetting(saved.contactListPath, DEFAULT_SETTINGS.contactListPath),
       peopleFolder: stringSetting(saved.peopleFolder, DEFAULT_SETTINGS.peopleFolder),

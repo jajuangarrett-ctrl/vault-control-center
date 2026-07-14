@@ -7,8 +7,8 @@ Vault Control Center is an operational workspace, not a marketing dashboard. Its
 1. Put capture and current work above the fold.
 2. Prefer dense rows and grouped work regions over decorative cards.
 3. Use orange as a signal, never as a background wash.
-4. Keep navigation stable across all eight routes.
-5. Make every visible count, file, person, and program actionable.
+4. Keep navigation stable across all nine routes.
+5. Make every visible count, file, person, area, and program actionable.
 6. Read live vault state at runtime; never bundle personal vault data.
 
 ## Reference concepts
@@ -51,9 +51,9 @@ Orange appears on the active route, the signal rail, capture emphasis, selected 
 The plugin renders one native `ItemView` with four persistent layers:
 
 1. Header: title, search, refresh, and theme toggle.
-2. Route strip: Home, Programs, AI Team, Recent, Bookmarks, People, Clipboard, Settings.
+2. Route strip: Home, Areas, Programs, AI Team, Recent, Bookmarks, People, Clipboard, Settings.
 3. Route content: live, replaceable work region.
-4. Mobile action dock: Home, Programs, Capture, Recent, More.
+4. Mobile action dock: Home, Areas, Programs, Capture, Recent, More.
 
 The Home route adds three stacked operational bands:
 
@@ -70,7 +70,7 @@ The orange signal rail is the signature visual element. It should remain visible
 - `Signal`: icon, label, live value, optional attention dot.
 - `WorkPanel`: section label, optional action, bordered row region.
 - `FileRow`: file icon, basename, compact path, relative modified time.
-- `ProgramRow`: name, file count, modified time, open action.
+- `FolderRootRow`: area or program name, file count, modified time, open action.
 - `PersonRow`: initials, name, agenda count, modified time.
 - `FilterChip`: compact filter with selected state.
 - `EmptyState`: useful explanation and the next available action.
@@ -81,7 +81,7 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 ## Interaction rules
 
 - Clicking a file opens it in an Obsidian leaf.
-- Clicking a folder or program opens its route detail, then offers native file actions.
+- Clicking an area, program, or folder opens its route detail, then offers native file actions.
 - `/` focuses dashboard search when the view is active.
 - Search filters the current route without leaving the keyboard.
 - Refresh immediately rebuilds the live index and reports completion.
@@ -119,7 +119,7 @@ The plugin may coordinate Obsidian chrome only while its explicit body class is 
 - Search vault
 - Refresh
 - Dark mode / Light mode
-- Eight route labels
+- Nine route labels
 - Thought, Email, Agenda item, Program update
 - Programs, AI queues, Agenda files, Open tasks
 - Current work, Latest files, People radar

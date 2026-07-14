@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 — 2026-07-14
+
+- Added an Areas route between Home and Programs with a configurable vault-relative source.
+- Indexed safe folders explicitly so empty Areas folders remain visible and navigable.
+- Indexed every safe, supported file under Areas, including files stored directly at the root and files nested at any depth.
+- Added top-level Area selection plus recursive folder drill-down, breadcrumbs, Up navigation, search, and native file opening.
+
 ## 0.1.1 — 2026-07-14
 
 - Fixed Program subfolder controls so they drill down inside the dashboard instead of opening an arbitrary descendant file.
