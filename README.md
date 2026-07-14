@@ -13,7 +13,7 @@ The dashboard keeps eight views in one consistent navy-and-orange interface:
 | View | Purpose |
 | --- | --- |
 | Home | Capture actions, live signals, current programs, recent files, people, and task status |
-| Programs | Program folders, activity groups, recent files, and quick folder access |
+| Programs | Program folders, activity groups, recursive subfolder drill-down, breadcrumbs, and native file opening |
 | AI Team | Four configurable operational queues with live file counts |
 | Recent | Searchable recent activity with category filters |
 | Bookmarks | Filtered Obsidian bookmarks; vault targets open natively and HTTP(S) links open externally |

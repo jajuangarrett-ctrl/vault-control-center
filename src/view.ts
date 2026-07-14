@@ -11,12 +11,14 @@ import {
   buildDashboardData,
   isExcludedPath,
   isSensitivePath,
+  pathIsWithin,
   type AiFolderKey,
   type DashboardBookmark,
   type DashboardData,
 } from "./data";
 import { createButton, createIcon } from "./dom";
 import type VaultControlCenterPlugin from "./plugin";
+import { resolveProgramFolderPath } from "./program-navigation";
 import {
   copyText,
   renderRoute,
@@ -40,6 +42,7 @@ import {
 interface PersistedViewState {
   route?: unknown;
   selectedProgramPath?: unknown;
+  selectedProgramFolderPath?: unknown;
   selectedAiQueue?: unknown;
   recentFilter?: unknown;
   bookmarkFilter?: unknown;
@@ -74,6 +77,7 @@ export class VaultControlCenterView extends ItemView {
   private renderState: DashboardRenderState = {
     query: "",
     selectedProgramPath: "",
+    selectedProgramFolderPath: "",
     selectedAiQueue: "emailQueue",
     recentFilter: "all",
     bookmarkFilter: "all",
@@ -132,6 +136,7 @@ export class VaultControlCenterView extends ItemView {
       ...super.getState(),
       route: this.route,
       selectedProgramPath: this.renderState.selectedProgramPath,
+      selectedProgramFolderPath: this.renderState.selectedProgramFolderPath,
       selectedAiQueue: this.renderState.selectedAiQueue,
       recentFilter: this.renderState.recentFilter,
       bookmarkFilter: this.renderState.bookmarkFilter,
@@ -146,6 +151,9 @@ export class VaultControlCenterView extends ItemView {
     }
     if (typeof saved.selectedProgramPath === "string") {
       this.renderState.selectedProgramPath = saved.selectedProgramPath;
+    }
+    if (typeof saved.selectedProgramFolderPath === "string") {
+      this.renderState.selectedProgramFolderPath = saved.selectedProgramFolderPath;
     }
     const savedAiQueue = saved.selectedAiQueue;
     if (typeof savedAiQueue === "string" && AI_QUEUE_KEYS.includes(savedAiQueue as AiFolderKey)) {
@@ -202,9 +210,17 @@ export class VaultControlCenterView extends ItemView {
         this.taskboardFetchedAt = Date.now();
         this.taskboardSettingsKey = taskboardSettingsKey;
       }
-      if (!this.renderState.selectedProgramPath && data.programs[0]) {
-        this.renderState.selectedProgramPath = data.programs[0].path;
-      }
+      const selectedProgram =
+        data.programs.find(
+          (program) => program.path === this.renderState.selectedProgramPath
+        ) ?? data.programs[0];
+      this.renderState.selectedProgramPath = selectedProgram?.path ?? "";
+      this.renderState.selectedProgramFolderPath = selectedProgram
+        ? resolveProgramFolderPath(
+            selectedProgram,
+            this.renderState.selectedProgramFolderPath || selectedProgram.path
+          )
+        : "";
       this.renderContent();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Dashboard refresh failed.";
@@ -366,7 +382,22 @@ export class VaultControlCenterView extends ItemView {
       capture: (commandId, label) => this.plugin.executeCapture(commandId, label),
       selectProgram: (path) => {
         this.renderState.selectedProgramPath = path;
+        this.renderState.selectedProgramFolderPath = path;
         this.renderContent();
+        this.focusProgramFolderHeading();
+      },
+      selectProgramFolder: (path) => {
+        const program = this.data?.programs.find((candidate) =>
+          pathIsWithin(path, candidate.path)
+        );
+        if (!program) return;
+        this.renderState.selectedProgramPath = program.path;
+        this.renderState.selectedProgramFolderPath = resolveProgramFolderPath(
+          program,
+          path
+        );
+        this.renderContent();
+        this.focusProgramFolderHeading();
       },
       selectAiQueue: (key) => {
         this.renderState.selectedAiQueue = key;
@@ -396,6 +427,14 @@ export class VaultControlCenterView extends ItemView {
     this.renderMobileDock();
     this.renderContent();
     this.contentRegionEl?.scrollTo({ top: 0 });
+  }
+
+  private focusProgramFolderHeading(): void {
+    window.setTimeout(() => {
+      this.contentRegionEl
+        ?.querySelector<HTMLElement>(".fjg-vcc-folder-heading")
+        ?.focus({ preventScroll: true });
+    }, 0);
   }
 
   private renderLoading(): void {

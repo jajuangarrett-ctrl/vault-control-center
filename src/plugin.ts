@@ -1,4 +1,5 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
+import { isExcludedPath, isSensitivePath, normalizeVaultPath } from "./data";
 import { VaultControlCenterSettingTab } from "./settings";
 import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
@@ -171,7 +172,16 @@ export default class VaultControlCenterPlugin extends Plugin {
   }
 
   async openVaultFile(path: string): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+    const normalizedPath = normalizeVaultPath(path);
+    if (
+      !normalizedPath ||
+      isExcludedPath(normalizedPath) ||
+      isSensitivePath(normalizedPath)
+    ) {
+      new Notice("That file is not available from the dashboard.");
+      return;
+    }
+    const file = this.app.vault.getAbstractFileByPath(normalizePath(normalizedPath));
     if (!(file instanceof TFile)) {
       new Notice("That file is no longer available.");
       return;

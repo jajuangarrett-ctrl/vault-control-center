@@ -1,0 +1,161 @@
+import {
+  isExcludedPath,
+  isSensitivePath,
+  normalizeVaultPath,
+  pathIsWithin,
+  type DashboardFileItem,
+  type DashboardProgram,
+} from "./data";
+
+export interface ProgramFolderBreadcrumb {
+  name: string;
+  path: string;
+}
+
+export interface ProgramFolderSummary {
+  name: string;
+  path: string;
+  count: number;
+  latestModifiedAt: number;
+}
+
+export interface ProgramFolderView {
+  rootPath: string;
+  path: string;
+  name: string;
+  parentPath: string | null;
+  breadcrumbs: ProgramFolderBreadcrumb[];
+  folders: ProgramFolderSummary[];
+  files: DashboardFileItem[];
+  count: number;
+  latestModifiedAt: number;
+  latestFile: DashboardFileItem | null;
+}
+
+/**
+ * Resolves a persisted or requested folder to the nearest folder that still
+ * exists inside the selected program. Unknown and cross-program paths always
+ * fall back to the program root.
+ */
+export function resolveProgramFolderPath(
+  program: DashboardProgram,
+  candidatePath: string
+): string {
+  const rootPath = normalizeVaultPath(program.path);
+  const safeFiles = safeProgramFiles(program, rootPath);
+  let currentPath = normalizeVaultPath(candidatePath) || rootPath;
+
+  if (!pathIsWithin(currentPath, rootPath)) return rootPath;
+
+  while (currentPath !== rootPath) {
+    if (safeFiles.some((file) => file.path.startsWith(`${currentPath}/`))) {
+      return currentPath;
+    }
+    const parentPath = parentFolderPath(currentPath);
+    if (!parentPath || !pathIsWithin(parentPath, rootPath)) return rootPath;
+    currentPath = parentPath;
+  }
+
+  return rootPath;
+}
+
+/** Builds the immediate folder/file view for one level of a program tree. */
+export function buildProgramFolderView(
+  program: DashboardProgram,
+  candidatePath: string
+): ProgramFolderView {
+  const rootPath = normalizeVaultPath(program.path);
+  const path = resolveProgramFolderPath(program, candidatePath);
+  const safeFiles = safeProgramFiles(program, rootPath);
+  const descendantFiles = sortFiles(
+    safeFiles.filter((file) => file.path.startsWith(`${path}/`))
+  );
+  const files = descendantFiles.filter((file) => parentFolderPath(file.path) === path);
+  const folderMap = new Map<string, ProgramFolderSummary>();
+
+  for (const file of descendantFiles) {
+    const relativePath = file.path.slice(path.length + 1);
+    const slashIndex = relativePath.indexOf("/");
+    if (slashIndex < 1) continue;
+
+    const name = relativePath.slice(0, slashIndex);
+    const childPath = `${path}/${name}`;
+    const existing = folderMap.get(childPath);
+    folderMap.set(childPath, {
+      name,
+      path: childPath,
+      count: (existing?.count ?? 0) + 1,
+      latestModifiedAt: Math.max(existing?.latestModifiedAt ?? 0, file.modifiedAt),
+    });
+  }
+
+  const folders = [...folderMap.values()].sort(
+    (left, right) => right.count - left.count || left.name.localeCompare(right.name)
+  );
+  const latestFile = descendantFiles[0] ?? null;
+
+  return {
+    rootPath,
+    path,
+    name: path === rootPath ? program.name : lastPathSegment(path),
+    parentPath: path === rootPath ? null : parentFolderPath(path),
+    breadcrumbs: folderBreadcrumbs(program, rootPath, path),
+    folders,
+    files,
+    count: descendantFiles.length,
+    latestModifiedAt: latestFile?.modifiedAt ?? 0,
+    latestFile,
+  };
+}
+
+function safeProgramFiles(
+  program: DashboardProgram,
+  rootPath: string
+): DashboardFileItem[] {
+  return program.files
+    .map((file) => ({ ...file, path: normalizeVaultPath(file.path) }))
+    .filter(
+      (file) =>
+        file.path !== rootPath &&
+        pathIsWithin(file.path, rootPath) &&
+        !isExcludedPath(file.path) &&
+        !isSensitivePath(file.path)
+    );
+}
+
+function folderBreadcrumbs(
+  program: DashboardProgram,
+  rootPath: string,
+  currentPath: string
+): ProgramFolderBreadcrumb[] {
+  const breadcrumbs: ProgramFolderBreadcrumb[] = [
+    { name: program.name || lastPathSegment(rootPath), path: rootPath },
+  ];
+  const relativePath = currentPath.slice(rootPath.length).replace(/^\/+/, "");
+  if (!relativePath) return breadcrumbs;
+
+  let path = rootPath;
+  for (const name of relativePath.split("/").filter(Boolean)) {
+    path = `${path}/${name}`;
+    breadcrumbs.push({ name, path });
+  }
+  return breadcrumbs;
+}
+
+function parentFolderPath(path: string): string | null {
+  const normalizedPath = normalizeVaultPath(path);
+  const slashIndex = normalizedPath.lastIndexOf("/");
+  return slashIndex > 0 ? normalizedPath.slice(0, slashIndex) : null;
+}
+
+function lastPathSegment(path: string): string {
+  const normalizedPath = normalizeVaultPath(path);
+  return normalizedPath.slice(normalizedPath.lastIndexOf("/") + 1);
+}
+
+function sortFiles(files: DashboardFileItem[]): DashboardFileItem[] {
+  return [...files].sort(
+    (left, right) =>
+      right.modifiedAt - left.modifiedAt || left.path.localeCompare(right.path)
+  );
+}

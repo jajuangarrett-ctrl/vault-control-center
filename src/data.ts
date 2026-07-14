@@ -18,7 +18,6 @@ export interface DashboardDataSettings {
 }
 
 export interface DashboardDataLimits {
-  programFiles: number;
   queueFiles: number;
   peopleFiles: number;
   recentFiles: number;
@@ -158,7 +157,6 @@ export const DEFAULT_DASHBOARD_DATA_SETTINGS: DashboardDataSettings = {
 };
 
 export const DEFAULT_DASHBOARD_DATA_LIMITS: DashboardDataLimits = {
-  programFiles: 12,
   queueFiles: 12,
   peopleFiles: 18,
   recentFiles: 30,
@@ -388,7 +386,7 @@ export async function buildDashboardData(
         name,
         path: `${normalizedSettings.programsFolder}/${name}`,
         count: sorted.length,
-        files: sorted.slice(0, limits.programFiles),
+        files: sorted,
       };
     })
     .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
@@ -506,7 +504,6 @@ function normalizeLimits(
   limits: Partial<DashboardDataLimits> | undefined
 ): DashboardDataLimits {
   return {
-    programFiles: positiveLimit(limits?.programFiles, DEFAULT_DASHBOARD_DATA_LIMITS.programFiles),
     queueFiles: positiveLimit(limits?.queueFiles, DEFAULT_DASHBOARD_DATA_LIMITS.queueFiles),
     peopleFiles: positiveLimit(limits?.peopleFiles, DEFAULT_DASHBOARD_DATA_LIMITS.peopleFiles),
     recentFiles: positiveLimit(limits?.recentFiles, DEFAULT_DASHBOARD_DATA_LIMITS.recentFiles),

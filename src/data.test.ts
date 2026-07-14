@@ -179,6 +179,27 @@ describe("buildDashboardData", () => {
     });
   });
 
+  it("retains every safe program file for recursive folder navigation", async () => {
+    const files = Array.from({ length: 15 }, (_, index) =>
+      file(
+        `Programs/Alpha/Reporting/Record ${String(index + 1).padStart(2, "0")}.md`,
+        index + 1
+      )
+    );
+    files.push(file("Programs/Alpha/Overview.md", 100));
+    files.push(file("Programs/Alpha/Archived/Old.md", 1_000));
+
+    const data = await buildDashboardData(fakeApp(files, {}), SETTINGS);
+
+    expect(data.programs).toHaveLength(1);
+    expect(data.programs[0].count).toBe(16);
+    expect(data.programs[0].files).toHaveLength(16);
+    expect(data.programs[0].files[0].path).toBe("Programs/Alpha/Overview.md");
+    expect(data.programs[0].files.map((entry) => entry.path)).not.toContain(
+      "Programs/Alpha/Archived/Old.md"
+    );
+  });
+
   it("returns empty data and source states when configured paths are missing", async () => {
     const app = fakeApp([], {}, false);
     const data = await buildDashboardData(app, SETTINGS);
