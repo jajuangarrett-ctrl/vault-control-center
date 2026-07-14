@@ -167,6 +167,7 @@ export class VaultControlCenterView extends ItemView {
     }
 
     if (this.rootEl) {
+      this.canonicalizeProgramSelection();
       this.renderRouteTabs();
       this.renderContent();
       this.renderMobileDock();
@@ -210,17 +211,7 @@ export class VaultControlCenterView extends ItemView {
         this.taskboardFetchedAt = Date.now();
         this.taskboardSettingsKey = taskboardSettingsKey;
       }
-      const selectedProgram =
-        data.programs.find(
-          (program) => program.path === this.renderState.selectedProgramPath
-        ) ?? data.programs[0];
-      this.renderState.selectedProgramPath = selectedProgram?.path ?? "";
-      this.renderState.selectedProgramFolderPath = selectedProgram
-        ? resolveProgramFolderPath(
-            selectedProgram,
-            this.renderState.selectedProgramFolderPath || selectedProgram.path
-          )
-        : "";
+      this.canonicalizeProgramSelection();
       this.renderContent();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Dashboard refresh failed.";
@@ -255,7 +246,16 @@ export class VaultControlCenterView extends ItemView {
     });
     this.searchInputEl.value = this.renderState.query;
     this.searchInputEl.addEventListener("input", () => {
+      const previousQuery = this.renderState.query;
       this.renderState.query = this.searchInputEl?.value ?? "";
+      if (
+        this.route === "programs" &&
+        !previousQuery.trim() &&
+        this.renderState.query.trim()
+      ) {
+        this.renderState.selectedProgramFolderPath =
+          this.renderState.selectedProgramPath;
+      }
       this.renderContent();
     });
 
@@ -366,6 +366,21 @@ export class VaultControlCenterView extends ItemView {
       return;
     }
     renderRoute(this.route, this.contentRegionEl, this.renderContext());
+  }
+
+  private canonicalizeProgramSelection(): void {
+    if (!this.data) return;
+    const selectedProgram =
+      this.data.programs.find(
+        (program) => program.path === this.renderState.selectedProgramPath
+      ) ?? this.data.programs[0];
+    this.renderState.selectedProgramPath = selectedProgram?.path ?? "";
+    this.renderState.selectedProgramFolderPath = selectedProgram
+      ? resolveProgramFolderPath(
+          selectedProgram,
+          this.renderState.selectedProgramFolderPath || selectedProgram.path
+        )
+      : "";
   }
 
   private renderContext(): DashboardRenderContext {

@@ -32,6 +32,39 @@ export interface ProgramFolderView {
   latestFile: DashboardFileItem | null;
 }
 
+export function programMatchesNavigationQuery(
+  program: DashboardProgram,
+  query: string
+): boolean {
+  const normalizedQuery = normalizeQuery(query);
+  if (!normalizedQuery) return true;
+  if (valuesMatch(normalizedQuery, program.name, program.path, program.count)) {
+    return true;
+  }
+  const rootPath = normalizeVaultPath(program.path);
+  return safeProgramFiles(program, rootPath).some((file) =>
+    fileMatchesQuery(file, normalizedQuery)
+  );
+}
+
+export function programFolderMatchesNavigationQuery(
+  program: DashboardProgram,
+  folder: ProgramFolderSummary,
+  query: string
+): boolean {
+  const normalizedQuery = normalizeQuery(query);
+  if (!normalizedQuery) return true;
+  if (valuesMatch(normalizedQuery, folder.name, folder.path, folder.count)) {
+    return true;
+  }
+  const rootPath = normalizeVaultPath(program.path);
+  return safeProgramFiles(program, rootPath).some(
+    (file) =>
+      pathIsWithin(file.path, folder.path) &&
+      fileMatchesQuery(file, normalizedQuery)
+  );
+}
+
 /**
  * Resolves a persisted or requested folder to the nearest folder that still
  * exists inside the selected program. Unknown and cross-program paths always
@@ -158,4 +191,30 @@ function sortFiles(files: DashboardFileItem[]): DashboardFileItem[] {
     (left, right) =>
       right.modifiedAt - left.modifiedAt || left.path.localeCompare(right.path)
   );
+}
+
+function fileMatchesQuery(
+  file: DashboardFileItem,
+  normalizedQuery: string
+): boolean {
+  return valuesMatch(
+    normalizedQuery,
+    file.title,
+    file.path,
+    file.extension,
+    file.category
+  );
+}
+
+function valuesMatch(
+  normalizedQuery: string,
+  ...values: Array<string | number>
+): boolean {
+  return values.some((value) =>
+    String(value).toLocaleLowerCase().includes(normalizedQuery)
+  );
+}
+
+function normalizeQuery(query: string): string {
+  return String(query ?? "").trim().toLocaleLowerCase();
 }

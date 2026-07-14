@@ -5,6 +5,8 @@ import type {
 } from "./data";
 import {
   buildProgramFolderView,
+  programFolderMatchesNavigationQuery,
+  programMatchesNavigationQuery,
   resolveProgramFolderPath,
 } from "./program-navigation";
 
@@ -234,6 +236,36 @@ describe("program folder navigation", () => {
     expect(view.files.map((file) => file.path)).toEqual([
       `${PROGRAM_PATH}/Reporting/Quarterly/Q1.md`,
     ]);
+  });
+
+  it("keeps ancestor folders available for safe nested search matches", () => {
+    const program = makeProgram([
+      dashboardFile(
+        `${PROGRAM_PATH}/Reporting/Quarterly/2026/Needle Report.md`,
+        500
+      ),
+      dashboardFile(`${PROGRAM_PATH}/Events/Kickoff.md`, 200),
+      dashboardFile(`${PROGRAM_PATH}/Passwords/Needle Secret.md`, 900),
+    ]);
+    const root = buildProgramFolderView(program, PROGRAM_PATH);
+    const reporting = root.folders.find((folder) => folder.name === "Reporting");
+    const events = root.folders.find((folder) => folder.name === "Events");
+
+    expect(programMatchesNavigationQuery(program, "Needle Report")).toBe(true);
+    expect(programMatchesNavigationQuery(program, "Quarterly")).toBe(true);
+    expect(programMatchesNavigationQuery(program, "Needle Secret")).toBe(false);
+    expect(reporting).toBeDefined();
+    expect(events).toBeDefined();
+    expect(
+      programFolderMatchesNavigationQuery(
+        program,
+        reporting!,
+        "Needle Report"
+      )
+    ).toBe(true);
+    expect(
+      programFolderMatchesNavigationQuery(program, events!, "Needle Report")
+    ).toBe(false);
   });
 });
 

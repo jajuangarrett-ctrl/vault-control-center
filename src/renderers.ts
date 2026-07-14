@@ -16,7 +16,11 @@ import {
   initialsFor,
   matchesQuery,
 } from "./dom";
-import { buildProgramFolderView } from "./program-navigation";
+import {
+  buildProgramFolderView,
+  programFolderMatchesNavigationQuery,
+  programMatchesNavigationQuery,
+} from "./program-navigation";
 import type { TaskboardSnapshot } from "./taskboard";
 import {
   DEFAULT_SETTINGS,
@@ -314,7 +318,7 @@ function renderTaskManagement(parent: HTMLElement, context: DashboardRenderConte
 
 function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): void {
   const matches = context.data.programs.filter((program) =>
-    matchesQuery(context.state.query, program.name, program.path, program.count)
+    programMatchesNavigationQuery(program, context.state.query)
   );
   const selected =
     matches.find((program) => program.path === context.state.selectedProgramPath) ?? matches[0];
@@ -414,7 +418,7 @@ function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): v
   });
 
   const visibleFolders = folderView.folders.filter((folder) =>
-    matchesQuery(context.state.query, folder.name, folder.path, folder.count)
+    programFolderMatchesNavigationQuery(selected, folder, context.state.query)
   );
   const visibleFiles = folderView.files.filter((file) =>
     fileMatches(file, context.state.query)
