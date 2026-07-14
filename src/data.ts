@@ -19,7 +19,6 @@ export interface DashboardDataSettings {
 }
 
 export interface DashboardDataLimits {
-  queueFiles: number;
   peopleFiles: number;
   recentFiles: number;
 }
@@ -65,6 +64,7 @@ export interface DashboardAiQueue {
   key: AiFolderKey;
   label: string;
   path: string;
+  scope: "direct" | "recursive";
   count: number;
   files: DashboardFileItem[];
 }
@@ -138,6 +138,7 @@ export interface DashboardData {
   aiQueues: Record<AiFolderKey, DashboardAiQueue>;
   people: DashboardPeopleData;
   recent: DashboardFileItem[];
+  recentMode: "viewed" | "modified";
   bookmarks: DashboardBookmark[];
   tasks: DashboardTaskCounts;
   sources: DashboardDataSources;
@@ -168,7 +169,6 @@ export const DEFAULT_DASHBOARD_DATA_SETTINGS: DashboardDataSettings = {
 };
 
 export const DEFAULT_DASHBOARD_DATA_LIMITS: DashboardDataLimits = {
-  queueFiles: 12,
   peopleFiles: 18,
   recentFiles: 30,
 };
@@ -455,17 +455,25 @@ export async function buildDashboardData(
   const aiQueues = Object.fromEntries(
     AI_FOLDER_KEYS.map((key) => {
       const path = normalizedSettings.aiFolders[key];
+      const scope = key === "ownerInbox" || key === "teamInbox"
+        ? "direct"
+        : "recursive";
       const files = sortFiles(
         vaultFiles
-          .filter(({ item }) => pathIsWithin(item.path, path))
+          .filter(({ item }) =>
+            scope === "direct"
+              ? pathIsDirectChild(item.path, path)
+              : pathIsWithin(item.path, path)
+          )
           .map(({ item }) => item)
       );
       const queue: DashboardAiQueue = {
         key,
         label: AI_QUEUE_LABELS[key],
         path,
+        scope,
         count: files.length,
-        files: files.slice(0, limits.queueFiles),
+        files,
       };
       return [key, queue];
     })
@@ -484,14 +492,27 @@ export async function buildDashboardData(
     files: peopleFiles.slice(0, limits.peopleFiles),
   };
 
-  const recent = sortFiles(
-    vaultFiles
-      .filter(({ item }) =>
-        normalizedSettings.recentRoots.some((root) =>
-          pathIsWithin(item.path, root)
-        )
+  const recentFilePaths = await readRecentFilePaths(app);
+  const filesByPath = new Map(
+    vaultFiles.map(({ item }) => [normalizeVaultPath(item.path), item])
+  );
+  const recentlyViewed = recentFilePaths
+    .map((path) => filesByPath.get(path))
+    .filter((item): item is DashboardFileItem => Boolean(item));
+  const recentMode: DashboardData["recentMode"] = recentlyViewed.length
+    ? "viewed"
+    : "modified";
+  const recent = (recentMode === "viewed"
+    ? recentlyViewed
+    : sortFiles(
+        vaultFiles
+          .filter(({ item }) =>
+            normalizedSettings.recentRoots.some((root) =>
+              pathIsWithin(item.path, root)
+            )
+          )
+          .map(({ item }) => item)
       )
-      .map(({ item }) => item)
   ).slice(0, limits.recentFiles);
 
   const taskFile = vaultFiles.find(
@@ -543,6 +564,7 @@ export async function buildDashboardData(
     aiQueues,
     people,
     recent,
+    recentMode,
     bookmarks: bookmarksResult.bookmarks.visible,
     tasks: tasksResult.tasks,
     sources: {
@@ -578,7 +600,6 @@ function normalizeLimits(
   limits: Partial<DashboardDataLimits> | undefined
 ): DashboardDataLimits {
   return {
-    queueFiles: positiveLimit(limits?.queueFiles, DEFAULT_DASHBOARD_DATA_LIMITS.queueFiles),
     peopleFiles: positiveLimit(limits?.peopleFiles, DEFAULT_DASHBOARD_DATA_LIMITS.peopleFiles),
     recentFiles: positiveLimit(limits?.recentFiles, DEFAULT_DASHBOARD_DATA_LIMITS.recentFiles),
   };
@@ -669,6 +690,70 @@ function firstDescendantSegment(path: string, root: string): string {
   const normalizedRoot = normalizeVaultPath(root);
   if (!normalizedRoot || !normalizedPath.startsWith(`${normalizedRoot}/`)) return "";
   return normalizedPath.slice(normalizedRoot.length + 1).split("/")[0] ?? "";
+}
+
+function pathIsDirectChild(path: string, root: string): boolean {
+  const normalizedPath = normalizeVaultPath(path);
+  const normalizedRoot = normalizeVaultPath(root);
+  if (!normalizedRoot || !normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    return false;
+  }
+  return !normalizedPath.slice(normalizedRoot.length + 1).includes("/");
+}
+
+export async function readRecentFilePaths(app: App): Promise<string[]> {
+  const nativePaths = safeLastOpenFiles(app);
+  const pluginPaths = await readRecentFilesPluginPaths(app);
+  return [...new Set([...pluginPaths, ...nativePaths].map(normalizeVaultPath))]
+    .filter(Boolean);
+}
+
+function safeLastOpenFiles(app: App): string[] {
+  try {
+    return app.workspace.getLastOpenFiles();
+  } catch {
+    return [];
+  }
+}
+
+async function readRecentFilesPluginPaths(app: App): Promise<string[]> {
+  // Obsidian's native list is short and can lag an active-file change. When the
+  // optional Recent Files plugin is enabled in file-open mode, its deduplicated
+  // history is authoritative and the native paths extend it as a fallback.
+  const enabledPluginsPath = normalizeVaultPath(
+    `${app.vault.configDir}/community-plugins.json`
+  );
+  const historyPath = normalizeVaultPath(
+    `${app.vault.configDir}/plugins/recent-files-obsidian/data.json`
+  );
+  try {
+    if (
+      !(await app.vault.adapter.exists(enabledPluginsPath)) ||
+      !(await app.vault.adapter.exists(historyPath))
+    ) {
+      return [];
+    }
+    const enabledPlugins = JSON.parse(
+      await app.vault.adapter.read(enabledPluginsPath)
+    ) as unknown;
+    if (
+      !Array.isArray(enabledPlugins) ||
+      !enabledPlugins.includes("recent-files-obsidian")
+    ) {
+      return [];
+    }
+    const parsed = JSON.parse(
+      await app.vault.adapter.read(historyPath)
+    ) as unknown;
+    if (!isRecord(parsed) || !Array.isArray(parsed.recentFiles)) return [];
+    if ((stringValue(parsed.updateOn) || "file-open") !== "file-open") return [];
+    return parsed.recentFiles
+      .filter(isRecord)
+      .map((entry) => stringValue(entry.path))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 function sortFiles(files: DashboardFileItem[]): DashboardFileItem[] {

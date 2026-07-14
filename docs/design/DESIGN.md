@@ -69,8 +69,9 @@ The orange signal rail is the signature visual element. It should remain visible
 - `CaptureAction`: icon, label, and a clear open affordance.
 - `Signal`: icon, label, live value, optional attention dot.
 - `WorkPanel`: section label, optional action, bordered row region.
-- `FileRow`: file icon, basename, compact path, relative modified time.
+- `FileRow`: file icon, basename, compact path, and relative modified time or a contextual viewed-status label.
 - `FolderRootRow`: area or program name, file count, modified time, open action.
+- `QueueRow`: direct safe, supported file from a configured active queue; queue lists are complete rather than preview-capped.
 - `PersonRow`: initials, name, agenda count, modified time.
 - `FilterChip`: compact filter with selected state.
 - `EmptyState`: useful explanation and the next available action.
@@ -85,6 +86,8 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 - `/` focuses dashboard search when the view is active.
 - Search filters the current route without leaving the keyboard.
 - Refresh immediately rebuilds the live index and reports completion.
+- Owner Inbox and Team Inbox counts represent direct active files only; nested subfolders are intentionally outside those queue counts.
+- Recent follows Obsidian's vault-wide file-open history, prioritizing an enabled Recent Files plugin in file-open mode before appending native history, and uses configured modified-time roots only when viewed history is unavailable.
 - Theme changes update the dashboard and, when enabled, the coordinated shell class.
 - Clipboard templates are editable, copyable, resettable, and stored only as preferences.
 - Sensitive or archived paths are excluded before display.

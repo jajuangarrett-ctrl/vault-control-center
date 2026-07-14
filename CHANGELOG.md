@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3 — 2026-07-14
+
+- Corrected AI Team queue counts and lists so Owner Inbox and Team Inbox show every direct safe, supported file, without the former twelve-file display cap.
+- Kept nested subfolders outside the active inbox queues so filed, grouped, or otherwise nested material does not inflate actionable queue counts.
+- Changed Recent to follow Obsidian's actual file-open history across the vault, prioritizing the enabled Recent Files plugin's file-open sequence when available and appending Obsidian's native history.
+- Retained modified-time activity from configured recent roots only as a fallback when no viewed-file history is available.
+
 ## 0.1.2 — 2026-07-14
 
 - Added an Areas route between Home and Programs with a configurable vault-relative source.

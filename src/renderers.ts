@@ -130,12 +130,20 @@ function renderHome(parent: HTMLElement, context: DashboardRenderContext): void 
   const workGrid = parent.createDiv({ cls: "fjg-vcc-work-grid" });
   renderCurrentWork(workGrid, context);
 
-  const latest = createPanel(workGrid, "Latest files", {
-    actionLabel: "View all",
-    actionIcon: "arrow-right",
-    onAction: () => context.navigate("recent"),
-  });
-  renderFileList(latest.body, filteredFiles(context.data.recent, context.state.query).slice(0, 9), context);
+  const latest = createPanel(
+    workGrid,
+    context.data.recentMode === "viewed" ? "Recently viewed" : "Latest files",
+    {
+      actionLabel: "View all",
+      actionIcon: "arrow-right",
+      onAction: () => context.navigate("recent"),
+    }
+  );
+  renderRecentFileList(
+    latest.body,
+    filteredFiles(context.data.recent, context.state.query).slice(0, 9),
+    context
+  );
 
   const people = createPanel(workGrid, "People radar", {
     actionLabel: "Contact list",
@@ -546,7 +554,16 @@ function renderAiTeam(parent: HTMLElement, context: DashboardRenderContext): voi
 
   const queue = context.data.aiQueues[context.state.selectedAiQueue];
   const panel = createPanel(parent, queue.label);
-  panel.header.createSpan({ cls: "fjg-vcc-badge", text: `${queue.count} files` });
+  panel.header.createSpan({
+    cls: "fjg-vcc-badge",
+    text: `${queue.count} ${queue.scope === "direct" ? "direct " : ""}files`,
+  });
+  if (queue.scope === "direct") {
+    panel.body.createEl("p", {
+      cls: "fjg-vcc-panel-note",
+      text: "Direct supported files are counted as active inbox items; nested folders are not included.",
+    });
+  }
   renderFileList(panel.body, queue.files.filter((file) => fileMatches(file, context.state.query)), context);
 }
 
@@ -566,8 +583,11 @@ function renderRecent(parent: HTMLElement, context: DashboardRenderContext): voi
       (context.state.recentFilter === "all" || file.category === context.state.recentFilter) &&
       fileMatches(file, context.state.query)
   );
-  const panel = createPanel(parent, `Recent files · ${files.length}`);
-  renderFileList(panel.body, files, context);
+  const panel = createPanel(
+    parent,
+    `${context.data.recentMode === "viewed" ? "Recently viewed" : "Recent files"} · ${files.length}`
+  );
+  renderRecentFileList(panel.body, files, context);
 }
 
 function renderBookmarks(parent: HTMLElement, context: DashboardRenderContext): void {
@@ -720,7 +740,39 @@ function renderFileList(
   for (const file of files) renderFileRow(list, file, context);
 }
 
-function renderFileRow(parent: HTMLElement, file: DashboardFileItem, context: DashboardRenderContext): void {
+function renderRecentFileList(
+  parent: HTMLElement,
+  files: DashboardFileItem[],
+  context: DashboardRenderContext
+): void {
+  if (!files.length) {
+    createEmptyState(
+      parent,
+      context.data.recentMode === "viewed"
+        ? "No recently viewed files match"
+        : "No files match",
+      "Clear search or open a file in Obsidian.",
+      "file-search"
+    );
+    return;
+  }
+  const list = parent.createDiv({ cls: "fjg-vcc-row-list" });
+  for (const file of files) {
+    renderFileRow(
+      list,
+      file,
+      context,
+      context.data.recentMode === "viewed" ? "Viewed" : undefined
+    );
+  }
+}
+
+function renderFileRow(
+  parent: HTMLElement,
+  file: DashboardFileItem,
+  context: DashboardRenderContext,
+  endText?: string
+): void {
   const row = parent.createEl("button", {
     cls: "fjg-vcc-row",
     attr: { type: "button", "aria-label": `Open ${file.title}` },
@@ -729,7 +781,10 @@ function renderFileRow(parent: HTMLElement, file: DashboardFileItem, context: Da
   const main = row.createDiv({ cls: "fjg-vcc-row-main" });
   main.createSpan({ cls: "fjg-vcc-row-title", text: file.title });
   main.createSpan({ cls: "fjg-vcc-row-path", text: file.path });
-  row.createSpan({ cls: "fjg-vcc-row-end", text: formatRelativeTime(file.modifiedAt) });
+  row.createSpan({
+    cls: "fjg-vcc-row-end",
+    text: endText ?? formatRelativeTime(file.modifiedAt),
+  });
   row.addEventListener("click", () => context.openFile(file.path));
 }
 

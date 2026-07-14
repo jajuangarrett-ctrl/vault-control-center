@@ -15,8 +15,8 @@ The dashboard keeps nine views in one consistent navy-and-orange interface:
 | Home | Capture actions, live signals, current programs, recent files, people, and task status |
 | Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with recursive drill-down, breadcrumbs, and native file opening |
 | Programs | Program folders, activity groups, recursive subfolder drill-down, breadcrumbs, and native file opening |
-| AI Team | Four configurable operational queues with live file counts |
-| Recent | Searchable recent activity with category filters |
+| AI Team | Four configurable operational queues; Owner and Team inboxes use complete direct-file counts and lists |
+| Recent | Searchable, vault-wide Obsidian file-open history with category filters |
 | Bookmarks | Filtered Obsidian bookmarks; vault targets open natively and HTTP(S) links open externally |
 | People | Agenda files, recency, and contact-list access |
 | Clipboard | Editable, copyable, resettable templates |
@@ -29,6 +29,8 @@ Additional features:
 - Optional Obsidian shell theming that is removed cleanly when disabled or unloaded
 - Responsive layouts for desktop, split panes, tablets, and phones
 - Live refresh after vault changes, with a manual force-refresh action
+- Owner Inbox and Team Inbox treat direct safe, supported files as the active queue; nested subfolders are excluded, and queue lists are not truncated
+- Recently viewed files use the enabled Recent Files plugin's file-open history when available, then append Obsidian's native open history
 - `/` to focus search while the dashboard is active, with the native search clear control
 - In-memory indexing only—derived dashboard records are not persisted
 
@@ -56,9 +58,11 @@ Open **Settings → Community plugins → Vault Control Center** and configure t
 - People agendas and contacts
 - Tasks
 - Four operational queues
-- Recent-view roots
+- Recent-activity fallback roots
 
 The bundled defaults are generic examples. Missing sources are reported in the dashboard instead of causing the view to fail.
+
+Recent normally comes from Obsidian's file-open history rather than file modification dates or only clicks made inside Vault Control Center. When the optional Recent Files plugin is enabled in file-open mode, its longer, immediately updated history is used first and Obsidian's native list supplies additional entries. If neither source provides viewed-file history, the dashboard temporarily falls back to modified-time activity under the configured recent roots.
 
 Capture buttons dispatch commands from companion capture plugins. Install and enable the corresponding Thought Capture, Email Capture, Agenda Capture, and Program Update Capture plugins for those buttons to work. Vault Control Center does not register the displayed actions as global hotkeys.
 
@@ -101,6 +105,7 @@ npm run check
 - **The taskboard falls back to local counts:** confirm the HTTPS endpoint, select a valid Obsidian Secret Storage value, enable the separate connection, and force Refresh. The Task Capture adapter also requires that plugin to have a complete connection.
 - **BRAT cannot install or update:** confirm the GitHub release includes `main.js`, `manifest.json`, and `styles.css` and that its tag matches the manifest version.
 - **The old dashboard still opens:** disable the legacy launcher after confirming the native plugin is configured.
+- **Recent does not match files you just viewed:** open the notes in Obsidian and use Refresh. Vault Control Center reads Obsidian's open history across the whole vault; configured recent roots are used only when no viewed history is available.
 
 ## Design notes
 
