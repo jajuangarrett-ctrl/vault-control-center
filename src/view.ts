@@ -100,6 +100,7 @@ interface PreviewCloseOptions {
 interface PreviewEditorState {
   file: TFile;
   recoveryPath: string | null;
+  recoverySavedAt: number | null;
   baselineContent: string;
   baselineEditorContent: string;
   draft: string;
@@ -152,6 +153,7 @@ export class VaultControlCenterView extends ItemView {
   private previewReturnFocusEl: HTMLElement | null = null;
   private previewComponent: Component | null = null;
   private previewEditorState: PreviewEditorState | null = null;
+  private previewEditStartRequestId = 0;
   private previewSavePromise: Promise<void> | null = null;
   private previewBrowserCollapsed = false;
   private previewRequestId = 0;
@@ -224,12 +226,24 @@ export class VaultControlCenterView extends ItemView {
           new Notice("The unsaved dashboard draft was retained and will reopen with the dashboard.");
         } else {
           if (state.recoveryPath) {
-            await this.plugin.clearPreviewRecoveryDraft(state.recoveryPath);
+            await this.clearPreviewRecoveryForState(state);
           }
           new Notice("This draft could not be retained because the file is no longer safe for dashboard editing.");
         }
       } catch {
         new Notice("The dashboard could not save or retain this draft before closing.");
+      }
+    }
+    if (
+      this.previewEditorState &&
+      !this.previewEditorState.dirty &&
+      this.previewEditorState.recoveryPath
+    ) {
+      try {
+        const cleared = await this.clearPreviewRecoveryForState(this.previewEditorState);
+        if (!cleared) throw new Error("Recovery path mismatch");
+      } catch {
+        new Notice("The clean dashboard draft closed, but its old recovery marker could not be cleared yet.");
       }
     }
     if (this.templateSaveTimer !== null) {
@@ -252,6 +266,7 @@ export class VaultControlCenterView extends ItemView {
     this.previewReturnFocusEl = null;
     this.activePreviewFile = null;
     this.previewEditorState = null;
+    this.previewEditStartRequestId += 1;
     this.previewSavePromise = null;
     this.previewBrowserCollapsed = false;
   }
@@ -783,7 +798,7 @@ export class VaultControlCenterView extends ItemView {
       });
     if (!(target instanceof TFile) || !canRestore) {
       try {
-        await this.plugin.clearPreviewRecoveryDraft(path);
+        await this.plugin.clearPreviewRecoveryDraft(path, recovery.savedAt);
         new Notice("An unusable dashboard recovery draft was discarded because its file is no longer safe to open here.");
       } catch {
         new Notice("An unusable dashboard recovery draft could not be cleared yet.");
@@ -791,29 +806,86 @@ export class VaultControlCenterView extends ItemView {
       return false;
     }
 
+    const restoreRequestId = this.previewRequestId;
+    const restoreEditStartRequestId = this.previewEditStartRequestId;
+    const restoreActiveFile = this.activePreviewFile;
+    const restorePendingPath = this.pendingPreviewPath;
     try {
       const currentContent = await this.app.vault.read(target);
-      const baselineEditorContent = normalizePreviewEditorContent(recovery.baselineContent);
-      const draft = normalizePreviewEditorContent(recovery.draft);
-      if (draft === baselineEditorContent) {
-        await this.plugin.clearPreviewRecoveryDraft(path);
+      if (
+        restoreRequestId !== this.previewRequestId ||
+        restoreEditStartRequestId !== this.previewEditStartRequestId ||
+        this.previewEditorState !== null ||
+        this.activePreviewFile !== restoreActiveFile ||
+        this.pendingPreviewPath !== restorePendingPath
+      ) return false;
+      const latestRecovery = this.plugin.getPreviewRecoveryDraft();
+      if (
+        !latestRecovery ||
+        latestRecovery.baselineContent !== recovery.baselineContent ||
+        latestRecovery.draft !== recovery.draft
+      ) return false;
+      const currentPath = normalizeVaultPath(target.path);
+      const latestRecoveryPath = normalizeVaultPath(latestRecovery.path);
+      if (
+        latestRecoveryPath !== path &&
+        latestRecoveryPath !== currentPath
+      ) return false;
+      const currentTarget = currentPath
+        ? this.app.vault.getAbstractFileByPath(normalizePath(currentPath))
+        : null;
+      const stillSafe = canPersistPreviewRecovery({
+        fileIsCurrent: currentTarget === target,
+        pathIsSafe:
+          Boolean(currentPath) &&
+          !isExcludedPath(currentPath) &&
+          !isSensitivePath(currentPath),
+        kind: classifyPreviewKind(target.extension),
+        fileSize: target.stat.size,
+        baselineContent: latestRecovery.baselineContent,
+        draft: latestRecovery.draft,
+      });
+      if (!stillSafe) {
+        try {
+          await this.clearPreviewRecoveryPaths(
+            [path, currentPath],
+            latestRecovery.savedAt
+          );
+          new Notice("An unusable dashboard recovery draft was discarded after its file changed.");
+        } catch {
+          new Notice("An unusable dashboard recovery draft could not be cleared yet.");
+        }
         return false;
       }
-      const lineEnding = detectPreviewLineEnding(recovery.baselineContent);
+      const recoveryPath = latestRecoveryPath || path;
+      const baselineEditorContent = normalizePreviewEditorContent(latestRecovery.baselineContent);
+      const draft = normalizePreviewEditorContent(latestRecovery.draft);
+      if (draft === baselineEditorContent) {
+        await this.clearPreviewRecoveryPaths(
+          [recoveryPath, currentPath],
+          latestRecovery.savedAt
+        );
+        return false;
+      }
+      const lineEnding = detectPreviewLineEnding(latestRecovery.baselineContent);
       if (currentContent === serializePreviewEditorContent(draft, lineEnding)) {
-        await this.plugin.clearPreviewRecoveryDraft(path);
+        await this.clearPreviewRecoveryPaths(
+          [recoveryPath, currentPath],
+          latestRecovery.savedAt
+        );
         return false;
       }
       this.previewEditorState = {
         file: target,
-        recoveryPath: path,
-        baselineContent: recovery.baselineContent,
+        recoveryPath,
+        recoverySavedAt: latestRecovery.savedAt,
+        baselineContent: latestRecovery.baselineContent,
         baselineEditorContent,
         draft,
         lineEnding,
         dirty: true,
         saving: false,
-        conflict: hasPreviewEditConflict(recovery.baselineContent, currentContent),
+        conflict: hasPreviewEditConflict(latestRecovery.baselineContent, currentContent),
       };
       this.activePreviewFile = target;
       this.pendingPreviewPath = target.path;
@@ -865,6 +937,9 @@ export class VaultControlCenterView extends ItemView {
       this.previewEditorState.file !== target &&
       this.previewEditorState.file.path !== target.path
     ) {
+      if (this.previewEditorState.recoveryPath) {
+        this.clearPreviewRecoveryInBackground(this.previewEditorState);
+      }
       this.previewEditorState = null;
     }
 
@@ -1062,13 +1137,29 @@ export class VaultControlCenterView extends ItemView {
       return;
     }
 
+    const editStartRequestId = ++this.previewEditStartRequestId;
+    const previewRequestId = this.previewRequestId;
     try {
       const content = await this.app.vault.read(file);
-      if (this.activePreviewFile?.path !== file.path) return;
+      const currentPath = normalizeVaultPath(file.path);
+      const currentTarget = currentPath
+        ? this.app.vault.getAbstractFileByPath(normalizePath(currentPath))
+        : null;
+      if (
+        editStartRequestId !== this.previewEditStartRequestId ||
+        previewRequestId !== this.previewRequestId ||
+        this.activePreviewFile?.path !== file.path ||
+        currentTarget !== file ||
+        isExcludedPath(currentPath) ||
+        isSensitivePath(currentPath) ||
+        !isEditablePreviewKind(classifyPreviewKind(file.extension)) ||
+        file.stat.size > PREVIEW_TEXT_SIZE_LIMIT
+      ) return;
       const baselineEditorContent = normalizePreviewEditorContent(content);
       this.previewEditorState = {
         file,
         recoveryPath: null,
+        recoverySavedAt: null,
         baselineContent: content,
         baselineEditorContent,
         draft: baselineEditorContent,
@@ -1079,6 +1170,10 @@ export class VaultControlCenterView extends ItemView {
       };
       await this.renderPreview(file, true);
     } catch (error) {
+      if (
+        editStartRequestId !== this.previewEditStartRequestId ||
+        previewRequestId !== this.previewRequestId
+      ) return;
       const message = error instanceof Error ? error.message : "The file could not be loaded for editing.";
       new Notice(`Could not start editing: ${message}`);
     }
@@ -1162,6 +1257,7 @@ export class VaultControlCenterView extends ItemView {
     if (!state || !state.dirty || state.saving || state.conflict) return;
 
     const target = state.file;
+    const previewRequestId = this.previewRequestId;
     const currentPath = normalizeVaultPath(target.path);
     const currentTarget = currentPath
       ? this.app.vault.getAbstractFileByPath(normalizePath(currentPath))
@@ -1194,15 +1290,29 @@ export class VaultControlCenterView extends ItemView {
       });
       if (this.previewEditorState !== state) return;
 
-      const recoveryPath = state.recoveryPath ?? target.path;
       this.previewEditorState = null;
       try {
-        const cleared = await this.plugin.clearPreviewRecoveryDraft(recoveryPath);
+        const cleared = await this.clearPreviewRecoveryForState(state);
         if (!cleared) throw new Error("Recovery path mismatch");
       } catch {
         new Notice("The note was saved, but the old recovery marker could not be cleared yet.");
       }
       const savedFile = this.app.vault.getAbstractFileByPath(normalizePath(target.path));
+      if (savedFile instanceof TFile && options.announceSuccess !== false) {
+        new Notice(`Saved ${normalizeFileTitle(savedFile.name) || savedFile.name} to the vault.`);
+      }
+      if (previewRequestId !== this.previewRequestId) {
+        const stillShowingSavedFile =
+          savedFile instanceof TFile &&
+          !this.previewEditorState &&
+          (this.activePreviewFile === savedFile ||
+            this.activePreviewFile?.path === savedFile.path ||
+            this.pendingPreviewPath === savedFile.path);
+        if (stillShowingSavedFile && options.renderAfterSave !== false) {
+          await this.renderPreview(savedFile, false);
+        }
+        return;
+      }
       if (!(savedFile instanceof TFile)) {
         this.activePreviewFile = null;
         this.pendingPreviewPath = target.path;
@@ -1211,9 +1321,6 @@ export class VaultControlCenterView extends ItemView {
       }
       this.activePreviewFile = savedFile;
       this.pendingPreviewPath = savedFile.path;
-      if (options.announceSuccess !== false) {
-        new Notice(`Saved ${normalizeFileTitle(savedFile.name) || savedFile.name} to the vault.`);
-      }
       if (options.renderAfterSave !== false) await this.renderPreview(savedFile, true);
     } catch (error) {
       if (this.previewEditorState !== state) return;
@@ -1238,14 +1345,15 @@ export class VaultControlCenterView extends ItemView {
       (state.file !== file && state.file.path !== file.path) ||
       state.saving
     ) return;
-    const recoveryPath = state.recoveryPath ?? state.file.path;
+    const previewRequestId = this.previewRequestId;
     this.previewEditorState = null;
     try {
-      const cleared = await this.plugin.clearPreviewRecoveryDraft(recoveryPath);
+      const cleared = await this.clearPreviewRecoveryForState(state);
       if (!cleared) throw new Error("Recovery path mismatch");
     } catch {
       new Notice("The draft was discarded, but its recovery marker could not be cleared yet.");
     }
+    if (previewRequestId !== this.previewRequestId) return;
     const currentFile = this.app.vault.getAbstractFileByPath(normalizePath(state.file.path));
     if (!(currentFile instanceof TFile)) {
       this.activePreviewFile = null;
@@ -1302,6 +1410,37 @@ export class VaultControlCenterView extends ItemView {
       () => this.previewPaneEl?.querySelector<HTMLTextAreaElement>(".fjg-vcc-preview-editor")?.focus({ preventScroll: true }),
       0
     );
+  }
+
+  private async clearPreviewRecoveryForState(state: PreviewEditorState): Promise<boolean> {
+    if (state.recoverySavedAt === null) return true;
+    return this.clearPreviewRecoveryPaths(
+      [state.recoveryPath, state.file.path],
+      state.recoverySavedAt
+    );
+  }
+
+  private async clearPreviewRecoveryPaths(
+    candidates: Array<string | null | undefined>,
+    expectedSavedAt?: number
+  ): Promise<boolean> {
+    const paths = [...new Set(candidates.filter(Boolean))] as string[];
+    for (const path of paths) {
+      if (await this.plugin.clearPreviewRecoveryDraft(path, expectedSavedAt)) return true;
+    }
+    return this.plugin.getPreviewRecoveryDraft() === null;
+  }
+
+  private clearPreviewRecoveryInBackground(state: PreviewEditorState): void {
+    void this.clearPreviewRecoveryForState(state)
+      .then((cleared) => {
+        if (!cleared) {
+          new Notice("The old dashboard recovery marker could not be matched for cleanup.");
+        }
+      })
+      .catch(() => {
+        new Notice("The old dashboard recovery marker could not be cleared yet.");
+      });
   }
 
   private createPreviewBrowserToggle(parent: HTMLElement): void {
@@ -1544,8 +1683,12 @@ export class VaultControlCenterView extends ItemView {
       return false;
     }
     const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
+    if (this.previewEditorState?.recoveryPath) {
+      this.clearPreviewRecoveryInBackground(this.previewEditorState);
+    }
     const returnFocus = this.previewReturnFocusEl;
     this.previewRequestId += 1;
+    this.previewEditStartRequestId += 1;
     this.disposePreviewComponent();
     this.activePreviewFile = null;
     this.pendingPreviewPath = "";

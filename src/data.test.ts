@@ -7,6 +7,7 @@ import {
   isSensitivePath,
   normalizeFileTitle,
   normalizeVaultPath,
+  remapVaultPathAfterRename,
   parseBookmarks,
   pathIsWithin,
   type DashboardDataSettings,
@@ -53,6 +54,26 @@ describe("vault path helpers", () => {
     expect(
       normalizeFileTitle("Budget Report 2f7c6da26d4f80aca6b7fb56102dfe26.md")
     ).toBe("Budget Report");
+  });
+
+  it("maps direct file renames and files inside renamed folders", () => {
+    expect(remapVaultPathAfterRename("Areas/A.md", "Areas/A.md", "Areas/B.md")).toBe(
+      "Areas/B.md"
+    );
+    expect(
+      remapVaultPathAfterRename(
+        "Areas/Planning/Notes/A.md",
+        "Areas/Planning",
+        "Areas/Strategy"
+      )
+    ).toBe("Areas/Strategy/Notes/A.md");
+  });
+
+  it("does not remap siblings or invalid paths", () => {
+    expect(
+      remapVaultPathAfterRename("Areas/Planning-Old/A.md", "Areas/Planning", "Areas/New")
+    ).toBeNull();
+    expect(remapVaultPathAfterRename("Areas/A.md", "", "Areas/B.md")).toBeNull();
   });
 });
 
