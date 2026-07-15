@@ -1048,13 +1048,14 @@ export class VaultControlCenterView extends ItemView {
           onClick: () => void this.startPreviewEditing(file),
         });
       }
-      createButton(actions, {
-        label: "Open in tab",
-        icon: "external-link",
-        className: "fjg-vcc-button fjg-vcc-preview-open-tab",
-        onClick: () => void this.plugin.openVaultFileInTab(file.path),
-      });
     }
+    createButton(actions, {
+      label: "Open in tab",
+      icon: "external-link",
+      className: "fjg-vcc-button fjg-vcc-preview-open-tab",
+      disabled: editorState?.saving ?? false,
+      onClick: () => void this.openPreviewInTab(file),
+    });
     this.createPreviewBrowserToggle(actions);
     const pathBar = pane.createDiv({ cls: "fjg-vcc-preview-pathbar" });
     pathBar.createSpan({ cls: "fjg-vcc-preview-path", text: file.path });
@@ -1391,6 +1392,10 @@ export class VaultControlCenterView extends ItemView {
       const label = labels.item(labels.length - 1);
       if (label) label.textContent = cancelLabel;
     }
+    const openTabButton = this.previewPaneEl.querySelector<HTMLButtonElement>(
+      ".fjg-vcc-preview-open-tab"
+    );
+    if (openTabButton) openTabButton.disabled = state.saving;
     const status = this.previewPaneEl.querySelector<HTMLElement>(".fjg-vcc-preview-edit-status");
     if (status) {
       status.textContent = this.previewEditorStatus(state);
@@ -1403,6 +1408,22 @@ export class VaultControlCenterView extends ItemView {
 
   private noticeUnsavedPreviewChanges(): void {
     new Notice("Save or discard your dashboard edits before leaving this note.");
+  }
+
+  private async openPreviewInTab(file: TFile): Promise<void> {
+    const state = this.previewEditorState;
+    const isCurrentEditor =
+      state && (state.file === file || state.file.path === file.path);
+    if (isCurrentEditor && (state.dirty || state.conflict)) {
+      new Notice("Save or discard your dashboard edits before opening this note in a tab.");
+      this.focusPreviewEditor();
+      return;
+    }
+    if (isCurrentEditor && state.saving) {
+      new Notice("Wait for the dashboard save to finish before opening this note in a tab.");
+      return;
+    }
+    await this.plugin.openVaultFileInTab(file.path);
   }
 
   private focusPreviewEditor(): void {

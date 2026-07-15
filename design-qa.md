@@ -22,6 +22,7 @@ The supplied jersey is a color reference, not a request to place sports imagery 
 | Collapsed file browser | 1280×900 | **Hide files** expands the note pane to 97% of the available dashboard width; **Show files** restores the split. |
 | Live save and restore | Obsidian 1.12.7 | A reversible Markdown edit saved to the vault, rendered immediately, and restored byte-for-byte to its original SHA-256. |
 | Conflict and recovery | Obsidian 1.12.7 | An external vault edit blocked Save; the dashboard draft survived tab close/reopen and cleared cleanly on Discard without changing the note. |
+| Persistent edit toolbar | 1280×720, 760×900, 390×844 | **Back** and **Open in tab** remain available in edit mode with no horizontal overflow; mobile keeps both as accessible icon controls. A dirty draft blocks Open in tab and returns focus to the editor; after Save, the tab action succeeds. |
 
 ## Full-view comparison
 
@@ -37,8 +38,8 @@ The palette source and final dark implementation were opened together in one vis
 ## Functional coverage
 
 - Unit coverage: preview-kind dispatch, editor eligibility, UTF-8 recovery bounds, conflict detection, line-ending preservation, safe history filtering/deduplication/cap, internal-link parsing, preview-history precedence, image/media indexing, recursive folder behavior, privacy filtering, queues, and taskboard behavior.
-- Browser fixture: dark/light toggle, split and collapsed preview, Edit/Save/Discard controls, mobile overlay, Back, reopen, Escape, selected row, dock visibility, exact 760px breakpoint, and runtime logs.
-- Live Obsidian verification: installed the v0.1.5 candidate in Obsidian 1.12.7, cleanly restarted the app, and exercised the actual plugin through Computer Use plus the live Electron DOM.
+- Browser fixture: dark/light toggle, split and collapsed preview, Edit/Save/Discard controls, persistent Back/Open-in-tab controls, dirty-draft tab guard, mobile overlay, Back, reopen, Escape, selected row, dock visibility, exact 760px breakpoint, and runtime logs.
+- Live Obsidian verification: installed the v0.1.5 editor foundation in Obsidian 1.12.7, cleanly restarted the app, and exercised the actual plugin through Computer Use plus the live Electron DOM. The installed v0.1.6 toolbar refinement was then rechecked in both the browser fixture and the real Obsidian plugin.
 
 ## Live Obsidian results
 
@@ -51,6 +52,7 @@ The palette source and final dark implementation were opened together in one vis
 | Markdown links | An internal link from Self Improvement opened its destination inside the same preview pane and kept the dashboard leaf active. |
 | Rapid selection | Concurrent large-text and image requests settled on the last selected image without stale content replacing it. |
 | Explicit tab action | `Open in tab` increased Markdown leaves from 5 to 6, activated the requested file, and preserved the dashboard plus its preview state. |
+| Quick-edit tab handoff | In edit mode, Back and Open in tab remained visible. A temporary dirty draft kept the Open action in the pane but blocked the native tab and refocused the editor; Discard restored the vault copy, after which Open created and activated the native note tab. |
 | Recent history | After previewing Canvas, HTML, TXT, PNG, and Markdown, Recent listed those dashboard-viewed files in that order with Canvas first. |
 | Inbox counts | Owner inbox showed 48 direct files and 48 rows; Team inbox showed 16 direct files and 16 rows. The only extra direct item in each filesystem folder was `.DS_Store`, which is intentionally excluded. |
 | Search and filters | Searching Recent for `Thoughts` returned only `09 Thoughts/Thoughts.md`; the Areas filter returned six paths and all began with `03 Areas/`. |

@@ -86,7 +86,7 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 
 - Clicking a file previews it inside the dashboard without replacing the dashboard leaf.
 - Clicking an area, program, or folder drills into its route detail; only file rows invoke the preview.
-- **Open in tab** is the only file action that deliberately opens Obsidian's native viewer/editor in another tab.
+- **Open in tab** is the only file action that deliberately opens Obsidian's native viewer/editor in another tab. It remains visible during quick editing, but an unsaved dashboard draft must be saved or discarded before the saved vault copy opens there.
 - Markdown internal links resolve into the same preview pane; HTTP(S) links remain external.
 - Back and Escape close the preview and restore route-row focus. Slow earlier renders cannot overwrite a later file selection.
 - `/` focuses dashboard search when the view is active.

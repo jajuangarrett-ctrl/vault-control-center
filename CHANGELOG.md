@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 — 2026-07-15
+
+- Kept **Back** and **Open in tab** visible while a note is in dashboard edit mode, so quick edits and full-tab editing remain part of one clear workflow.
+- Protected unsaved dashboard edits by requiring them to be saved or discarded before the same note opens in a native Obsidian tab.
+
 ## 0.1.5 — 2026-07-15
 
 - Made Markdown, TXT, CSV, HTML-source, and JSON previews editable inside the dashboard with explicit **Edit**, **Save**, and **Discard changes** actions plus Command/Ctrl+S.

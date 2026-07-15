@@ -26,7 +26,7 @@ Additional features:
 
 - Native ribbon icon and command-palette actions
 - Shared preview pane across every file-bearing route; normal clicks keep the dashboard active
-- In-dashboard editing for Markdown, TXT, CSV, HTML source, and JSON with explicit Save/Discard controls, Command/Ctrl+S, external-change conflict protection, and bounded close/reopen draft recovery
+- In-dashboard editing for Markdown, TXT, CSV, HTML source, and JSON with explicit Save/Discard controls, Command/Ctrl+S, external-change conflict protection, and bounded close/reopen draft recovery; **Back** and **Open in tab** remain available throughout the quick-edit workflow
 - Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action for unsupported or native-only formats
 - A note-first desktop split that gives the preview roughly two-thirds of the width, plus **Hide files** / **Show files** for a nearly full-width reading and editing pane
 - Coordinated throwback dark and light themes derived from deep navy, golden yellow, orange, royal blue, and warm cream

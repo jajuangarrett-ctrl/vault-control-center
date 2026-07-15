@@ -106,13 +106,13 @@
       </main>
       <aside class="fjg-vcc-preview-pane" id="preview-pane" role="region" aria-labelledby="fixture-preview-title" aria-hidden="true" hidden>
         <header class="fjg-vcc-preview-header">
-          <button class="fjg-vcc-preview-back" id="preview-close" type="button"><span class="preview-icon">←</span><span>Back</span></button>
+          <button class="fjg-vcc-preview-back" id="preview-close" type="button" aria-label="Close preview and return to the dashboard"><span class="preview-icon">←</span><span>Back</span></button>
           <div class="fjg-vcc-preview-heading"><span class="fjg-vcc-preview-kicker" id="preview-kicker">MD preview</span><h2 class="fjg-vcc-preview-title" id="fixture-preview-title" tabindex="-1">Daily Note — Monday</h2></div>
           <div class="fjg-vcc-preview-actions">
             <button class="fjg-vcc-button fjg-vcc-preview-edit" id="preview-edit" type="button"><span class="preview-icon">✎</span><span>Edit</span></button>
             <button class="fjg-vcc-button fjg-vcc-preview-cancel" id="preview-cancel" type="button" hidden><span class="preview-icon">×</span><span>Cancel</span></button>
             <button class="fjg-vcc-button is-primary fjg-vcc-preview-save" id="preview-save" type="button" disabled hidden><span class="preview-icon">✓</span><span>Save</span></button>
-            <button class="fjg-vcc-button fjg-vcc-preview-open-tab" id="preview-open-tab" type="button"><span class="preview-icon">↗</span><span>Open in tab</span></button>
+            <button class="fjg-vcc-button fjg-vcc-preview-open-tab" id="preview-open-tab" type="button" aria-label="Open in tab"><span class="preview-icon">↗</span><span>Open in tab</span></button>
             <button class="fjg-vcc-button fjg-vcc-preview-browser-toggle" id="browser-toggle" type="button" aria-expanded="true"><span class="preview-icon">▥</span><span>Hide files</span></button>
           </div>
         </header>
@@ -231,7 +231,7 @@ This note is editable inside Vault Control Center. Saving writes the Markdown so
         editing = true;
         previewKicker.textContent = 'Editing MD';
         editButton.hidden = true;
-        openTabButton.hidden = true;
+        openTabButton.hidden = false;
         cancelButton.hidden = false;
         saveButton.hidden = false;
         saveButton.disabled = true;
@@ -263,6 +263,16 @@ This note is editable inside Vault Control Center. Saving writes the Markdown so
         if (!editor || saveButton.disabled) return;
         savedText = editor.value;
         renderReadMode();
+      });
+      openTabButton.addEventListener('click', () => {
+        const editor = document.querySelector('#fixture-editor');
+        if (editing && editor?.value !== savedText) {
+          previewStatus.className = 'fjg-vcc-preview-edit-status is-dirty';
+          previewStatus.textContent = 'Save or discard before opening in tab';
+          editor.focus();
+          return;
+        }
+        previewStatus.textContent = 'Opened in a new tab';
       });
       browserToggle.addEventListener('click', () => {
         const collapsed = fixtureRoot.dataset.browserCollapsed === 'true';
