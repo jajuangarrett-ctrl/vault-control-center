@@ -1,7 +1,7 @@
 {
   "id": "vault-control-center",
   "name": "Vault Control Center",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "minAppVersion": "1.12.7",
   "description": "A native operational dashboard for areas, programs, AI queues, recent files, people, bookmarks, capture, and templates.",
   "author": "Franklin Garrett",

@@ -172,7 +172,7 @@ export default class VaultControlCenterPlugin extends Plugin {
     }
   }
 
-  async openVaultFile(path: string): Promise<void> {
+  async openVaultFileInTab(path: string): Promise<void> {
     const normalizedPath = normalizeVaultPath(path);
     if (
       !normalizedPath ||
@@ -187,7 +187,7 @@ export default class VaultControlCenterPlugin extends Plugin {
       new Notice("That file is no longer available.");
       return;
     }
-    await this.app.workspace.getLeaf(false).openFile(file);
+    await this.app.workspace.getLeaf("tab").openFile(file);
   }
 }
 

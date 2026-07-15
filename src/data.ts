@@ -27,6 +27,7 @@ export interface DashboardDataBuildOptions {
   limits?: Partial<DashboardDataLimits>;
   now?: Date;
   bookmarksPath?: string;
+  recentFilePaths?: string[];
 }
 
 export type DashboardFileCategory =
@@ -183,6 +184,28 @@ const ALLOWED_EXTENSIONS = new Set([
   "xls",
   "csv",
   "txt",
+  "json",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "bmp",
+  "svg",
+  "mp3",
+  "wav",
+  "m4a",
+  "ogg",
+  "oga",
+  "flac",
+  "aac",
+  "opus",
+  "mp4",
+  "m4v",
+  "webm",
+  "mov",
+  "ogv",
+  "mkv",
 ]);
 
 const EXCLUDED_PATH_SEGMENTS = new Set(
@@ -492,7 +515,12 @@ export async function buildDashboardData(
     files: peopleFiles.slice(0, limits.peopleFiles),
   };
 
-  const recentFilePaths = await readRecentFilePaths(app);
+  const recentFilePaths = [
+    ...new Set([
+      ...(options.recentFilePaths ?? []).map(normalizeVaultPath),
+      ...(await readRecentFilePaths(app)),
+    ]),
+  ].filter(Boolean);
   const filesByPath = new Map(
     vaultFiles.map(({ item }) => [normalizeVaultPath(item.path), item])
   );

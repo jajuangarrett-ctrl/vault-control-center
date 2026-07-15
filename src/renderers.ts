@@ -50,6 +50,7 @@ export interface DashboardRenderContext {
   taskboard: TaskboardSnapshot;
   settings: DashboardSettings;
   state: DashboardRenderState;
+  activePreviewPath: string;
   navigate: (route: DashboardRoute) => void;
   openFile: (path: string) => void;
   openBookmark: (bookmark: DashboardBookmark) => void;
@@ -146,7 +147,7 @@ function renderHome(parent: HTMLElement, context: DashboardRenderContext): void 
   );
 
   const people = createPanel(workGrid, "People radar", {
-    actionLabel: "Contact list",
+    actionLabel: "Preview contact list",
     actionIcon: "contact-round",
     onAction: () => context.openFile(context.settings.contactListPath),
   });
@@ -417,7 +418,7 @@ function renderFolderCollection(
       )
     : null;
   const detail = createPanel(layout, selected?.name ?? `${options.title} detail`, {
-    actionLabel: folderView?.latestFile ? "Open latest" : undefined,
+    actionLabel: folderView?.latestFile ? "Preview latest" : undefined,
     actionIcon: "file-up",
     onAction: folderView?.latestFile
       ? () => context.openFile(folderView.latestFile?.path ?? "")
@@ -608,9 +609,19 @@ function renderBookmarks(parent: HTMLElement, context: DashboardRenderContext): 
     createEmptyState(panel.body, "No bookmarks match", "Sensitive bookmarks stay hidden automatically.", "bookmark-x");
   }
   for (const bookmark of bookmarks) {
+    const previewsFile = bookmark.type !== "url";
     const row = panel.body.createEl("button", {
-      cls: "fjg-vcc-row",
-      attr: { type: "button", "aria-label": `Open ${bookmark.label}` },
+      cls: `fjg-vcc-row${bookmark.type === "file" && context.activePreviewPath === bookmark.target ? " is-selected" : ""}`,
+      attr: {
+        type: "button",
+        "aria-label": `${previewsFile ? "Preview" : "Open"} ${bookmark.label}`,
+        ...(bookmark.type === "file"
+          ? {
+              "aria-current": context.activePreviewPath === bookmark.target ? "true" : "false",
+              "data-file-path": bookmark.target,
+            }
+          : {}),
+      },
     });
     createIcon(row, bookmark.type === "url" ? "external-link" : bookmark.type, "fjg-vcc-row-icon");
     const main = row.createDiv({ cls: "fjg-vcc-row-main" });
@@ -633,7 +644,7 @@ function renderPeople(parent: HTMLElement, context: DashboardRenderContext): voi
     text: `${context.data.people.count} agenda files ready for one-to-one and team follow-up.`,
   });
   createButton(toolbar, {
-    label: "Contact list",
+    label: "Preview contact list",
     icon: "contact-round",
     className: "fjg-vcc-button",
     onClick: () => context.openFile(context.settings.contactListPath),
@@ -691,7 +702,7 @@ function renderSettings(parent: HTMLElement, context: DashboardRenderContext): v
       attr: { type: "button", "aria-pressed": String(context.settings.theme === theme) },
     });
     button.createSpan({ cls: "fjg-vcc-theme-swatch", attr: { "data-theme": theme, "aria-hidden": "true" } });
-    button.createSpan({ text: theme === "dark" ? "Navy dark" : "Cool light" });
+    button.createSpan({ text: theme === "dark" ? "Throwback dark" : "Throwback light" });
     button.addEventListener("click", () => context.setTheme(theme));
   }
   const shellLabel = appearance.createEl("label", { cls: "fjg-vcc-toggle-row" });
@@ -723,7 +734,7 @@ function renderSettings(parent: HTMLElement, context: DashboardRenderContext): v
   const privacy = parent.createEl("section", { cls: "fjg-vcc-settings-section" });
   privacy.createEl("h2", { text: "Privacy boundary" });
   privacy.createEl("p", {
-    text: "Indexes are derived in memory. Sensitive and archived paths are excluded before rendering, and no vault snapshot is written to plugin data.",
+    text: "Indexes are derived in memory. Sensitive and archived paths are excluded before rendering. Only a capped list of safe preview paths is kept in Obsidian workspace state so Recent stays accurate; no vault content or snapshot is written to plugin data.",
   });
 }
 
@@ -774,8 +785,13 @@ function renderFileRow(
   endText?: string
 ): void {
   const row = parent.createEl("button", {
-    cls: "fjg-vcc-row",
-    attr: { type: "button", "aria-label": `Open ${file.title}` },
+    cls: `fjg-vcc-row${context.activePreviewPath === file.path ? " is-selected" : ""}`,
+    attr: {
+      type: "button",
+      "aria-label": `Preview ${file.title}`,
+      "aria-current": context.activePreviewPath === file.path ? "true" : "false",
+      "data-file-path": file.path,
+    },
   });
   createIcon(row, iconForExtension(file.extension), "fjg-vcc-row-icon");
   const main = row.createDiv({ cls: "fjg-vcc-row-main" });
@@ -800,8 +816,13 @@ function renderPeopleRows(
   const list = parent.createDiv({ cls: "fjg-vcc-row-list" });
   for (const file of files) {
     const row = list.createEl("button", {
-      cls: "fjg-vcc-row",
-      attr: { type: "button", "aria-label": `Open agenda for ${file.title}` },
+      cls: `fjg-vcc-row${context.activePreviewPath === file.path ? " is-selected" : ""}`,
+      attr: {
+        type: "button",
+        "aria-label": `Preview agenda for ${file.title}`,
+        "aria-current": context.activePreviewPath === file.path ? "true" : "false",
+        "data-file-path": file.path,
+      },
     });
     row.createSpan({ cls: "fjg-vcc-avatar", text: initialsFor(file.title) });
     const main = row.createDiv({ cls: "fjg-vcc-row-main" });
@@ -881,11 +902,33 @@ function iconForExtension(extension: string): string {
     md: "file-text",
     pdf: "file-type-2",
     html: "code-2",
+    json: "braces",
     canvas: "layout-dashboard",
     csv: "table-2",
     xlsx: "sheet",
     xls: "sheet",
     docx: "file-type",
+    png: "image",
+    jpg: "image",
+    jpeg: "image",
+    gif: "image",
+    webp: "image",
+    bmp: "image",
+    svg: "image",
+    mp3: "audio-lines",
+    wav: "audio-lines",
+    m4a: "audio-lines",
+    ogg: "audio-lines",
+    oga: "audio-lines",
+    flac: "audio-lines",
+    aac: "audio-lines",
+    opus: "audio-lines",
+    mp4: "video",
+    m4v: "video",
+    webm: "video",
+    mov: "video",
+    ogv: "video",
+    mkv: "video",
   };
   return icons[extension] ?? "file";
 }

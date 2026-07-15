@@ -26,7 +26,7 @@ describe("AI queue inventories", () => {
       file("Operations/Owner Inbox/Another direct.pdf", 60),
       file("Operations/Owner Inbox/Nested/Not an inbox item.md", 100),
       file("Operations/Owner Inbox/service_credentials.md", 101),
-      file("Operations/Owner Inbox/Unsupported.png", 102),
+      file("Operations/Owner Inbox/Unsupported.zip", 102),
       file("Operations/Team Inbox/Team direct.md", 90),
       file("Operations/Team Inbox/Another direct.pdf", 80),
       file("Operations/Team Inbox/Email Drafts/Nested draft.md", 110),
@@ -83,6 +83,35 @@ describe("AI queue inventories", () => {
 });
 
 describe("recent file history", () => {
+  it("places in-dashboard preview history ahead of native and plugin history", async () => {
+    const files = [
+      file("Programs/Previewed.md", 10),
+      file("Programs/Plugin.md", 20),
+      file("Programs/Native.md", 30),
+    ];
+    const app = fakeApp(files, {
+      lastOpenFiles: ["Programs/Native.md"],
+      contents: {
+        ".config/community-plugins.json": JSON.stringify(["recent-files-obsidian"]),
+        ".config/plugins/recent-files-obsidian/data.json": JSON.stringify({
+          updateOn: "file-open",
+          recentFiles: [{ path: "Programs/Plugin.md" }],
+        }),
+      },
+    });
+
+    const data = await buildDashboardData(app, SETTINGS, {
+      recentFilePaths: ["Programs/Previewed.md", "Programs/Plugin.md"],
+    });
+
+    expect(data.recent.map((entry) => entry.path)).toEqual([
+      "Programs/Previewed.md",
+      "Programs/Plugin.md",
+      "Programs/Native.md",
+    ]);
+    expect(data.recentMode).toBe("viewed");
+  });
+
   it("prioritizes Recent Files open history, then appends native history", async () => {
     const files = [
       file("Outside Roots/Viewed first.md", 10),
@@ -91,7 +120,7 @@ describe("recent file history", () => {
       file("Operations/Plugin fourth.md", 800),
       file("Programs/Fifth.md", 700),
       file("Private/passwords/Unsafe.md", 1_000),
-      file("Outside Roots/Unsupported.png", 1_100),
+      file("Outside Roots/Unsupported.zip", 1_100),
     ];
     const recentFilesData = JSON.stringify({
       updateOn: "file-open",
@@ -101,7 +130,7 @@ describe("recent file history", () => {
         { basename: "Plugin fourth", path: "Operations/Plugin fourth.md" },
         { basename: "Missing", path: "Anywhere/Missing.md" },
         { basename: "Unsafe", path: "Private/passwords/Unsafe.md" },
-        { basename: "Unsupported", path: "Outside Roots/Unsupported.png" },
+        { basename: "Unsupported", path: "Outside Roots/Unsupported.zip" },
         { basename: "Fifth", path: "Programs/Fifth.md" },
       ],
     });
@@ -111,7 +140,7 @@ describe("recent file history", () => {
         "Programs/Viewed second.md",
         "Anywhere/Missing from workspace.md",
         "Private/passwords/Unsafe.md",
-        "Outside Roots/Unsupported.png",
+        "Outside Roots/Unsupported.zip",
       ],
       contents: {
         ".config/community-plugins.json": JSON.stringify([

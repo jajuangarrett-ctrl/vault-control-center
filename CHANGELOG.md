@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 — 2026-07-14
+
+- Added a shared in-dashboard preview pane across Home, Areas, Programs, AI Team, Recent, Bookmarks, and People, so normal file clicks no longer replace or leave the dashboard.
+- Added safe embedded previews for Markdown, text, CSV, HTML source, JSON, images, audio, video, PDF, and a bounded Canvas summary; Office and unsupported formats stay in the pane with an explicit native **Open in tab** action.
+- Preserved route, folder, filter, query, scroll, and focus state while previewing; added Escape/Back behavior, selected-row state, internal Markdown-link routing, stale-render protection, and responsive mobile overlay behavior.
+- Added dashboard preview history ahead of native/plugin open history so Recent accurately reflects files viewed inside Vault Control Center, while retaining only a capped list of safe paths in Obsidian workspace state.
+- Expanded the live index to supported image, media, and JSON formats so those files are visible and previewable in Areas, Programs, queues, bookmarks, and Recent.
+- Rebuilt dark and light themes around the supplied throwback Warriors palette: deep navy, royal blue, golden yellow, orange, and warm cream, including the optional coordinated Obsidian shell.
+
 ## 0.1.3 — 2026-07-14
 
 - Corrected AI Team queue counts and lists so Owner Inbox and Team Inbox show every direct safe, supported file, without the former twelve-file display cap.

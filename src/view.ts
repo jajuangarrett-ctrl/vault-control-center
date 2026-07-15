@@ -1,9 +1,13 @@
 import {
+  Component,
   ItemView,
+  MarkdownRenderer,
   Notice,
   TFile,
   TFolder,
   Vault,
+  normalizePath,
+  parseLinktext,
   type ViewStateResult,
   type WorkspaceLeaf,
 } from "obsidian";
@@ -11,14 +15,25 @@ import {
   buildDashboardData,
   isExcludedPath,
   isSensitivePath,
+  normalizeFileTitle,
+  normalizeVaultPath,
   pathIsWithin,
   type AiFolderKey,
   type DashboardBookmark,
   type DashboardData,
+  type DashboardFileCategory,
+  type DashboardFileItem,
 } from "./data";
 import { createButton, createIcon } from "./dom";
 import type VaultControlCenterPlugin from "./plugin";
 import { resolveProgramFolderPath } from "./program-navigation";
+import {
+  PREVIEW_TEXT_SIZE_LIMIT,
+  classifyPreviewKind,
+  mergePreviewHistory,
+  parseInternalLinkTarget,
+  type PreviewKind,
+} from "./preview";
 import {
   copyText,
   renderRoute,
@@ -48,6 +63,8 @@ interface PersistedViewState {
   selectedAiQueue?: unknown;
   recentFilter?: unknown;
   bookmarkFilter?: unknown;
+  previewPath?: unknown;
+  previewHistory?: unknown;
 }
 
 type AppWithSettings = {
@@ -61,6 +78,15 @@ const AI_QUEUE_KEYS: AiFolderKey[] = ["emailQueue", "formattedNotes", "ownerInbo
 const RECENT_FILTERS: RecentFilter[] = ["all", "programs", "ai", "people", "tasks", "areas", "vault"];
 const BOOKMARK_FILTERS: BookmarkFilter[] = ["all", "file", "folder", "url"];
 const TASKBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface PreviewOpenOptions {
+  focus?: boolean;
+  recordHistory?: boolean;
+}
+
+interface PreviewCloseOptions {
+  restoreFocus?: boolean;
+}
 
 export class VaultControlCenterView extends ItemView {
   navigation = false;
@@ -88,9 +114,18 @@ export class VaultControlCenterView extends ItemView {
   };
   private rootEl: HTMLElement | null = null;
   private routeTabsEl: HTMLElement | null = null;
+  private contentFrameEl: HTMLElement | null = null;
   private contentRegionEl: HTMLElement | null = null;
+  private previewPaneEl: HTMLElement | null = null;
   private mobileDockEl: HTMLElement | null = null;
   private searchInputEl: HTMLInputElement | null = null;
+  private activePreviewFile: TFile | null = null;
+  private pendingPreviewPath = "";
+  private previewReturnFocusEl: HTMLElement | null = null;
+  private previewComponent: Component | null = null;
+  private previewRequestId = 0;
+  private previewHistory: string[] = [];
+  private previewResizeObserver: ResizeObserver | null = null;
   private templateSaveTimer: number | null = null;
   private refreshPromise: Promise<void> | null = null;
   private taskboardFetchedAt = 0;
@@ -118,6 +153,9 @@ export class VaultControlCenterView extends ItemView {
     this.renderShell();
     const ownerDocument = this.contentEl.ownerDocument;
     this.registerDomEvent(ownerDocument, "keydown", (event: KeyboardEvent) => this.handleKeyboard(event));
+    if (this.pendingPreviewPath) {
+      void this.openPreview(this.pendingPreviewPath, { focus: false, recordHistory: false });
+    }
     await this.refresh();
   }
 
@@ -127,12 +165,20 @@ export class VaultControlCenterView extends ItemView {
       this.templateSaveTimer = null;
       await this.plugin.saveSettings();
     }
+    this.previewRequestId += 1;
+    this.disposePreviewComponent();
+    this.previewResizeObserver?.disconnect();
+    this.previewResizeObserver = null;
     this.contentEl.empty();
     this.rootEl = null;
+    this.contentFrameEl = null;
     this.contentRegionEl = null;
+    this.previewPaneEl = null;
     this.routeTabsEl = null;
     this.mobileDockEl = null;
     this.searchInputEl = null;
+    this.previewReturnFocusEl = null;
+    this.activePreviewFile = null;
   }
 
   getState(): Record<string, unknown> {
@@ -146,6 +192,8 @@ export class VaultControlCenterView extends ItemView {
       selectedAiQueue: this.renderState.selectedAiQueue,
       recentFilter: this.renderState.recentFilter,
       bookmarkFilter: this.renderState.bookmarkFilter,
+      previewPath: this.activePreviewFile?.path || this.pendingPreviewPath,
+      previewHistory: this.previewHistory,
     };
   }
 
@@ -177,6 +225,30 @@ export class VaultControlCenterView extends ItemView {
     if (typeof saved.bookmarkFilter === "string" && BOOKMARK_FILTERS.includes(saved.bookmarkFilter as BookmarkFilter)) {
       this.renderState.bookmarkFilter = saved.bookmarkFilter as BookmarkFilter;
     }
+    const savedPreviewPath = typeof saved.previewPath === "string"
+      ? normalizeVaultPath(saved.previewPath)
+      : "";
+    this.pendingPreviewPath =
+      savedPreviewPath &&
+      !isExcludedPath(savedPreviewPath) &&
+      !isSensitivePath(savedPreviewPath)
+        ? savedPreviewPath
+        : "";
+    if (Array.isArray(saved.previewHistory)) {
+      this.previewHistory = saved.previewHistory
+        .filter((path): path is string => typeof path === "string")
+        .reduceRight(
+          (history, path) => mergePreviewHistory(
+            history,
+            path,
+            (candidate) =>
+              !isExcludedPath(candidate) &&
+              !isSensitivePath(candidate) &&
+              this.app.vault.getAbstractFileByPath(normalizePath(candidate)) instanceof TFile
+          ),
+          [] as string[]
+        );
+    }
 
     if (this.rootEl) {
       this.canonicalizeAreaSelection();
@@ -184,6 +256,11 @@ export class VaultControlCenterView extends ItemView {
       this.renderRouteTabs();
       this.renderContent();
       this.renderMobileDock();
+      if (this.pendingPreviewPath) {
+        void this.openPreview(this.pendingPreviewPath, { focus: false, recordHistory: false });
+      } else if (this.activePreviewFile) {
+        this.closePreview({ restoreFocus: false });
+      }
     }
   }
 
@@ -213,7 +290,9 @@ export class VaultControlCenterView extends ItemView {
         this.taskboardSettingsKey !== taskboardSettingsKey ||
         Date.now() - this.taskboardFetchedAt >= TASKBOARD_CACHE_TTL_MS;
       const [data, taskboard] = await Promise.all([
-        buildDashboardData(this.app, this.plugin.settings),
+        buildDashboardData(this.app, this.plugin.settings, {
+          recentFilePaths: this.previewHistory,
+        }),
         shouldRefreshTaskboard
           ? fetchTaskboardSnapshot(this.app, this.plugin.settings)
           : Promise.resolve(this.taskboard),
@@ -227,6 +306,9 @@ export class VaultControlCenterView extends ItemView {
       this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
       this.renderContent();
+      if (this.activePreviewFile || this.pendingPreviewPath) {
+        void this.restoreActivePreview();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Dashboard refresh failed.";
       new Notice(message);
@@ -237,7 +319,11 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private renderShell(): void {
-    const previousFocus = document.activeElement === this.searchInputEl;
+    const previousFocus = this.contentEl.ownerDocument.activeElement === this.searchInputEl;
+    this.previewRequestId += 1;
+    this.disposePreviewComponent();
+    this.previewResizeObserver?.disconnect();
+    this.previewResizeObserver = null;
     this.contentEl.empty();
     this.rootEl = this.contentEl.createDiv({
       cls: "fjg-vcc",
@@ -294,13 +380,34 @@ export class VaultControlCenterView extends ItemView {
       attr: { role: "tablist", "aria-label": "Dashboard views" },
     });
     this.renderRouteTabs();
-    this.contentRegionEl = this.rootEl.createEl("main", { cls: "fjg-vcc-content" });
+    this.contentFrameEl = this.rootEl.createDiv({ cls: "fjg-vcc-content-frame" });
+    this.contentRegionEl = this.contentFrameEl.createEl("main", {
+      cls: "fjg-vcc-content",
+      attr: { "aria-label": "Dashboard content" },
+    });
+    this.previewPaneEl = this.contentFrameEl.createEl("aside", {
+      cls: "fjg-vcc-preview-pane",
+      attr: {
+        role: "region",
+        "aria-label": "File preview",
+        "aria-hidden": "true",
+      },
+    });
+    this.previewPaneEl.hidden = true;
     this.mobileDockEl = this.rootEl.createEl("nav", {
       cls: "fjg-vcc-mobile-dock",
       attr: { "aria-label": "Mobile dashboard navigation" },
     });
     this.renderMobileDock();
     this.renderContent();
+
+    if (typeof ResizeObserver !== "undefined") {
+      this.previewResizeObserver = new ResizeObserver(() => this.updatePreviewLayoutMode());
+      this.previewResizeObserver.observe(this.rootEl);
+    }
+    if (this.activePreviewFile || this.pendingPreviewPath) {
+      void this.restoreActivePreview();
+    }
 
     if (previousFocus) window.setTimeout(() => this.searchInputEl?.focus(), 0);
   }
@@ -389,6 +496,7 @@ export class VaultControlCenterView extends ItemView {
       return;
     }
     renderRoute(this.route, this.contentRegionEl, this.renderContext());
+    this.syncPreviewSelection();
   }
 
   private canonicalizeProgramSelection(): void {
@@ -426,8 +534,9 @@ export class VaultControlCenterView extends ItemView {
       taskboard: this.taskboard,
       settings: this.plugin.settings,
       state: this.renderState,
+      activePreviewPath: this.activePreviewFile?.path ?? this.pendingPreviewPath,
       navigate: (route) => this.navigate(route),
-      openFile: (path) => void this.plugin.openVaultFile(path),
+      openFile: (path) => void this.openPreview(path),
       openBookmark: (bookmark) => void this.openBookmark(bookmark),
       openExternal: (url) => this.openExternal(url),
       capture: (commandId, label) => this.plugin.executeCapture(commandId, label),
@@ -496,6 +605,7 @@ export class VaultControlCenterView extends ItemView {
 
   private navigate(route: DashboardRoute): void {
     if (this.route === route) return;
+    this.closePreview({ restoreFocus: false });
     this.route = route;
     this.renderRouteTabs();
     this.renderMobileDock();
@@ -540,10 +650,515 @@ export class VaultControlCenterView extends ItemView {
     if (this.app.workspace.getActiveViewOfType(VaultControlCenterView) !== this) return;
     const target = event.target as HTMLElement | null;
     const isEditing = target?.matches("input, textarea, select, [contenteditable='true']") ?? false;
+    if (event.key === "Escape" && (this.activePreviewFile || this.pendingPreviewPath)) {
+      event.preventDefault();
+      this.closePreview();
+      return;
+    }
     if (event.key === "/" && !isEditing) {
       event.preventDefault();
       this.searchInputEl?.focus();
     }
+  }
+
+  private async openPreview(
+    path: string,
+    options: PreviewOpenOptions = {}
+  ): Promise<void> {
+    const normalizedPath = normalizeVaultPath(path);
+    if (
+      !normalizedPath ||
+      isExcludedPath(normalizedPath) ||
+      isSensitivePath(normalizedPath)
+    ) {
+      new Notice("That file is not available from the dashboard.");
+      return;
+    }
+
+    const target = this.app.vault.getAbstractFileByPath(normalizePath(normalizedPath));
+    if (!(target instanceof TFile)) {
+      new Notice("That file is no longer available.");
+      return;
+    }
+
+    const activeElement = this.contentEl.ownerDocument.activeElement;
+    const ownerHTMLElement = this.contentEl.ownerDocument.defaultView?.HTMLElement;
+    if (
+      options.focus !== false &&
+      ownerHTMLElement &&
+      activeElement instanceof ownerHTMLElement &&
+      this.contentRegionEl?.contains(activeElement)
+    ) {
+      this.previewReturnFocusEl = activeElement;
+    }
+
+    this.activePreviewFile = target;
+    this.pendingPreviewPath = target.path;
+    if (options.recordHistory !== false) this.recordPreviewHistory(target);
+    this.syncPreviewSelection();
+    await this.renderPreview(target, options.focus !== false);
+  }
+
+  private async restoreActivePreview(): Promise<void> {
+    const path = normalizeVaultPath(
+      this.activePreviewFile?.path || this.pendingPreviewPath
+    );
+    if (!path) return;
+    if (isExcludedPath(path) || isSensitivePath(path)) {
+      this.closePreview({ restoreFocus: false });
+      return;
+    }
+    const target = this.app.vault.getAbstractFileByPath(normalizePath(path));
+    if (!(target instanceof TFile)) {
+      this.activePreviewFile = null;
+      this.pendingPreviewPath = path;
+      this.renderMissingPreview(path);
+      return;
+    }
+    this.activePreviewFile = target;
+    this.pendingPreviewPath = target.path;
+    await this.renderPreview(target, false);
+  }
+
+  private async renderPreview(file: TFile, focus: boolean): Promise<void> {
+    const pane = this.previewPaneEl;
+    if (!pane) return;
+
+    const requestId = ++this.previewRequestId;
+    this.disposePreviewComponent();
+    pane.empty();
+    pane.hidden = false;
+    pane.setAttribute("aria-hidden", "false");
+    this.rootEl?.setAttribute("data-preview-open", "true");
+
+    const header = pane.createEl("header", { cls: "fjg-vcc-preview-header" });
+    createButton(header, {
+      label: "Back",
+      icon: "arrow-left",
+      className: "fjg-vcc-preview-back",
+      ariaLabel: "Close preview and return to the dashboard",
+      onClick: () => this.closePreview(),
+    });
+    const headingGroup = header.createDiv({ cls: "fjg-vcc-preview-heading" });
+    headingGroup.createSpan({
+      cls: "fjg-vcc-preview-kicker",
+      text: `${file.extension.toLocaleUpperCase() || "FILE"} preview`,
+    });
+    const headingId = `fjg-vcc-preview-title-${requestId}`;
+    const heading = headingGroup.createEl("h2", {
+      cls: "fjg-vcc-preview-title",
+      text: normalizeFileTitle(file.name) || file.name,
+      attr: { id: headingId, tabindex: "-1" },
+    });
+    pane.setAttribute("aria-labelledby", headingId);
+    pane.removeAttribute("aria-label");
+
+    const actions = header.createDiv({ cls: "fjg-vcc-preview-actions" });
+    createButton(actions, {
+      label: "Open in tab",
+      icon: "external-link",
+      className: "fjg-vcc-button fjg-vcc-preview-open-tab",
+      onClick: () => void this.plugin.openVaultFileInTab(file.path),
+    });
+    const pathBar = pane.createDiv({ cls: "fjg-vcc-preview-pathbar" });
+    pathBar.createSpan({ cls: "fjg-vcc-preview-path", text: file.path });
+    pathBar.createSpan({
+      cls: "fjg-vcc-preview-size",
+      text: formatFileSize(file.stat.size),
+    });
+    const body = pane.createDiv({
+      cls: "fjg-vcc-preview-body",
+      attr: { tabindex: "0" },
+    });
+    const loading = body.createDiv({
+      cls: "fjg-vcc-preview-loading",
+      attr: { role: "status" },
+    });
+    createIcon(loading, "loader-circle");
+    loading.createSpan({ text: "Preparing preview…" });
+
+    this.updatePreviewLayoutMode();
+    const session = this.addChild(new Component());
+    this.previewComponent = session;
+
+    try {
+      const kind = classifyPreviewKind(file.extension);
+      if (
+        (kind === "markdown" || kind === "text") &&
+        file.stat.size > PREVIEW_TEXT_SIZE_LIMIT
+      ) {
+        body.empty();
+        this.renderPreviewFallback(
+          body,
+          "Preview limited for this file",
+          `This ${formatFileSize(file.stat.size)} file is too large to render safely inside the dashboard.`
+        );
+      } else {
+        await this.renderPreviewContent(kind, file, body, session, requestId);
+      }
+    } catch (error) {
+      if (!this.isCurrentPreviewRequest(requestId, file.path)) return;
+      body.empty();
+      const message = error instanceof Error ? error.message : "The file could not be rendered.";
+      this.renderPreviewFallback(body, "Preview unavailable", message, true);
+    }
+
+    if (!this.isCurrentPreviewRequest(requestId, file.path)) return;
+    this.updatePreviewLayoutMode();
+    if (focus) {
+      this.contentEl.ownerDocument.defaultView?.setTimeout(
+        () => heading.focus({ preventScroll: true }),
+        0
+      );
+    }
+  }
+
+  private async renderPreviewContent(
+    kind: PreviewKind,
+    file: TFile,
+    body: HTMLElement,
+    session: Component,
+    requestId: number
+  ): Promise<void> {
+    switch (kind) {
+      case "markdown": {
+        const markdown = await this.app.vault.cachedRead(file);
+        if (!this.isCurrentPreviewRequest(requestId, file.path)) return;
+        body.empty();
+        body.addClass("markdown-rendered", "fjg-vcc-preview-markdown");
+        session.registerDomEvent(body, "click", (event: MouseEvent) => {
+          const target = event.target as HTMLElement | null;
+          const anchor = target?.closest<HTMLAnchorElement>("a.internal-link");
+          if (!anchor) return;
+          const linkTarget = parseInternalLinkTarget(
+            anchor.getAttribute("href"),
+            anchor.getAttribute("data-href")
+          );
+          if (!linkTarget) return;
+          const { path } = parseLinktext(linkTarget);
+          const destination = this.app.metadataCache.getFirstLinkpathDest(path, file.path);
+          event.preventDefault();
+          event.stopPropagation();
+          if (destination) void this.openPreview(destination.path);
+          else new Notice("That linked file is no longer available.");
+        }, { capture: true });
+        await MarkdownRenderer.render(this.app, markdown, body, file.path, session);
+        return;
+      }
+      case "text": {
+        const text = await this.app.vault.cachedRead(file);
+        if (!this.isCurrentPreviewRequest(requestId, file.path)) return;
+        body.empty();
+        const source = body.createEl("pre", { cls: "fjg-vcc-preview-source" });
+        source.createEl("code", { text });
+        return;
+      }
+      case "image": {
+        body.empty();
+        const figure = body.createEl("figure", { cls: "fjg-vcc-preview-media" });
+        const image = figure.createEl("img", {
+          attr: {
+            src: this.app.vault.getResourcePath(file),
+            alt: normalizeFileTitle(file.name) || file.name,
+            loading: "eager",
+          },
+        });
+        session.registerDomEvent(image, "error", () => {
+          figure.empty();
+          this.renderPreviewFallback(
+            figure,
+            "Image preview unavailable",
+            "Use Open in tab to view this image with Obsidian's native viewer.",
+            true
+          );
+        });
+        figure.createEl("figcaption", { text: file.name });
+        return;
+      }
+      case "audio":
+      case "video": {
+        body.empty();
+        const media = body.createEl(kind, {
+          cls: "fjg-vcc-preview-av",
+          attr: {
+            src: this.app.vault.getResourcePath(file),
+            controls: "",
+            preload: "metadata",
+            ...(kind === "video" ? { playsinline: "" } : {}),
+          },
+        });
+        session.register(() => {
+          media.pause();
+          media.removeAttribute("src");
+          media.load();
+        });
+        return;
+      }
+      case "pdf": {
+        body.empty();
+        body.addClass("fjg-vcc-preview-pdf");
+        const frame = body.createEl("iframe", {
+          cls: "fjg-vcc-preview-pdf-frame",
+          attr: {
+            src: this.app.vault.getResourcePath(file),
+            title: `PDF preview of ${normalizeFileTitle(file.name) || file.name}`,
+            loading: "eager",
+          },
+        });
+        session.register(() => frame.setAttribute("src", "about:blank"));
+        return;
+      }
+      case "native-fallback": {
+        body.empty();
+        if (file.extension.toLocaleLowerCase() === "canvas") {
+          await this.renderCanvasSummary(file, body, requestId);
+          return;
+        }
+        this.renderPreviewFallback(
+          body,
+          "Native preview required",
+          `${file.extension.toLocaleUpperCase() || "This file type"} does not have a safe embedded renderer. The dashboard stayed open; use Open in tab when you need Obsidian's native viewer.`
+        );
+      }
+    }
+  }
+
+  private async renderCanvasSummary(
+    file: TFile,
+    body: HTMLElement,
+    requestId: number
+  ): Promise<void> {
+    if (file.stat.size > PREVIEW_TEXT_SIZE_LIMIT) {
+      this.renderPreviewFallback(
+        body,
+        "Canvas summary unavailable",
+        "This canvas is too large to summarize safely inside the dashboard."
+      );
+      return;
+    }
+    const raw = await this.app.vault.cachedRead(file);
+    if (!this.isCurrentPreviewRequest(requestId, file.path)) return;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("The canvas data is not in a readable format.");
+    }
+    const record = parsed as { nodes?: unknown; edges?: unknown };
+    const nodes = Array.isArray(record.nodes) ? record.nodes : [];
+    const edges = Array.isArray(record.edges) ? record.edges : [];
+    body.empty();
+    const summary = body.createDiv({ cls: "fjg-vcc-canvas-summary" });
+    summary.createEl("h3", { text: "Canvas overview" });
+    const stats = summary.createDiv({ cls: "fjg-vcc-canvas-stats" });
+    stats.createSpan({ text: `${nodes.length} node${nodes.length === 1 ? "" : "s"}` });
+    stats.createSpan({ text: `${edges.length} connection${edges.length === 1 ? "" : "s"}` });
+    const textNodes = nodes
+      .filter((node): node is { text: string } =>
+        Boolean(node) &&
+        typeof node === "object" &&
+        typeof (node as { text?: unknown }).text === "string"
+      )
+      .map((node) => node.text.trim())
+      .filter(Boolean)
+      .slice(0, 24);
+    if (textNodes.length) {
+      const list = summary.createEl("ul");
+      for (const text of textNodes) {
+        list.createEl("li", { text: text.length > 240 ? `${text.slice(0, 237)}…` : text });
+      }
+    } else {
+      summary.createEl("p", {
+        text: "This canvas contains visual or linked nodes without inline text. Open it in a tab for the full board.",
+      });
+    }
+  }
+
+  private renderPreviewFallback(
+    parent: HTMLElement,
+    title: string,
+    description: string,
+    error = false
+  ): void {
+    const state = parent.createDiv({
+      cls: "fjg-vcc-preview-fallback",
+      attr: { role: error ? "alert" : "status" },
+    });
+    createIcon(state, error ? "triangle-alert" : "file-question");
+    state.createEl("strong", { text: title });
+    state.createEl("p", { text: description });
+  }
+
+  private renderMissingPreview(path: string): void {
+    const pane = this.previewPaneEl;
+    if (!pane) return;
+    this.previewRequestId += 1;
+    this.disposePreviewComponent();
+    pane.empty();
+    pane.hidden = false;
+    pane.setAttribute("aria-hidden", "false");
+    pane.removeAttribute("aria-labelledby");
+    pane.setAttribute("aria-label", "Unavailable file preview");
+    this.rootEl?.setAttribute("data-preview-open", "true");
+    const header = pane.createEl("header", { cls: "fjg-vcc-preview-header" });
+    createButton(header, {
+      label: "Back",
+      icon: "arrow-left",
+      className: "fjg-vcc-preview-back",
+      onClick: () => this.closePreview(),
+    });
+    const heading = header.createDiv({ cls: "fjg-vcc-preview-heading" });
+    heading.createSpan({ cls: "fjg-vcc-preview-kicker", text: "Preview unavailable" });
+    const pathParts = path.split("/");
+    heading.createEl("h2", {
+      cls: "fjg-vcc-preview-title",
+      text: pathParts[pathParts.length - 1] || "File",
+    });
+    const body = pane.createDiv({ cls: "fjg-vcc-preview-body" });
+    this.renderPreviewFallback(
+      body,
+      "File moved or deleted",
+      "Refresh the dashboard or choose another file. No other tab was opened.",
+      true
+    );
+    this.updatePreviewLayoutMode();
+    this.syncPreviewSelection();
+  }
+
+  private closePreview(options: PreviewCloseOptions = {}): void {
+    const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
+    const returnFocus = this.previewReturnFocusEl;
+    this.previewRequestId += 1;
+    this.disposePreviewComponent();
+    this.activePreviewFile = null;
+    this.pendingPreviewPath = "";
+    this.previewReturnFocusEl = null;
+    if (this.previewPaneEl) {
+      this.previewPaneEl.empty();
+      this.previewPaneEl.hidden = true;
+      this.previewPaneEl.setAttribute("aria-hidden", "true");
+      this.previewPaneEl.removeAttribute("aria-labelledby");
+      this.previewPaneEl.setAttribute("aria-label", "File preview");
+    }
+    this.rootEl?.removeAttribute("data-preview-open");
+    this.updatePreviewLayoutMode();
+    this.syncPreviewSelection();
+
+    if (options.restoreFocus === false) return;
+    const fallback = Array.from(
+      this.contentRegionEl?.querySelectorAll<HTMLElement>("[data-file-path]") ?? []
+    )
+      .find((element) => element.dataset.filePath === activePath);
+    this.contentEl.ownerDocument.defaultView?.setTimeout(() => {
+      if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+      else fallback?.focus({ preventScroll: true });
+    }, 0);
+  }
+
+  private disposePreviewComponent(): void {
+    if (!this.previewComponent) return;
+    try {
+      this.removeChild(this.previewComponent);
+    } catch {
+      this.previewComponent.unload();
+    }
+    this.previewComponent = null;
+  }
+
+  private updatePreviewLayoutMode(): void {
+    const previewOpen = Boolean(
+      this.previewPaneEl &&
+      !this.previewPaneEl.hidden &&
+      (this.activePreviewFile || this.pendingPreviewPath)
+    );
+    const width = this.rootEl?.getBoundingClientRect().width ?? 0;
+    const overlay = previewOpen && width > 0 && width < 760;
+    this.rootEl?.setAttribute("data-preview-mode", overlay ? "overlay" : "split");
+    if (!previewOpen) this.rootEl?.removeAttribute("data-preview-mode");
+    if (overlay) {
+      this.contentRegionEl?.setAttribute("inert", "");
+      this.contentRegionEl?.setAttribute("aria-hidden", "true");
+    } else {
+      this.contentRegionEl?.removeAttribute("inert");
+      this.contentRegionEl?.removeAttribute("aria-hidden");
+    }
+  }
+
+  private syncPreviewSelection(): void {
+    const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
+    for (const row of Array.from(
+      this.contentRegionEl?.querySelectorAll<HTMLElement>("[data-file-path]") ?? []
+    )) {
+      const selected = Boolean(activePath && row.dataset.filePath === activePath);
+      row.classList.toggle("is-selected", selected);
+      row.setAttribute("aria-current", selected ? "true" : "false");
+    }
+  }
+
+  private isCurrentPreviewRequest(requestId: number, filePath: string): boolean {
+    return Boolean(
+      requestId === this.previewRequestId &&
+      this.previewPaneEl?.isConnected &&
+      this.activePreviewFile?.path === filePath
+    );
+  }
+
+  private recordPreviewHistory(file: TFile): void {
+    this.previewHistory = mergePreviewHistory(
+      this.previewHistory,
+      file.path,
+      (path) => {
+        if (isExcludedPath(path) || isSensitivePath(path)) return false;
+        return this.app.vault.getAbstractFileByPath(normalizePath(path)) instanceof TFile;
+      }
+    );
+    if (!this.data) return;
+    const item = this.findDashboardFileItem(file.path) ?? this.toDashboardFileItem(file);
+    this.data.recent = [
+      item,
+      ...this.data.recent.filter((candidate) => candidate.path !== item.path),
+    ].slice(0, 30);
+    this.data.recentMode = "viewed";
+  }
+
+  private findDashboardFileItem(path: string): DashboardFileItem | undefined {
+    if (!this.data) return undefined;
+    const collections: DashboardFileItem[][] = [
+      this.data.recent,
+      this.data.areasRoot.files,
+      ...this.data.programs.map((program) => program.files),
+      ...Object.values(this.data.aiQueues).map((queue) => queue.files),
+      this.data.people.files,
+    ];
+    for (const files of collections) {
+      const match = files.find((candidate) => candidate.path === path);
+      if (match) return match;
+    }
+    return undefined;
+  }
+
+  private toDashboardFileItem(file: TFile): DashboardFileItem {
+    return {
+      title: normalizeFileTitle(file.name) || file.basename,
+      name: file.name,
+      path: file.path,
+      extension: file.extension.toLocaleLowerCase(),
+      modifiedAt: file.stat.mtime,
+      createdAt: file.stat.ctime,
+      size: file.stat.size,
+      category: this.categoryForPath(file.path),
+    };
+  }
+
+  private categoryForPath(path: string): DashboardFileCategory {
+    if (pathIsWithin(path, this.plugin.settings.programsFolder)) return "programs";
+    if (pathIsWithin(path, this.plugin.settings.areasFolder)) return "areas";
+    if (Object.values(this.plugin.settings.aiFolders).some((root) => pathIsWithin(path, root))) {
+      return "ai";
+    }
+    if (pathIsWithin(path, this.plugin.settings.peopleFolder)) return "people";
+    if (normalizeVaultPath(path) === normalizeVaultPath(this.plugin.settings.tasksFilePath)) {
+      return "tasks";
+    }
+    return "vault";
   }
 
   private async openBookmark(bookmark: DashboardBookmark): Promise<void> {
@@ -551,9 +1166,14 @@ export class VaultControlCenterView extends ItemView {
       this.openExternal(bookmark.target);
       return;
     }
-    const target = this.app.vault.getAbstractFileByPath(bookmark.target);
+    const targetPath = normalizeVaultPath(bookmark.target);
+    if (!targetPath || isExcludedPath(targetPath) || isSensitivePath(targetPath)) {
+      new Notice("That bookmark is not available from the dashboard.");
+      return;
+    }
+    const target = this.app.vault.getAbstractFileByPath(normalizePath(targetPath));
     if (target instanceof TFile) {
-      await this.app.workspace.getLeaf(false).openFile(target);
+      await this.openPreview(target.path);
       return;
     }
     if (target instanceof TFolder) {
@@ -569,10 +1189,10 @@ export class VaultControlCenterView extends ItemView {
       });
       files.sort((left, right) => right.stat.mtime - left.stat.mtime);
       if (files[0]) {
-        await this.app.workspace.getLeaf(false).openFile(files[0]);
+        await this.openPreview(files[0].path);
         return;
       }
-      new Notice("That folder has no safe files available to open.");
+      new Notice("That folder has no safe files available to preview.");
       return;
     }
     new Notice("That bookmark target is no longer available.");
@@ -623,4 +1243,11 @@ export class VaultControlCenterView extends ItemView {
     app.setting?.open?.();
     app.setting?.openTabById?.(this.plugin.manifest.id);
   }
+}
+
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "Unknown size";
+  if (bytes < 1_024) return `${bytes} B`;
+  if (bytes < 1_048_576) return `${(bytes / 1_024).toFixed(bytes < 10_240 ? 1 : 0)} KB`;
+  return `${(bytes / 1_048_576).toFixed(bytes < 10_485_760 ? 1 : 0)} MB`;
 }

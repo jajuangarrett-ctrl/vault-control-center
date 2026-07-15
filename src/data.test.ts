@@ -153,7 +153,7 @@ describe("buildDashboardData", () => {
 
     expect(data.generatedAt).toBe("2026-07-13T12:00:00.000Z");
     expect(data.programs.map(({ name, count }) => ({ name, count }))).toEqual([
-      { name: "Alpha", count: 2 },
+      { name: "Alpha", count: 3 },
       { name: "Beta", count: 1 },
     ]);
     expect(data.aiQueues.emailQueue.count).toBe(1);
@@ -161,7 +161,7 @@ describe("buildDashboardData", () => {
     expect(data.aiQueues.ownerInbox.count).toBe(0);
     expect(data.aiQueues.teamInbox.count).toBe(1);
     expect(data.people.count).toBe(1);
-    expect(data.recent[0].path).toBe("Tasks/Tasks.md");
+    expect(data.recent[0].path).toBe("Programs/Alpha/Poster.png");
     expect(data.bookmarks).toHaveLength(1);
     expect(data.metrics.hiddenBookmarks).toBe(1);
     expect(data.tasks).toEqual({
@@ -228,10 +228,12 @@ describe("buildDashboardData", () => {
     expect(data.areasRoot).toMatchObject({
       name: "All Areas",
       path: "03 Areas",
-      count: 20,
+      count: 21,
     });
-    expect(data.areasRoot.files).toHaveLength(20);
-    expect(data.areasRoot.files[0].path).toBe("03 Areas/03 Areas.md");
+    expect(data.areasRoot.files).toHaveLength(21);
+    expect(data.areasRoot.files[0].path).toBe(
+      "03 Areas/Student-Support/Image.png"
+    );
     expect(data.areasRoot.files.every((entry) => entry.category === "areas")).toBe(
       true
     );
@@ -242,7 +244,7 @@ describe("buildDashboardData", () => {
       {
         name: "Student-Support",
         path: "03 Areas/Student-Support",
-        count: 16,
+        count: 17,
       },
       { name: "How-To", path: "03 Areas/How-To", count: 2 },
       { name: "Reference", path: "03 Areas/Reference", count: 1 },
@@ -251,15 +253,15 @@ describe("buildDashboardData", () => {
     const studentSupport = data.areas.find(
       (area) => area.path === "03 Areas/Student-Support"
     );
-    expect(studentSupport?.files).toHaveLength(16);
+    expect(studentSupport?.files).toHaveLength(17);
     expect(studentSupport?.files[0].path).toBe(
-      "03 Areas/Student-Support/Overview.md"
+      "03 Areas/Student-Support/Image.png"
     );
     expect(studentSupport?.files.every((entry) => entry.category === "areas")).toBe(
       true
     );
     expect(JSON.stringify({ root: data.areasRoot, areas: data.areas })).not.toMatch(
-      /Archived|Passwords|\.private|Areas Archive|Image\.png/
+      /Archived|Passwords|\.private|Areas Archive/
     );
     expect(data.sources.areasFolder).toEqual({
       path: "03 Areas",

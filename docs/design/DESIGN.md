@@ -1,12 +1,12 @@
 # Vault Control Center design system
 
-Vault Control Center is an operational workspace, not a marketing dashboard. Its visual language is compact, quiet, and native to Obsidian: one shared information architecture, one component system, and two coordinated token sets.
+Vault Control Center is an operational workspace, not a marketing dashboard. Its visual language is compact and native to Obsidian: one shared information architecture, one component system, a persistent file-preview experience, and two coordinated throwback token sets.
 
 ## Product principles
 
 1. Put capture and current work above the fold.
 2. Prefer dense rows and grouped work regions over decorative cards.
-3. Use orange as a signal, never as a background wash.
+3. Use gold for active navigation, orange for operational signals, and royal blue for focus and links.
 4. Keep navigation stable across all nine routes.
 5. Make every visible count, file, person, area, and program actionable.
 6. Read live vault state at runtime; never bundle personal vault data.
@@ -17,24 +17,25 @@ Vault Control Center is an operational workspace, not a marketing dashboard. Its
 - `vault-control-center-light-concept.png` — the exact desktop structure in light mode.
 - `vault-control-center-mobile-dark-concept.png` — touch-first responsive hierarchy.
 
-These are visual targets rather than literal screenshots. Names and values shown in them are illustrative.
+These are legacy structure references rather than current palette references. Names and values shown in them are illustrative. The current color system was derived from Franklin's supplied old-school Golden State Warriors jersey reference: deep navy fabric, royal-blue depth, golden-yellow trim, orange outlines, and a warm cream light-mode ground. Sports branding and imagery are intentionally not placed in the product UI.
 
 ## Color tokens
 
 | Role | Dark | Light |
 | --- | --- | --- |
-| Canvas | `#071826` | `#ffffff` |
-| Surface | `#0b2438` | `#f3f7fa` |
-| Raised surface | `#12334a` | `#eaf1f6` |
-| Primary text | `#eaf2f7` | `#0b2545` |
-| Muted text | `#93a9b8` | `#566c7d` |
-| Border | `#28485c` | `#d2dee7` |
-| Signal orange | `#f47a24` | `#e86f1c` |
-| Cool accent | `#3ba6c9` | `#157b9a` |
-| Positive | `#8bcf62` | `#5f9f3c` |
-| Critical | `#ff5c5c` | `#cc3c3c` |
+| Canvas | `#0a1238` | `#fffdf5` |
+| Surface | `#111d4f` | `#f1f4ff` |
+| Raised surface | `#1a2a64` | `#e5eaff` |
+| Primary text | `#f8faff` | `#151b4b` |
+| Muted text | `#c7cde0` | `#586184` |
+| Border | `#344781` | `#cbd3f1` |
+| Signal orange | `#f47a24` | `#c64b0a` |
+| Golden accent | `#ffc72c` | `#e9ab00` |
+| Royal-blue accent | `#83a2ff` | `#3049a8` |
+| Positive | `#83d16b` | `#477e33` |
+| Critical | `#ff6b67` | `#b52f36` |
 
-Orange appears on the active route, the signal rail, capture emphasis, selected states, and urgent task indicators. Cool blue is reserved for links, planning states, and secondary focus.
+Gold appears on the active route, preview trim, and small selected details. Orange remains the operational signal rail, selected-row rail, and urgent indicator. Royal blue is reserved for links, planning states, secondary emphasis, and visible focus. Bright gold is decorative in light mode; readable small text uses a darker ochre token.
 
 ## Typography and rhythm
 
@@ -48,12 +49,13 @@ Orange appears on the active route, the signal rail, capture emphasis, selected 
 
 ## Container model
 
-The plugin renders one native `ItemView` with four persistent layers:
+The plugin renders one native `ItemView` with five persistent layers:
 
 1. Header: title, search, refresh, and theme toggle.
 2. Route strip: Home, Areas, Programs, AI Team, Recent, Bookmarks, People, Clipboard, Settings.
-3. Route content: live, replaceable work region.
-4. Mobile action dock: Home, Areas, Programs, Capture, Recent, More.
+3. Route content: live, replaceable work region whose navigation and filters survive preview actions.
+4. Preview pane: a sibling of route content, split beside it on desktop and replacing only the route region on mobile.
+5. Mobile action dock: Home, Areas, Programs, Capture, Recent, More; hidden while the full-width mobile preview is open.
 
 The Home route adds three stacked operational bands:
 
@@ -70,6 +72,7 @@ The orange signal rail is the signature visual element. It should remain visible
 - `Signal`: icon, label, live value, optional attention dot.
 - `WorkPanel`: section label, optional action, bordered row region.
 - `FileRow`: file icon, basename, compact path, and relative modified time or a contextual viewed-status label.
+- `PreviewPane`: Back, file title/path/size, safe read-only renderer, and the only **Open in tab** escape.
 - `FolderRootRow`: area or program name, file count, modified time, open action.
 - `QueueRow`: direct safe, supported file from a configured active queue; queue lists are complete rather than preview-capped.
 - `PersonRow`: initials, name, agenda count, modified time.
@@ -81,13 +84,16 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 
 ## Interaction rules
 
-- Clicking a file opens it in an Obsidian leaf.
-- Clicking an area, program, or folder opens its route detail, then offers native file actions.
+- Clicking a file previews it inside the dashboard without replacing the dashboard leaf.
+- Clicking an area, program, or folder drills into its route detail; only file rows invoke the preview.
+- **Open in tab** is the only file action that deliberately opens Obsidian's native viewer/editor in another tab.
+- Markdown internal links resolve into the same preview pane; HTTP(S) links remain external.
+- Back and Escape close the preview and restore route-row focus. Slow earlier renders cannot overwrite a later file selection.
 - `/` focuses dashboard search when the view is active.
 - Search filters the current route without leaving the keyboard.
 - Refresh immediately rebuilds the live index and reports completion.
 - Owner Inbox and Team Inbox counts represent direct active files only; nested subfolders are intentionally outside those queue counts.
-- Recent follows Obsidian's vault-wide file-open history, prioritizing an enabled Recent Files plugin in file-open mode before appending native history, and uses configured modified-time roots only when viewed history is unavailable.
+- Recent places the dashboard's capped safe-path preview history first, then prioritizes an enabled Recent Files plugin in file-open mode before appending native history. Configured modified-time roots are used only when viewed history is unavailable.
 - Theme changes update the dashboard and, when enabled, the coordinated shell class.
 - Clipboard templates are editable, copyable, resettable, and stored only as preferences.
 - Sensitive or archived paths are excluded before display.
@@ -96,9 +102,9 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 
 | Width | Behavior |
 | --- | --- |
-| `>= 1180px` | Three-column Home work grid; full header actions and route labels. |
-| `760–1179px` | Two-column work grid; People moves to a full-width row. |
-| `< 760px` | One column, horizontally scrollable route strip, 2×2 capture and signal grids, sticky mobile dock. |
+| `>= 1180px` | Three-column Home work grid when closed; preview opens as a sticky right-hand split pane. |
+| `760–1179px` | Two-column work grid; People moves to a full-width row; preview keeps a minimum readable width. |
+| `< 760px` | One-column route, horizontally scrollable route strip, 2×2 capture and signal grids; preview replaces the route region and hides the mobile dock until closed. |
 | `< 420px` | Compact labels and metadata; preserve 44px targets and never truncate the primary action. |
 
 At narrow widths, content order is Capture → Signals → Current work → Latest files → People. No desktop-only action may become unreachable.
@@ -111,6 +117,7 @@ At narrow widths, content order is Capture → Signals → Current work → Late
 - Respect `prefers-reduced-motion` and avoid structural animation.
 - Use native buttons and inputs with explicit accessible labels.
 - Keep route selection and disclosure state available to assistive technology.
+- Label the preview region and title, use status/alert semantics, keep 44px mobile controls, and make the covered mobile route inert while the preview is open.
 
 ## Shell theme boundary
 

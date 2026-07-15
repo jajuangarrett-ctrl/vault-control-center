@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="../../styles.css">
     <style>
       html, body { margin: 0; min-height: 100%; }
-      body { background: #071826; }
+      body { background: #0a1238; }
       .preview-icon { display: inline-grid; width: 1.4em; height: 1.4em; place-items: center; font-size: .8em; font-weight: 800; }
       .capture-scale .fjg-vcc { width: 1600px; min-height: 1000px; }
     </style>
@@ -36,7 +36,8 @@
         <button class="fjg-vcc-route-tab">Clipboard</button>
         <button class="fjg-vcc-route-tab">Settings</button>
       </nav>
-      <main class="fjg-vcc-content">
+      <div class="fjg-vcc-content-frame">
+      <main class="fjg-vcc-content" aria-label="Dashboard content">
         <div class="fjg-vcc-route-view" data-route="home">
           <div class="fjg-vcc-capture-grid">
             <button class="fjg-vcc-capture-action"><span class="preview-icon">✎</span><span class="fjg-vcc-capture-label">Thought</span><span class="fjg-vcc-capture-open">Open</span></button>
@@ -82,7 +83,7 @@
             <section class="fjg-vcc-panel">
               <header class="fjg-vcc-panel-header"><h2>Latest files</h2><button class="fjg-vcc-text-action">View all →</button></header>
               <div class="fjg-vcc-panel-body">
-                <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Daily Note — Monday</span><span class="fjg-vcc-row-path">Daily Notes/Monday.md</span></span><span class="fjg-vcc-row-end">9:20 AM</span></button>
+                <button class="fjg-vcc-row" id="preview-trigger" data-file-path="Daily Notes/Monday.md" aria-label="Preview Daily Note — Monday"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Daily Note — Monday</span><span class="fjg-vcc-row-path">Daily Notes/Monday.md</span></span><span class="fjg-vcc-row-end">9:20 AM</span></button>
                 <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Program Leads Meeting</span><span class="fjg-vcc-row-path">Meetings/Program Leads.md</span></span><span class="fjg-vcc-row-end">8:05 AM</span></button>
                 <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">CARE Team Dashboard</span><span class="fjg-vcc-row-path">Dashboards/CARE Team.md</span></span><span class="fjg-vcc-row-end">Yesterday</span></button>
                 <button class="fjg-vcc-row"><span class="fjg-vcc-row-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Basic Needs Intake Trends</span><span class="fjg-vcc-row-path">Reports/Intake Trends.md</span></span><span class="fjg-vcc-row-end">Yesterday</span></button>
@@ -91,7 +92,7 @@
               </div>
             </section>
             <section class="fjg-vcc-panel">
-              <header class="fjg-vcc-panel-header"><h2>People radar</h2><button class="fjg-vcc-text-action">Contact list →</button></header>
+              <header class="fjg-vcc-panel-header"><h2>People radar</h2><button class="fjg-vcc-text-action">Preview contact list →</button></header>
               <div class="fjg-vcc-panel-body">
                 <button class="fjg-vcc-row"><span class="fjg-vcc-avatar">AR</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Alex Rivera</span><span class="fjg-vcc-row-meta">Agenda file</span></span><span class="fjg-vcc-row-end">Today</span></button>
                 <button class="fjg-vcc-row"><span class="fjg-vcc-avatar">JL</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Jordan Lee</span><span class="fjg-vcc-row-meta">Agenda file</span></span><span class="fjg-vcc-row-end">Yesterday</span></button>
@@ -103,6 +104,24 @@
           </div>
         </div>
       </main>
+      <aside class="fjg-vcc-preview-pane" id="preview-pane" role="region" aria-labelledby="fixture-preview-title" aria-hidden="true" hidden>
+        <header class="fjg-vcc-preview-header">
+          <button class="fjg-vcc-preview-back" id="preview-close" type="button"><span class="preview-icon">←</span><span>Back</span></button>
+          <div class="fjg-vcc-preview-heading"><span class="fjg-vcc-preview-kicker">MD preview</span><h2 class="fjg-vcc-preview-title" id="fixture-preview-title" tabindex="-1">Daily Note — Monday</h2></div>
+          <div class="fjg-vcc-preview-actions"><button class="fjg-vcc-button fjg-vcc-preview-open-tab" type="button"><span class="preview-icon">↗</span><span>Open in tab</span></button></div>
+        </header>
+        <div class="fjg-vcc-preview-pathbar"><span class="fjg-vcc-preview-path">Daily Notes/Monday.md</span><span class="fjg-vcc-preview-size">4.8 KB</span></div>
+        <div class="fjg-vcc-preview-body markdown-rendered fjg-vcc-preview-markdown" tabindex="0">
+          <h1>Monday leadership brief</h1>
+          <p>This preview stays inside Vault Control Center, so the dashboard route, filters, and scroll position remain intact.</p>
+          <h2>Today’s priorities</h2>
+          <ul><li>Review student-support program updates.</li><li>Prepare the program leads agenda.</li><li>Confirm follow-up owners and deadlines.</li></ul>
+          <blockquote>Use <strong>Open in tab</strong> only when you want the full native Obsidian editor.</blockquote>
+          <h2>Decisions</h2>
+          <table><thead><tr><th>Item</th><th>Owner</th><th>Status</th></tr></thead><tbody><tr><td>Basic Needs intake review</td><td>Franklin</td><td>Ready</td></tr><tr><td>CARE Team dashboard</td><td>Program leads</td><td>In progress</td></tr></tbody></table>
+        </div>
+      </aside>
+      </div>
       <nav class="fjg-vcc-mobile-dock"><button class="fjg-vcc-mobile-dock-item is-active">⌂<span>Home</span></button><button class="fjg-vcc-mobile-dock-item">▦<span>Areas</span></button><button class="fjg-vcc-mobile-dock-item">▱<span>Programs</span></button><button class="fjg-vcc-mobile-dock-item">＋<span>Capture</span></button><button class="fjg-vcc-mobile-dock-item">◷<span>Recent</span></button><button class="fjg-vcc-mobile-dock-item">•••<span>More</span></button></nav>
     </div>
     <script>
@@ -120,6 +139,37 @@
         document.body.className = `fjg-vcc-shell-enabled fjg-vcc-theme-${light ? 'dark' : 'light'}`;
         event.currentTarget.lastElementChild.textContent = light ? 'Light mode' : 'Dark mode';
       });
+      const fixtureRoot = document.querySelector('.fjg-vcc');
+      const previewPane = document.querySelector('#preview-pane');
+      const previewTrigger = document.querySelector('#preview-trigger');
+      const syncPreviewMode = () => {
+        if (!fixtureRoot.hasAttribute('data-preview-open')) return fixtureRoot.removeAttribute('data-preview-mode');
+        fixtureRoot.dataset.previewMode = fixtureRoot.getBoundingClientRect().width < 760 ? 'overlay' : 'split';
+      };
+      const openPreview = () => {
+        fixtureRoot.dataset.previewOpen = 'true';
+        previewPane.hidden = false;
+        previewPane.setAttribute('aria-hidden', 'false');
+        previewTrigger.classList.add('is-selected');
+        previewTrigger.setAttribute('aria-current', 'true');
+        syncPreviewMode();
+      };
+      const closePreview = () => {
+        fixtureRoot.removeAttribute('data-preview-open');
+        previewPane.hidden = true;
+        previewPane.setAttribute('aria-hidden', 'true');
+        previewTrigger.classList.remove('is-selected');
+        previewTrigger.setAttribute('aria-current', 'false');
+        syncPreviewMode();
+        previewTrigger.focus();
+      };
+      previewTrigger.addEventListener('click', openPreview);
+      document.querySelector('#preview-close').addEventListener('click', closePreview);
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && fixtureRoot.hasAttribute('data-preview-open')) closePreview();
+      });
+      window.addEventListener('resize', syncPreviewMode);
+      if (previewParams.get('preview') === '1') openPreview();
     </script>
   </body>
 </html>

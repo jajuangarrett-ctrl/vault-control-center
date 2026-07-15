@@ -8,16 +8,16 @@ Vault Control Center is a native Obsidian dashboard for operating a structured v
 
 ## What it includes
 
-The dashboard keeps nine views in one consistent navy-and-orange interface:
+The dashboard keeps nine views in one consistent throwback navy, gold, orange, royal-blue, and warm-cream interface:
 
 | View | Purpose |
 | --- | --- |
 | Home | Capture actions, live signals, current programs, recent files, people, and task status |
-| Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with recursive drill-down, breadcrumbs, and native file opening |
-| Programs | Program folders, activity groups, recursive subfolder drill-down, breadcrumbs, and native file opening |
+| Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with recursive drill-down, breadcrumbs, and in-dashboard previews |
+| Programs | Program folders, activity groups, recursive subfolder drill-down, breadcrumbs, and in-dashboard previews |
 | AI Team | Four configurable operational queues; Owner and Team inboxes use complete direct-file counts and lists |
 | Recent | Searchable, vault-wide Obsidian file-open history with category filters |
-| Bookmarks | Filtered Obsidian bookmarks; vault targets open natively and HTTP(S) links open externally |
+| Bookmarks | Filtered Obsidian bookmarks; vault targets preview inside the dashboard and HTTP(S) links open externally |
 | People | Agenda files, recency, and contact-list access |
 | Clipboard | Editable, copyable, resettable templates |
 | Settings | Theme, source health, privacy boundary, and native plugin settings |
@@ -25,14 +25,16 @@ The dashboard keeps nine views in one consistent navy-and-orange interface:
 Additional features:
 
 - Native ribbon icon and command-palette actions
-- Coordinated dark and light themes
+- Shared read-only preview pane across every file-bearing route; normal clicks keep the dashboard active
+- Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action for native editing or unsupported formats
+- Coordinated throwback dark and light themes derived from deep navy, golden yellow, orange, royal blue, and warm cream
 - Optional Obsidian shell theming that is removed cleanly when disabled or unloaded
 - Responsive layouts for desktop, split panes, tablets, and phones
 - Live refresh after vault changes, with a manual force-refresh action
 - Owner Inbox and Team Inbox treat direct safe, supported files as the active queue; nested subfolders are excluded, and queue lists are not truncated
-- Recently viewed files use the enabled Recent Files plugin's file-open history when available, then append Obsidian's native open history
+- Recently viewed files start with Vault Control Center preview history, then use the enabled Recent Files plugin's file-open history when available and append Obsidian's native open history
 - `/` to focus search while the dashboard is active, with the native search clear control
-- In-memory indexing only—derived dashboard records are not persisted
+- In-memory indexing; only a capped list of safe preview paths is retained in Obsidian workspace state so Recent remains accurate
 
 ## Installation
 
@@ -62,7 +64,7 @@ Open **Settings → Community plugins → Vault Control Center** and configure t
 
 The bundled defaults are generic examples. Missing sources are reported in the dashboard instead of causing the view to fail.
 
-Recent normally comes from Obsidian's file-open history rather than file modification dates or only clicks made inside Vault Control Center. When the optional Recent Files plugin is enabled in file-open mode, its longer, immediately updated history is used first and Obsidian's native list supplies additional entries. If neither source provides viewed-file history, the dashboard temporarily falls back to modified-time activity under the configured recent roots.
+Recent combines three sources in viewed order: files previewed inside Vault Control Center, the optional Recent Files plugin when it is enabled in file-open mode, and Obsidian's native open history. Preview history is capped at 30 safe paths in the Obsidian workspace state; no file contents are stored. If none of these sources provides usable viewed-file history, the dashboard temporarily falls back to modified-time activity under the configured recent roots.
 
 Capture buttons dispatch commands from companion capture plugins. Install and enable the corresponding Thought Capture, Email Capture, Agenda Capture, and Program Update Capture plugins for those buttons to work. Vault Control Center does not register the displayed actions as global hotkeys.
 
@@ -83,7 +85,7 @@ Vault Control Center reads the vault-relative folders and files configured in it
 
 Before display, the index excludes hidden/internal folders, archived paths, and names that look like passwords, API keys, secrets, credentials, tokens, or private keys. Bookmark URLs containing basic-auth credentials or obvious sensitive query keys are withheld; visible URL metadata is reduced to the origin while the original URL is retained only for opening.
 
-Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, task records, and secret values are not saved there.
+Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, file contents, task records, and secret values are not saved there. Obsidian workspace state may contain the currently previewed safe path and a capped safe-path preview history so the pane and Recent view survive workspace restoration.
 
 ## Replacing the legacy launcher
 
@@ -105,7 +107,8 @@ npm run check
 - **The taskboard falls back to local counts:** confirm the HTTPS endpoint, select a valid Obsidian Secret Storage value, enable the separate connection, and force Refresh. The Task Capture adapter also requires that plugin to have a complete connection.
 - **BRAT cannot install or update:** confirm the GitHub release includes `main.js`, `manifest.json`, and `styles.css` and that its tag matches the manifest version.
 - **The old dashboard still opens:** disable the legacy launcher after confirming the native plugin is configured.
-- **Recent does not match files you just viewed:** open the notes in Obsidian and use Refresh. Vault Control Center reads Obsidian's open history across the whole vault; configured recent roots are used only when no viewed history is available.
+- **Recent does not match files you just viewed:** use Refresh. Files previewed in the dashboard are placed first, followed by Recent Files and native Obsidian history; configured recent roots are used only when no viewed history is available.
+- **A file shows “Native preview required”:** use **Open in tab** for Office documents or formats without a safe embedded renderer.
 
 ## Design notes
 
