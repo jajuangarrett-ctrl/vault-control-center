@@ -17,6 +17,7 @@ The supplied jersey is a color reference, not a request to place sports imagery 
 | Light split preview | 1280×900 | Warm cream canvas, royal-blue text/focus, gold trim, and orange signals preserve hierarchy and contrast. |
 | Collapsed file browser | 1280×900 | **Hide files** gives the read-only preview nearly the full dashboard width; **Show files** restores the original compact split. |
 | Compact pane at large text scale | 340px pane | Markdown width stays within the pane, long titles and paths wrap, and no words are clipped at the right edge. |
+| Responsive boundary | 759px / 760px | 759px uses the full-width mobile overlay; 760px keeps the side-by-side split and visible **Hide files** control, with no overflow at either width. |
 | Dark mobile preview | 390×844 | Preview replaces only route content, route tabs remain available, mobile dock hides, icon controls fit, and no horizontal page overflow occurs. |
 | Close and reopen | 390×844 | Back restores the dashboard/dock and clears row selection; the file row reopens the preview. |
 | Escape | 390×844 | Escape closes the visible preview and restores the route state. |
@@ -36,7 +37,7 @@ The palette source and final dark implementation were opened together in one vis
 
 - Unit coverage: preview-kind dispatch, safe history filtering/deduplication/cap, internal-link parsing, preview-history precedence, image/media indexing, recursive folder behavior, privacy filtering, queues, and taskboard behavior.
 - Browser fixture: dark/light toggle, split and collapsed preview, mobile overlay, Back, reopen, Escape, selected row, dock visibility, and runtime logs.
-- Live Obsidian verification: installed v0.1.4 in Obsidian 1.12.7, force-reloaded the app, and exercised the actual plugin through Computer Use plus the live Electron DOM.
+- Live Obsidian verification: installed v0.1.7 in Obsidian 1.12.7, reloaded the plugin, and exercised the actual plugin through Computer Use plus the live Electron DOM.
 
 ## Live Obsidian results
 
@@ -55,6 +56,7 @@ The palette source and final dark implementation were opened together in one vis
 | Other routes | Home capture launcher opened and closed safely; Bookmarks file filtering exposed nine previewable files; People opened an agenda note in the pane; Clipboard exposed three editable templates with Copy/Reset controls; Settings exposed both throwback themes. |
 | Refresh | The live Refresh control entered and cleared its refreshing state without losing the Home route. |
 | Live layout | At a 793px dashboard width, the pane measured 342px, route content measured 423px, split mode was active, and horizontal overflow was false. |
+| Preview text fit | At a 340px live pane width, rendered Markdown measured 340px client and scroll width, zero text descendants overflowed, and the wrapped action row remained inside the header. |
 | Theme tokens | Light: `#fffdf5`, `#f1f4ff`, `#151b4b`, `#c64b0a`, `#e9ab00`, `#3049a8`. Dark: `#0a1238`, `#111d4f`, `#f8faff`, `#f47a24`, `#ffc72c`, `#83a2ff`. |
 
 No Vault Control Center errors were observed in the live console. Existing TaskNotes frontmatter warnings and other unrelated plugin/theme warnings were outside this change.

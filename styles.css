@@ -2279,7 +2279,7 @@ a.fjg-vcc-row {
 
 }
 
-@container fjg-vcc (max-width: 760px) {
+@container fjg-vcc (max-width: 759px) {
   .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
     display: block;
     padding: 0;
