@@ -13,8 +13,8 @@ The dashboard keeps nine views in one consistent throwback navy, gold, orange, r
 | View | Purpose |
 | --- | --- |
 | Home | Capture actions, live signals, current programs, recent files, people, and task status |
-| Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with a collapsible root rail, recursive drill-down, breadcrumbs, and in-dashboard previews |
-| Programs | Program folders, activity groups, a collapsible root rail, recursive subfolder drill-down, breadcrumbs, and in-dashboard previews |
+| Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with a collapsible root rail, recursive drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
+| Programs | Program folders, activity groups, a collapsible root rail, recursive subfolder drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
 | AI Team | Four configurable operational queues; Owner and Team inboxes use complete direct-file counts and lists |
 | Recent | Searchable, vault-wide Obsidian file-open history with category filters |
 | Bookmarks | Filtered Obsidian bookmarks; vault targets preview inside the dashboard and HTTP(S) links open externally |
@@ -38,6 +38,7 @@ Additional features:
 - Owner Inbox and Team Inbox treat direct safe, supported files as the active queue; nested subfolders are excluded, and queue lists are not truncated
 - Recently viewed files start with Vault Control Center preview history, then use the enabled Recent Files plugin's file-open history when available and append Obsidian's native open history
 - `/` to focus search while the dashboard is active, with the native search clear control
+- On Areas and Programs, any nonblank query replaces drill-down with all safe files across that route whose file name or full folder path matches; synthetic **All Areas** copies are deduplicated
 - In-memory indexing; only a capped list of safe preview paths is retained in Obsidian workspace state so Recent remains accurate
 
 ## Installation
@@ -67,6 +68,8 @@ Open **Settings → Community plugins → Vault Control Center** and configure t
 - Recent-activity fallback roots
 
 The bundled defaults are generic examples. Missing sources are reported in the dashboard instead of causing the view to fail.
+
+Areas and Programs search does not change the selected root or nested folder. A matching file opens in the shared preview, Back returns to the same results, and **Clear search** restores the exact pre-search folder view. A route-wide empty state appears when nothing matches. Result paths wrap at desktop, split-pane, and phone widths.
 
 Recent combines three sources in viewed order: files previewed inside Vault Control Center, the optional Recent Files plugin when it is enabled in file-open mode, and Obsidian's native open history. Preview history is capped at 30 safe paths in the Obsidian workspace state; no file contents are stored. If none of these sources provides usable viewed-file history, the dashboard temporarily falls back to modified-time activity under the configured recent roots.
 

@@ -78,6 +78,33 @@ export function programFolderMatchesNavigationQuery(
 }
 
 /**
+ * Returns every safe file matching a query across one or more folder roots.
+ * Paths are de-duplicated because synthetic roots, such as All Areas, can
+ * contain the same files as their child roots.
+ */
+export function searchProgramFiles(
+  programs: DashboardProgram[],
+  query: string
+): DashboardFileItem[] {
+  const normalizedQuery = normalizeQuery(query);
+  if (!normalizedQuery) return [];
+
+  const matches = new Map<string, DashboardFileItem>();
+  for (const program of programs) {
+    const rootPath = normalizeVaultPath(program.path);
+    for (const file of safeProgramFiles(program, rootPath)) {
+      if (!fileMatchesQuery(file, normalizedQuery)) continue;
+      const existing = matches.get(file.path);
+      if (!existing || file.modifiedAt > existing.modifiedAt) {
+        matches.set(file.path, file);
+      }
+    }
+  }
+
+  return sortFiles([...matches.values()]);
+}
+
+/**
  * Resolves a persisted or requested folder to the nearest folder that still
  * exists inside the selected program. Unknown and cross-program paths always
  * fall back to the program root.

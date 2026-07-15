@@ -5,6 +5,7 @@ import {
   programFolderMatchesNavigationQuery,
   programMatchesNavigationQuery,
   resolveProgramFolderPath,
+  searchProgramFiles,
 } from "./program-navigation";
 
 const AREA_PATH = "03 Areas/Student-Support";
@@ -200,6 +201,63 @@ describe("Areas recursive folder navigation", () => {
         "Next Level"
       )
     ).toBe(true);
+  });
+
+  it("deduplicates route-wide search results from All Areas and child roots", () => {
+    const schedulingFile = areaFile(
+      "03 Areas/Scheduling/Needle Calendar.md",
+      500
+    );
+    const fiscalFile = areaFile("03 Areas/Fiscal/Needle Budget.md", 700);
+    const directFile = areaFile("03 Areas/Needle Index.md", 300);
+    const areasRoot: DashboardProgram = {
+      name: "All Areas",
+      path: "03 Areas",
+      count: 3,
+      files: [schedulingFile, fiscalFile, directFile],
+    };
+    const scheduling: DashboardProgram = {
+      name: "Scheduling",
+      path: "03 Areas/Scheduling",
+      count: 1,
+      files: [schedulingFile],
+    };
+    const fiscal: DashboardProgram = {
+      name: "Fiscal",
+      path: "03 Areas/Fiscal",
+      count: 1,
+      files: [fiscalFile],
+    };
+
+    expect(
+      searchProgramFiles([areasRoot, scheduling, fiscal], "Needle").map(
+        (file) => file.path
+      )
+    ).toEqual([
+      "03 Areas/Fiscal/Needle Budget.md",
+      "03 Areas/Scheduling/Needle Calendar.md",
+      "03 Areas/Needle Index.md",
+    ]);
+    expect(
+      searchProgramFiles([areasRoot, scheduling, fiscal], "All Areas")
+    ).toEqual([]);
+  });
+
+  it("keeps same-named files from different Area folders", () => {
+    const areasRoot: DashboardProgram = {
+      name: "All Areas",
+      path: "03 Areas",
+      count: 2,
+      files: [
+        areaFile("03 Areas/Fiscal/Status.md", 200),
+        areaFile("03 Areas/Scheduling/Status.md", 100),
+      ],
+    };
+
+    expect(searchProgramFiles([areasRoot], "Status").map((file) => file.path)).toEqual([
+      "03 Areas/Fiscal/Status.md",
+      "03 Areas/Scheduling/Status.md",
+    ]);
   });
 });
 

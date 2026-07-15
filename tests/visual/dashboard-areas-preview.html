@@ -8,6 +8,7 @@
     <style>
       html, body { margin: 0; min-height: 100%; }
       body { background: #0a1238; }
+      .fjg-vcc [hidden] { display: none !important; }
       .preview-icon { display: inline-grid; width: 1.4em; height: 1.4em; place-items: center; font-size: .8em; font-weight: 800; }
     </style>
   </head>
@@ -19,7 +20,7 @@
           <p class="fjg-vcc-subtitle">Live vault operations</p>
         </div>
         <div class="fjg-vcc-header-actions">
-          <label class="fjg-vcc-search"><span class="preview-icon">⌕</span><input type="search" placeholder="Search vault" aria-label="Search the current dashboard view"></label>
+          <label class="fjg-vcc-search"><span class="preview-icon">⌕</span><input id="fixture-search-input" type="search" placeholder="Search this tab" aria-label="Search the current dashboard tab" aria-controls="fixture-file-browser"></label>
           <button class="fjg-vcc-button" type="button"><span class="preview-icon">↻</span><span>Refresh</span></button>
           <button class="fjg-vcc-theme-toggle" type="button" id="theme-toggle"><span class="preview-icon">☀</span><span>Light mode</span></button>
         </div>
@@ -38,7 +39,24 @@
       <div class="fjg-vcc-content-frame">
         <main class="fjg-vcc-content" id="fixture-file-browser" aria-label="Dashboard content">
           <div class="fjg-vcc-route-view" data-route="areas">
-            <div class="fjg-vcc-page-layout fjg-vcc-program-layout">
+            <div class="fjg-vcc-page-layout fjg-vcc-folder-search-layout" id="fixture-search-layout" data-layout="wide-list" hidden>
+              <section class="fjg-vcc-panel fjg-vcc-folder-search-panel">
+                <header class="fjg-vcc-panel-header"><h2>Areas search · 4</h2><button class="fjg-vcc-text-action" id="fixture-clear-search" type="button"><span class="preview-icon">×</span><span>Clear search</span></button></header>
+                <div class="fjg-vcc-panel-body">
+                  <div class="fjg-vcc-detail-summary fjg-vcc-folder-search-summary" role="status" aria-live="polite" aria-atomic="true"><strong>4 matching files</strong><span>Across Areas · File names and folder paths matching “cw”</span></div>
+                  <section class="fjg-vcc-folder-search-results" aria-label="Areas file search results">
+                    <div class="fjg-vcc-section-label fjg-vcc-files-label">All matching files</div>
+                    <div class="fjg-vcc-row-list">
+                      <button class="fjg-vcc-row" type="button"><span class="preview-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Meeting with Juan</span><span class="fjg-vcc-row-path">03 Areas/Meetings with CW Chair/Meeting with Juan.md</span></span><span class="fjg-vcc-row-end">5d ago</span></button>
+                      <button class="fjg-vcc-row" type="button"><span class="preview-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Contact P.A.s for CW and ISSP</span><span class="fjg-vcc-row-path">03 Areas/Recruitment/CalWORKs Spring-Summer 2026-2027 Recruitment/Contact P.A.s for CW and ISSP.md</span></span><span class="fjg-vcc-row-end">5d ago</span></button>
+                      <button class="fjg-vcc-row" type="button"><span class="preview-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">QC-Classified_non-management CW-ISSP Old</span><span class="fjg-vcc-row-path">03 Areas/Recruitment/Reference Docs/QC-Classified_non-management CW-ISSP Old.pdf</span></span><span class="fjg-vcc-row-end">May 21</span></button>
+                      <button class="fjg-vcc-row" type="button"><span class="preview-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">CW ISSP QC</span><span class="fjg-vcc-row-path">03 Areas/Recruitment/Hire CalWORKs - ISSP Counselor/03 Misc/CW ISSP QC.pdf</span></span><span class="fjg-vcc-row-end">Apr 19</span></button>
+                    </div>
+                  </section>
+                </div>
+              </section>
+            </div>
+            <div class="fjg-vcc-page-layout fjg-vcc-program-layout" id="fixture-folder-layout">
               <section class="fjg-vcc-panel fjg-vcc-folder-rail">
                 <header class="fjg-vcc-panel-header">
                   <h2>Areas · 29</h2>
@@ -109,8 +127,27 @@
       const browserToggle = document.querySelector('#browser-toggle');
       const fileBrowser = document.querySelector('#fixture-file-browser');
       const railToggle = document.querySelector('#rail-toggle');
+      const searchInput = document.querySelector('#fixture-search-input');
+      const searchLayout = document.querySelector('#fixture-search-layout');
+      const folderLayout = document.querySelector('#fixture-folder-layout');
       let browserCollapsed = false;
       let railCollapsed = false;
+
+      const syncSearch = () => {
+        const searching = Boolean(searchInput.value.trim());
+        searchLayout.hidden = !searching;
+        folderLayout.hidden = searching;
+      };
+      searchInput.addEventListener('input', syncSearch);
+      document.querySelector('#fixture-clear-search').addEventListener('click', () => {
+        searchInput.value = '';
+        syncSearch();
+        searchInput.focus();
+      });
+      if (params.get('search')) {
+        searchInput.value = params.get('search');
+        syncSearch();
+      }
 
       if (params.get('theme') === 'light') {
         root.dataset.theme = 'light';

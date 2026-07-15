@@ -8,6 +8,7 @@ import {
   programFolderMatchesNavigationQuery,
   programMatchesNavigationQuery,
   resolveProgramFolderPath,
+  searchProgramFiles,
 } from "./program-navigation";
 
 const PROGRAM_PATH = "Programs/Alpha";
@@ -266,6 +267,49 @@ describe("program folder navigation", () => {
     expect(
       programFolderMatchesNavigationQuery(program, events!, "Needle Report")
     ).toBe(false);
+  });
+
+  it("returns matching files across every program without requiring folder drill-down", () => {
+    const alpha = makeProgram([
+      dashboardFile(`${PROGRAM_PATH}/Reporting/Needle Status.md`, 500),
+      dashboardFile(`${PROGRAM_PATH}/Events/Needle Invitation.pdf`, 200),
+      dashboardFile(`${PROGRAM_PATH}/Unrelated.md`, 900),
+    ]);
+    const betaPath = "Programs/Beta";
+    const beta: DashboardProgram = {
+      name: "Beta",
+      path: betaPath,
+      count: 2,
+      files: [
+        dashboardFile(`${betaPath}/Fiscal/Needle Budget.xlsx`, 700),
+        dashboardFile(`${betaPath}/Needle Overview.md`, 400),
+      ],
+    };
+
+    expect(
+      searchProgramFiles([alpha, beta], "  nEeDlE  ").map((file) => file.path)
+    ).toEqual([
+      `${betaPath}/Fiscal/Needle Budget.xlsx`,
+      `${PROGRAM_PATH}/Reporting/Needle Status.md`,
+      `${betaPath}/Needle Overview.md`,
+      `${PROGRAM_PATH}/Events/Needle Invitation.pdf`,
+    ]);
+    expect(searchProgramFiles([alpha, beta], "   ")).toEqual([]);
+    expect(searchProgramFiles([alpha, beta], "does-not-exist")).toEqual([]);
+  });
+
+  it("matches parent folder names while excluding unsafe aggregate results", () => {
+    const program = makeProgram([
+      dashboardFile(`${PROGRAM_PATH}/Budgets/Allocation.md`, 300),
+      dashboardFile(`${PROGRAM_PATH}/Archived/Budgets Old.md`, 900),
+      dashboardFile(`${PROGRAM_PATH}/Passwords/Budgets Login.md`, 800),
+      dashboardFile(`${PROGRAM_PATH}/.private/Budgets Hidden.md`, 700),
+      dashboardFile(`${PROGRAM_PATH}-Backup/Budgets Copy.md`, 1_000),
+    ]);
+
+    expect(searchProgramFiles([program], "Budgets").map((file) => file.path)).toEqual([
+      `${PROGRAM_PATH}/Budgets/Allocation.md`,
+    ]);
   });
 });
 

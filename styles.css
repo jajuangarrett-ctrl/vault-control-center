@@ -1653,6 +1653,25 @@ a.fjg-vcc-row {
   min-width: 0;
 }
 
+.fjg-vcc-folder-search-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fjg-vcc-folder-search-summary {
+  align-items: baseline;
+}
+
+.fjg-vcc-folder-search-results > .fjg-vcc-section-label {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--vcc-border);
+}
+
+.fjg-vcc-folder-search-results .fjg-vcc-row-path {
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .fjg-vcc-folder-toolbar {
   display: flex;
   align-items: center;

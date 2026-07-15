@@ -37,9 +37,18 @@ interface FolderRailViewInternals {
   rootEl: HTMLElement | null;
   data: unknown;
   folderRailCollapsed: boolean;
+  searchInputEl: HTMLInputElement | null;
+  renderState: {
+    query: string;
+    selectedAreaPath: string;
+    selectedAreaFolderPath: string;
+    selectedProgramPath: string;
+    selectedProgramFolderPath: string;
+  };
   syncFolderRailAttribute: () => void;
   renderContext: () => {
     setFolderRailCollapsed: (collapsed: boolean) => void;
+    clearSearch: () => void;
   };
 }
 
@@ -111,9 +120,46 @@ describe("folder rail state", () => {
     internals.syncFolderRailAttribute();
     expect(root.getAttribute("data-folder-rail-collapsed")).toBe("true");
 
+    internals.renderState.query = "cw";
+    internals.syncFolderRailAttribute();
+    expect(root.getAttribute("data-folder-rail-collapsed")).toBeNull();
+
+    internals.renderState.query = "";
+    internals.syncFolderRailAttribute();
+    expect(root.getAttribute("data-folder-rail-collapsed")).toBe("true");
+
     internals.route = "recent";
     internals.syncFolderRailAttribute();
     expect(root.getAttribute("data-folder-rail-collapsed")).toBeNull();
+  });
+
+  it("clears search without changing the pre-search folder selection", () => {
+    const view = makeView();
+    const internals = view as unknown as FolderRailViewInternals;
+    const focus = vi.fn();
+    const searchInput = { value: "cw", focus } as unknown as HTMLInputElement;
+    internals.data = {};
+    internals.searchInputEl = searchInput;
+    internals.renderState.query = "cw";
+    internals.renderState.selectedAreaPath = "03 Areas/Recruitment";
+    internals.renderState.selectedAreaFolderPath =
+      "03 Areas/Recruitment/Hire CalWORKs - ISSP Counselor";
+    internals.renderState.selectedProgramPath = "02 Programs/BSSP";
+    internals.renderState.selectedProgramFolderPath = "02 Programs/BSSP/Events";
+
+    internals.renderContext().clearSearch();
+
+    expect(internals.renderState.query).toBe("");
+    expect(searchInput.value).toBe("");
+    expect(internals.renderState.selectedAreaPath).toBe("03 Areas/Recruitment");
+    expect(internals.renderState.selectedAreaFolderPath).toBe(
+      "03 Areas/Recruitment/Hire CalWORKs - ISSP Counselor"
+    );
+    expect(internals.renderState.selectedProgramPath).toBe("02 Programs/BSSP");
+    expect(internals.renderState.selectedProgramFolderPath).toBe(
+      "02 Programs/BSSP/Events"
+    );
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 });
 

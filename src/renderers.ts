@@ -21,6 +21,7 @@ import {
   buildProgramFolderView,
   programFolderMatchesNavigationQuery,
   programMatchesNavigationQuery,
+  searchProgramFiles,
 } from "./program-navigation";
 import type { TaskboardSnapshot } from "./taskboard";
 import {
@@ -54,6 +55,7 @@ export interface DashboardRenderContext {
   folderRailId: string;
   folderRailCollapsed: boolean;
   setFolderRailCollapsed: (collapsed: boolean) => void;
+  clearSearch: () => void;
   navigate: (route: DashboardRoute) => void;
   openFile: (path: string) => void;
   openBookmark: (bookmark: DashboardBookmark) => void;
@@ -383,6 +385,12 @@ function renderFolderCollection(
   context: DashboardRenderContext,
   options: FolderCollectionOptions
 ): void {
+  const query = context.state.query.trim();
+  if (query) {
+    renderFolderCollectionSearch(parent, context, options, query);
+    return;
+  }
+
   const matches = options.roots.filter((root) =>
     programMatchesNavigationQuery(root, context.state.query)
   );
@@ -567,6 +575,59 @@ function renderFolderCollection(
       text: "Choose a folder to keep drilling down.",
     });
   }
+}
+
+function renderFolderCollectionSearch(
+  parent: HTMLElement,
+  context: DashboardRenderContext,
+  options: FolderCollectionOptions,
+  query: string
+): void {
+  const results = searchProgramFiles(options.roots, query);
+  const layout = parent.createDiv({
+    cls: "fjg-vcc-page-layout fjg-vcc-folder-search-layout",
+    attr: { "data-layout": "wide-list" },
+  });
+  const detail = createPanel(
+    layout,
+    `${options.title} search · ${results.length}`,
+    {
+      actionLabel: "Clear search",
+      actionIcon: "x",
+      onAction: context.clearSearch,
+      className: "fjg-vcc-folder-search-panel",
+    }
+  );
+  const summary = detail.body.createDiv({
+    cls: "fjg-vcc-detail-summary fjg-vcc-folder-search-summary",
+    attr: { role: "status", "aria-live": "polite", "aria-atomic": "true" },
+  });
+  summary.createEl("strong", {
+    text: `${results.length} matching file${results.length === 1 ? "" : "s"}`,
+  });
+  summary.createSpan({
+    text: `Across ${options.title} · File names and folder paths matching “${query}”`,
+  });
+
+  const resultsRegion = detail.body.createEl("section", {
+    cls: "fjg-vcc-folder-search-results",
+    attr: { "aria-label": `${options.title} file search results` },
+  });
+  if (!results.length) {
+    createEmptyState(
+      resultsRegion,
+      `No files match “${query}”`,
+      `Try another file or folder name, or clear search to browse ${options.title}.`,
+      "file-search"
+    );
+    return;
+  }
+
+  resultsRegion.createDiv({
+    cls: "fjg-vcc-section-label fjg-vcc-files-label",
+    text: "All matching files",
+  });
+  renderFileList(resultsRegion, results, context);
 }
 
 function renderAiTeam(parent: HTMLElement, context: DashboardRenderContext): void {
@@ -819,7 +880,7 @@ function renderFileRow(
     cls: `fjg-vcc-row${context.activePreviewPath === file.path ? " is-selected" : ""}`,
     attr: {
       type: "button",
-      "aria-label": `Preview ${file.title}`,
+      "aria-label": `Preview ${file.title}, in ${file.path}`,
       "aria-current": context.activePreviewPath === file.path ? "true" : "false",
       "data-file-path": file.path,
     },

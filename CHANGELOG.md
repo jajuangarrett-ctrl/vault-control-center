@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.9 — 2026-07-15
+
+- Changed nonblank search on Areas and Programs from folder-by-folder filtering to one route-wide list of every safe matching file, without requiring drill-down.
+- Matched both file names and full folder paths, and deduplicated files repeated through the synthetic **All Areas** root while retaining same-named files at different paths.
+- Preserved the selected root and nested folder while searching so **Clear search** returns to the exact pre-search folder view.
+- Added explicit matching-file counts and no-results guidance; search-result clicks preview in the dashboard, and Back returns to the same query and result row.
+- Kept long result paths wrapped and readable across desktop splits and mobile preview transitions, with deterministic coverage for multi-root results, clearing, privacy filtering, preview, and Back.
+
 ## 0.1.8 — 2026-07-15
 
 - Added a collapsible Areas and Programs root-folder rail that preserves the selected root and folder while giving the detail and preview regions more room.

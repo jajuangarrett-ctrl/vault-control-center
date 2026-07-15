@@ -59,6 +59,8 @@ The plugin renders one native `ItemView` with five persistent layers:
 
 Areas and Programs divide route content into a root-folder rail and a detail browser. The rail can retract to a 44px disclosure strip without losing the selected root or nested folder. With a preview open, the note receives roughly 44% of the desktop frame by default and roughly 55% while that rail is retracted; hiding all files gives the note nearly the full frame.
 
+A nonblank query temporarily replaces that rail/detail composition with one wide route-level result panel. The result set spans every safe file in the active Areas or Programs route, while the underlying root and nested-folder selection remains unchanged for clearing search.
+
 The Home route adds three stacked operational bands:
 
 - Four capture actions.
@@ -76,6 +78,7 @@ The orange signal rail is the signature visual element. It should remain visible
 - `FileRow`: file icon, basename, compact path, and relative modified time or a contextual viewed-status label.
 - `PreviewPane`: compact Back, file title/path/size, safe read-only renderer, **Hide files** / **Show files** expansion, and the only **Open in tab** escape.
 - `FolderRailDisclosure`: Areas/Programs control that retracts or restores the root list while preserving route, folder, focus, and assistive-technology state.
+- `FolderSearchResults`: wide Areas/Programs result panel with a live count, clear action, wrapped full paths, no-results guidance, and normal previewable file rows.
 - `FolderRootRow`: area or program name, file count, modified time, open action.
 - `QueueRow`: direct safe, supported file from a configured active queue; queue lists are complete rather than preview-capped.
 - `PersonRow`: initials, name, agenda count, modified time.
@@ -96,7 +99,9 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 - Back and Escape close the preview and restore route-row focus. Slow earlier renders cannot overwrite a later file selection.
 - Rendered Markdown, long note titles, and long paths must wrap within the preview's actual inner width at every display scale; tables and code blocks may scroll inside their own bounded region.
 - `/` focuses dashboard search when the view is active.
-- Search filters the current route without leaving the keyboard.
+- On Areas and Programs, a nonblank search replaces drill-down with every safe matching file across the active route. It matches file names and full folder paths, deduplicates exact paths repeated through **All Areas**, and keeps same-named files at different paths.
+- Searching never mutates the selected root or nested folder. **Clear search** restores the exact folder view, while preview and Back preserve the query, result list, selected-row state, and focus return target.
+- A zero-match query presents one route-wide empty state with a clear recovery action rather than a misleading folder selection.
 - Refresh immediately rebuilds the live index and reports completion.
 - Owner Inbox and Team Inbox counts represent direct active files only; nested subfolders are intentionally outside those queue counts.
 - Recent places the dashboard's capped safe-path preview history first, then prioritizes an enabled Recent Files plugin in file-open mode before appending native history. Configured modified-time roots are used only when viewed history is unavailable.
@@ -114,6 +119,8 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 | `< 420px` | Compact labels and metadata; preserve 44px targets and never truncate the primary action. |
 
 When the Areas or Programs route region itself falls below 640px, its root rail and detail browser stack. A retracted rail becomes a compact horizontal disclosure row so its restore action remains available.
+
+Route-wide search results stay a single column at every width. File names and full paths wrap inside each row, and opening a result uses the existing full-width mobile preview below 760px; Back restores the responsive result list.
 
 At narrow widths, content order is Capture → Signals → Current work → Latest files → People. No desktop-only action may become unreachable.
 
@@ -134,7 +141,7 @@ The plugin may coordinate Obsidian chrome only while its explicit body class is 
 ## Above-the-fold copy inventory
 
 - Vault Control Center
-- Search vault
+- Search this tab
 - Refresh
 - Dark mode / Light mode
 - Nine route labels

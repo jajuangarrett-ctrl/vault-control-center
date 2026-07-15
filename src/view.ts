@@ -351,30 +351,22 @@ export class VaultControlCenterView extends ItemView {
     titleGroup.createEl("p", { cls: "fjg-vcc-subtitle", text: "Live vault operations" });
 
     const actions = header.createDiv({ cls: "fjg-vcc-header-actions" });
-    const search = actions.createDiv({ cls: "fjg-vcc-search" });
+    const search = actions.createDiv({
+      cls: "fjg-vcc-search",
+      attr: { role: "search" },
+    });
     createIcon(search, "search");
     this.searchInputEl = search.createEl("input", {
       attr: {
         type: "search",
-        placeholder: "Search vault",
-        "aria-label": "Search the current dashboard view",
+        placeholder: "Search this tab",
+        "aria-label": "Search the current dashboard tab",
+        "aria-controls": this.browserRegionId,
       },
     });
     this.searchInputEl.value = this.renderState.query;
     this.searchInputEl.addEventListener("input", () => {
-      const previousQuery = this.renderState.query;
       this.renderState.query = this.searchInputEl?.value ?? "";
-      if (
-        (this.route === "areas" || this.route === "programs") &&
-        !previousQuery.trim() &&
-        this.renderState.query.trim()
-      ) {
-        if (this.route === "areas") {
-          this.renderState.selectedAreaFolderPath = this.renderState.selectedAreaPath;
-        } else {
-          this.renderState.selectedProgramFolderPath = this.renderState.selectedProgramPath;
-        }
-      }
       this.renderContent();
     });
 
@@ -558,6 +550,12 @@ export class VaultControlCenterView extends ItemView {
         this.folderRailCollapsed = collapsed;
         this.syncFolderRailAttribute();
       },
+      clearSearch: () => {
+        this.renderState.query = "";
+        if (this.searchInputEl) this.searchInputEl.value = "";
+        this.renderContent();
+        this.searchInputEl?.focus({ preventScroll: true });
+      },
       navigate: (route) => this.navigate(route),
       openFile: (path) => void this.openPreview(path),
       openBookmark: (bookmark) => void this.openBookmark(bookmark),
@@ -638,7 +636,8 @@ export class VaultControlCenterView extends ItemView {
 
   private syncFolderRailAttribute(): void {
     const activeRoute = this.route === "areas" || this.route === "programs";
-    if (activeRoute && this.folderRailCollapsed) {
+    const folderBrowserVisible = !this.renderState.query.trim();
+    if (activeRoute && folderBrowserVisible && this.folderRailCollapsed) {
       this.rootEl?.setAttribute("data-folder-rail-collapsed", "true");
     } else {
       this.rootEl?.removeAttribute("data-folder-rail-collapsed");

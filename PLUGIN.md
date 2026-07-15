@@ -9,6 +9,7 @@ Vault Control Center is a standalone native Obsidian community plugin. It presen
 - `src/plugin.ts` owns lifecycle, commands, settings migration, refresh scheduling, and theme cleanup.
 - `src/view.ts` owns the native `ItemView`, routes, search, cache policy, and native opening behavior.
 - `src/data.ts` builds the in-memory vault index and applies privacy filters.
+- `src/program-navigation.ts` owns recursive folder views and safe route-wide Areas/Programs file search.
 - `src/taskboard.ts` owns optional read-only network access and credential boundaries.
 - `src/renderers.ts` renders all nine routes with native DOM elements.
 - `src/settings.ts` exposes source paths, theme controls, and opt-in integrations.
@@ -39,6 +40,12 @@ The optional taskboard connection is disabled by default. A separate connection 
 
 Automatic refreshes reuse remote data for five minutes. Initial open, changed integration settings, the Refresh button, and the refresh command can fetch remote data.
 
+## Areas and Programs search
+
+Any nonblank query on Areas or Programs replaces the folder drill-down with one wide list of every safe matching file across the active route. Matching uses the file name and full folder path. Exact paths repeated through the synthetic **All Areas** root are shown once, while same-named files in different folders remain separate.
+
+Search does not mutate the selected root or nested folder. **Clear search** restores the exact pre-search folder view. Opening a result uses the shared dashboard preview, and Back returns to the same query and result row. A route-level empty state handles zero matches, and long result paths wrap across desktop, split-pane, and mobile layouts.
+
 ## Build and verification
 
 ```bash
@@ -49,7 +56,7 @@ npm run check
 Before a release:
 
 1. Confirm both theme modes and coordinated-shell cleanup in Obsidian.
-2. Verify all nine routes, search/clear, refresh, the Areas/Programs root-rail disclosure, compact preview actions, split-pane responsiveness, and mobile-width layout.
+2. Verify all nine routes, route-wide Areas/Programs search and clearing, no-results recovery, search-result preview/Back, refresh, the root-rail disclosure, compact preview actions, wrapped paths, split-pane responsiveness, and mobile-width layout.
 3. Run a credential and machine-path scan across source and `main.js`.
 4. Confirm `npm audit` reports no known vulnerabilities.
 5. Update `package.json`, `package-lock.json`, `manifest.json`, `versions.json`, and `CHANGELOG.md` together.
