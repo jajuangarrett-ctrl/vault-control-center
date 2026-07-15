@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.8 — 2026-07-15
+
+- Added a collapsible Areas and Programs root-folder rail that preserves the selected root and folder while giving the detail and preview regions more room.
+- Rebalanced the desktop split so the read-only note preview receives roughly 44% of the dashboard by default and roughly 55% when the folder rail is retracted; **Hide files** still expands the preview to nearly full width.
+- Reduced **Back**, **Open in tab**, and **Hide files** / **Show files** to a compact single-row desktop toolbar, with icon-only controls in constrained panes and 44px touch targets on mobile.
+- Persisted the folder-rail disclosure state in Obsidian workspace state and retained accessible labels, expanded-state semantics, focus, and responsive behavior.
+- Added a dedicated Areas three-panel visual fixture and verified the default, retracted-rail, hidden-files, split-boundary, and mobile states without horizontal overflow or clipped note text.
+
 ## 0.1.7 — 2026-07-15
 
 - Restored the v0.1.4 read-only preview workflow and original compact desktop split after the enlarged editable pane disrupted the dashboard UX.

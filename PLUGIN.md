@@ -10,7 +10,7 @@ Vault Control Center is a standalone native Obsidian community plugin. It presen
 - `src/view.ts` owns the native `ItemView`, routes, search, cache policy, and native opening behavior.
 - `src/data.ts` builds the in-memory vault index and applies privacy filters.
 - `src/taskboard.ts` owns optional read-only network access and credential boundaries.
-- `src/renderers.ts` renders all eight routes with native DOM elements.
+- `src/renderers.ts` renders all nine routes with native DOM elements.
 - `src/settings.ts` exposes source paths, theme controls, and opt-in integrations.
 - `styles.css` contains scoped component, responsive, and optional shell-theme rules.
 
@@ -49,10 +49,10 @@ npm run check
 Before a release:
 
 1. Confirm both theme modes and coordinated-shell cleanup in Obsidian.
-2. Verify all eight routes, search/clear, refresh, split-pane responsiveness, and mobile-width layout.
+2. Verify all nine routes, search/clear, refresh, the Areas/Programs root-rail disclosure, compact preview actions, split-pane responsiveness, and mobile-width layout.
 3. Run a credential and machine-path scan across source and `main.js`.
 4. Confirm `npm audit` reports no known vulnerabilities.
-5. Update `manifest.json`, `versions.json`, and `CHANGELOG.md` together.
+5. Update `package.json`, `package-lock.json`, `manifest.json`, `versions.json`, and `CHANGELOG.md` together.
 6. Tag the version and attach `main.js`, `manifest.json`, and `styles.css` to the GitHub release.
 
 ## Release assets

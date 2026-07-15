@@ -1,64 +1,62 @@
-# Design QA — in-dashboard preview and throwback theme
+# Vault Control Center annotated-layout design QA
 
-## Visual sources
+- Source visual truth path: `/var/folders/cb/x8yltvld0339lpxj2vnskzcc0000gn/T/codex-clipboard-e21bace7-35dc-459a-be9c-90c12fd42026.png`
+- Browser-rendered implementation screenshot: `/tmp/vcc-v018-final-desktop.png`
+- Live Obsidian v0.1.8 screenshot: `/tmp/vcc-v018-live-default.png`
+- Normalized full-view comparison: `/tmp/vcc-v018-design-comparison.png`
+- Viewport: 1280 × 720 for the final desktop capture; quantitative checks also ran at 1600 × 1000, 1100 × 800, 760 × 800, 759 × 800, and 390 × 844.
+- State: light theme, Areas route, Scheduling Information selected, Markdown preview open. Additional states covered the Areas rail collapsed, file browser hidden/restored, preview closed with Back, preview closed with Escape, and mobile overlay mode.
 
-- Palette reference: `/var/folders/cb/x8yltvld0339lpxj2vnskzcc0000gn/T/codex-clipboard-2ba9acfd-de80-42a7-aa8c-edb410baf288.png`
-- Desktop dark implementation: `tests/visual/qa/dashboard-preview-split-dark-final.jpg`
-- Desktop light implementation: `tests/visual/qa/dashboard-preview-split-light-final.jpg`
-- Mobile dark implementation: `tests/visual/qa/dashboard-preview-mobile-dark-v2.jpg`
+## Full-view comparison evidence
 
-The supplied jersey is a color reference, not a request to place sports imagery or branding in the product. The implementation translates its deep navy fabric, royal-blue depth, bright golden trim, and orange outline into accessible dashboard tokens; light mode uses warm cream and pale royal surfaces with darker blue/orange text accents.
+The combined comparison shows the annotated source and final implementation in one 1280-pixel-wide image. The source is an annotated composite rather than a pixel-specification viewport, so the comparison is intentionally based on its explicit layout intent:
 
-## Verified states
+- The preview increases from roughly one third of the content frame in the source to about 44% by default in the implementation.
+- The file-detail region is correspondingly smaller while remaining readable.
+- The Areas rail has a visible retract control and collapses to a 44-pixel stub.
+- When the rail is collapsed, the preview increases to about 54% and the detail panel also gains width.
+- Back, Open in tab, and Hide files fit on one compact toolbar row; the responsive form uses 32-pixel desktop controls and expands the preview and rail controls to 44-pixel targets for touch/coarse-pointer input.
+- The long preview title and long vault path wrap without horizontal clipping.
 
-| State | Viewport | Result |
-| --- | --- | --- |
-| Dark split preview | 1280×900 | Route and preview remain readable side by side; route-aware grids collapse to two columns; no horizontal page overflow. |
-| Light split preview | 1280×900 | Warm cream canvas, royal-blue text/focus, gold trim, and orange signals preserve hierarchy and contrast. |
-| Collapsed file browser | 1280×900 | **Hide files** gives the read-only preview nearly the full dashboard width; **Show files** restores the original compact split. |
-| Compact pane at large text scale | 340px pane | Markdown width stays within the pane, long titles and paths wrap, and no words are clipped at the right edge. |
-| Responsive boundary | 759px / 760px | 759px uses the full-width mobile overlay; 760px keeps the side-by-side split and visible **Hide files** control, with no overflow at either width. |
-| Dark mobile preview | 390×844 | Preview replaces only route content, route tabs remain available, mobile dock hides, icon controls fit, and no horizontal page overflow occurs. |
-| Close and reopen | 390×844 | Back restores the dashboard/dock and clears row selection; the file row reopens the preview. |
-| Escape | 390×844 | Escape closes the visible preview and restores the route state. |
+No separate focused-region composite was needed because the normalized full-view image keeps the three columns, toolbar, title wrapping, path bar, and rendered note text legible. DOM measurements supplemented the visual comparison for control height, panel widths, hidden state, focus preservation, and overflow.
 
-## Full-view comparison
+## Findings
 
-The palette source and final dark implementation were opened together in one visual comparison. The dominant navy is preserved as the canvas and surface family; the jersey's yellow trim becomes the active-route and preview-edge gold; orange becomes selection and signal rails; cool royal blue becomes borders, focus, links, and raised depth. The resulting dashboard remains recognizably Vault Control Center rather than resembling a branded sports page.
+No actionable P0, P1, or P2 visual differences remain.
 
-## Focused comparison and iterations
+- Fonts and typography: The existing Vault Control Center font stack, weights, and hierarchy are preserved. The long title wraps to two lines instead of truncating, and note text remains fully readable at desktop and phone widths.
+- Spacing and layout rhythm: The implementation follows the annotation's hierarchy: smaller rail, slightly smaller file-detail region, and substantially larger preview. Panel gaps, borders, radii, and header spacing remain consistent with the existing dashboard system.
+- Colors and visual tokens: Existing light and dark Warriors-inspired tokens are retained; no new arbitrary colors or gradients were introduced.
+- Image quality and asset fidelity: The target contains no new decorative image asset to reproduce. Production controls use Obsidian's Lucide icon library rather than handcrafted SVG, CSS art, emoji, or placeholder imagery. The fixture's text glyphs are test-only.
+- Copy and content: Existing dashboard labels are preserved. New labels are direct and stateful: Hide/Show areas list, Hide/Show programs list, Back, Open in tab, and Hide/Show files.
+- Icons and affordances: The folder-rail control changes between panel-open and panel-close icons, provides a tooltip and accessible label, and keeps keyboard focus after toggling.
+- Responsiveness: No document or root horizontal overflow appeared at any tested width. At 759 pixels and below, the preview switches to an inert-backed overlay and hides the redundant Hide files control. Fine-pointer phone-width rendering keeps compact 42-pixel Back/Open controls; the later coarse-pointer override raises every preview and rail disclosure target to at least 44 pixels on touch devices.
+- Accessibility: Toggle buttons expose `aria-controls` and `aria-expanded`; the hidden browser is inert and `aria-hidden`; Back and Escape restore focus to the originating file row; collapsing the rail preserves focus on the toggle.
 
-1. The first split layout left the People panel too narrow at 1280px. A route-scoped container query now changes the Home work region to two columns below 900px and moves People to a full-width row.
-2. Four capture and signal columns became cramped when the preview was open. The same route-scoped query now uses 2×2 capture and signal grids.
-3. The first 390px preview header allowed the Open-in-tab label to wrap vertically. Narrow layouts now use icon-only Back and Open-in-tab controls while retaining accessible labels in the live plugin.
-4. The desktop and mobile fixtures were rechecked after these changes; computed layout reports no horizontal document overflow.
+## Comparison history
 
-## Functional coverage
+1. Earlier finding — P1 behavior: the fixture and initial implementation state used a boolean-only data attribute while CSS expected the literal value `"true"`, so the label changed but the rail did not retract. Fix: write or remove `data-folder-rail-collapsed="true"` explicitly. Post-fix evidence: rail body `display: none`, rail width 44 px, active control label `Show areas list`, preview width increased from 693 px to 858 px at 1600 × 1000.
+2. Earlier finding — P2 responsive polish: at a 1280-pixel desktop capture, the full rail-toggle label caused the Areas heading to wrap. Fix: switch the rail control to an icon-only form when the route container is at most 720 px wide while retaining the title and accessible label. Post-fix evidence: 32-pixel control, one-line `Areas · 29` heading, no horizontal overflow.
+3. Earlier finding — P2 touch accessibility: compact desktop selectors could retain 32-pixel controls on coarse-pointer tablets because their selector specificity exceeded the generic touch rule. Fix: add a later, equally or more specific coarse-pointer override for Back, Open in tab, Hide/Show files, and the folder-rail disclosure. Post-fix evidence: the resolved CSS cascade now enforces `min-width: 44px` and `min-height: 44px` for each affected control without changing the fine-pointer desktop capture.
+4. Final pass: the normalized source/implementation comparison shows no remaining P0/P1/P2 issue. Browser console log check returned no errors or warnings. The installed v0.1.8 build was then force-reloaded in Obsidian 1.12.7 and inspected with live vault data: the Areas disclosure exposed the correct Hide/Show state, the Markdown preview kept Back and Open in tab, the wide split exposed Hide/Show files, and the file browser restored without closing the preview.
 
-- Unit coverage: preview-kind dispatch, safe history filtering/deduplication/cap, internal-link parsing, preview-history precedence, image/media indexing, recursive folder behavior, privacy filtering, queues, and taskboard behavior.
-- Browser fixture: dark/light toggle, split and collapsed preview, mobile overlay, Back, reopen, Escape, selected row, dock visibility, and runtime logs.
-- Live Obsidian verification: installed v0.1.7 in Obsidian 1.12.7, reloaded the plugin, and exercised the actual plugin through Computer Use plus the live Electron DOM.
+## Primary interactions tested
 
-## Live Obsidian results
+- Collapse and restore the Areas rail.
+- Hide and restore the entire file browser while keeping the rail's collapsed preference.
+- Close the preview with Back and verify focus restoration.
+- Close the preview with Escape and verify focus restoration.
+- Verify split-to-overlay behavior at 760/759 px.
+- Verify long-title, long-path, toolbar, and note-body layout at 390 px.
+- Reload the installed production bundle in Obsidian 1.12.7; open a real Areas Markdown preview; collapse/restore the Areas rail; hide/restore the file browser; confirm the preview and compact controls remain active.
 
-| Check | Result |
-| --- | --- |
-| Areas drill-down | Recruitment → Hire CalWORKs - ISSP Counselor → 03 Misc stayed in the Areas browser and exposed the correct PDF rows. |
-| Programs drill-down | Basic-Needs → Budgets and Funding stayed in the Programs browser and exposed Markdown, PDF, and XLSX rows. |
-| Embedded formats | Markdown, PDF, PNG, TXT, HTML source, and Canvas summary rendered inside the shared pane. The live PNG loaded at 636px natural width. |
-| Safe fallback | XLSX stayed in the dashboard and displayed `Native preview required`; no blank or outside tab was opened automatically. |
-| Markdown links | An internal link from Self Improvement opened its destination inside the same preview pane and kept the dashboard leaf active. |
-| Rapid selection | Concurrent large-text and image requests settled on the last selected image without stale content replacing it. |
-| Explicit tab action | `Open in tab` increased Markdown leaves from 5 to 6, activated the requested file, and preserved the dashboard plus its preview state. |
-| Recent history | After previewing Canvas, HTML, TXT, PNG, and Markdown, Recent listed those dashboard-viewed files in that order with Canvas first. |
-| Inbox counts | Owner inbox showed 48 direct files and 48 rows; Team inbox showed 16 direct files and 16 rows. The only extra direct item in each filesystem folder was `.DS_Store`, which is intentionally excluded. |
-| Search and filters | Searching Recent for `Thoughts` returned only `09 Thoughts/Thoughts.md`; the Areas filter returned six paths and all began with `03 Areas/`. |
-| Other routes | Home capture launcher opened and closed safely; Bookmarks file filtering exposed nine previewable files; People opened an agenda note in the pane; Clipboard exposed three editable templates with Copy/Reset controls; Settings exposed both throwback themes. |
-| Refresh | The live Refresh control entered and cleared its refreshing state without losing the Home route. |
-| Live layout | At a 793px dashboard width, the pane measured 342px, route content measured 423px, split mode was active, and horizontal overflow was false. |
-| Preview text fit | At a 340px live pane width, rendered Markdown measured 340px client and scroll width, zero text descendants overflowed, and the wrapped action row remained inside the header. |
-| Theme tokens | Light: `#fffdf5`, `#f1f4ff`, `#151b4b`, `#c64b0a`, `#e9ab00`, `#3049a8`. Dark: `#0a1238`, `#111d4f`, `#f8faff`, `#f47a24`, `#ffc72c`, `#83a2ff`. |
+## Implementation checklist
 
-No Vault Control Center errors were observed in the live console. Existing TaskNotes frontmatter warnings and other unrelated plugin/theme warnings were outside this change.
+- [x] Make the Areas/Programs rail retractable and persistent in view state.
+- [x] Enlarge the default preview and enlarge it further when the rail retracts.
+- [x] Reduce the file-detail panel proportion without clipping its content.
+- [x] Compact Back, Open in tab, and Hide files.
+- [x] Preserve accessible names, expanded state, inert behavior, and focus restoration.
+- [x] Validate light, dark, desktop, breakpoint, and phone layouts in the browser.
 
 final result: passed

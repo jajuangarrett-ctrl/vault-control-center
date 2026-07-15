@@ -13,8 +13,8 @@ The dashboard keeps nine views in one consistent throwback navy, gold, orange, r
 | View | Purpose |
 | --- | --- |
 | Home | Capture actions, live signals, current programs, recent files, people, and task status |
-| Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with recursive drill-down, breadcrumbs, and in-dashboard previews |
-| Programs | Program folders, activity groups, recursive subfolder drill-down, breadcrumbs, and in-dashboard previews |
+| Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with a collapsible root rail, recursive drill-down, breadcrumbs, and in-dashboard previews |
+| Programs | Program folders, activity groups, a collapsible root rail, recursive subfolder drill-down, breadcrumbs, and in-dashboard previews |
 | AI Team | Four configurable operational queues; Owner and Team inboxes use complete direct-file counts and lists |
 | Recent | Searchable, vault-wide Obsidian file-open history with category filters |
 | Bookmarks | Filtered Obsidian bookmarks; vault targets preview inside the dashboard and HTTP(S) links open externally |
@@ -26,7 +26,9 @@ Additional features:
 
 - Native ribbon icon and command-palette actions
 - Shared read-only preview pane across every file-bearing route; normal clicks keep the dashboard active
-- Compact right-side desktop preview by default, with **Hide files** / **Show files** to temporarily give the read-only note nearly the full dashboard width
+- Wider right-side desktop preview by default, with the Areas and Programs root rail independently retractable to give the folder detail and note more room
+- Compact **Back**, **Open in tab**, and **Hide files** / **Show files** controls that remain accessible when labels collapse in constrained panes
+- **Hide files** / **Show files** can still temporarily give the read-only note nearly the full dashboard width without changing the root-rail state
 - Pane-safe Markdown wrapping plus responsive title/path controls so preview text remains visible at larger display scales
 - Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action for native editing or unsupported formats
 - Coordinated throwback dark and light themes derived from deep navy, golden yellow, orange, royal blue, and warm cream
@@ -87,7 +89,7 @@ Vault Control Center reads the vault-relative folders and files configured in it
 
 Before display, the index excludes hidden/internal folders, archived paths, and names that look like passwords, API keys, secrets, credentials, tokens, or private keys. Bookmark URLs containing basic-auth credentials or obvious sensitive query keys are withheld; visible URL metadata is reduced to the origin while the original URL is retained only for opening.
 
-Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, file contents, task records, and secret values are not saved there. Obsidian workspace state may contain the currently previewed safe path and a capped safe-path preview history so the pane and Recent view survive workspace restoration.
+Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, file contents, task records, and secret values are not saved there. Obsidian workspace state may contain the currently previewed safe path, a capped safe-path preview history, and the Areas/Programs root-rail disclosure state so the dashboard survives workspace restoration.
 
 ## Replacing the legacy launcher
 

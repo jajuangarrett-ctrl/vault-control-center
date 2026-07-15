@@ -45,7 +45,7 @@ Gold appears on the active route, preview trim, and small selected details. Oran
 - Row title: 13–14px, 600 weight.
 - Supporting metadata: 11–12px, muted.
 - Base spacing unit: 4px. Common gaps: 8, 12, 16, 24px.
-- Controls are at least 36px high on desktop and 44px on touch devices.
+- General controls are at least 36px high on desktop and 44px on touch devices. Compact preview and folder-rail chrome may use 32px desktop controls with explicit accessible labels; those controls expand to at least 44px on touch devices.
 
 ## Container model
 
@@ -56,6 +56,8 @@ The plugin renders one native `ItemView` with five persistent layers:
 3. Route content: live, replaceable work region whose navigation and filters survive preview actions.
 4. Preview pane: a sibling of route content, split beside it on desktop and replacing only the route region on mobile.
 5. Mobile action dock: Home, Areas, Programs, Capture, Recent, More; hidden while the full-width mobile preview is open.
+
+Areas and Programs divide route content into a root-folder rail and a detail browser. The rail can retract to a 44px disclosure strip without losing the selected root or nested folder. With a preview open, the note receives roughly 44% of the desktop frame by default and roughly 55% while that rail is retracted; hiding all files gives the note nearly the full frame.
 
 The Home route adds three stacked operational bands:
 
@@ -72,7 +74,8 @@ The orange signal rail is the signature visual element. It should remain visible
 - `Signal`: icon, label, live value, optional attention dot.
 - `WorkPanel`: section label, optional action, bordered row region.
 - `FileRow`: file icon, basename, compact path, and relative modified time or a contextual viewed-status label.
-- `PreviewPane`: Back, file title/path/size, safe read-only renderer, **Hide files** / **Show files** expansion, and the only **Open in tab** escape.
+- `PreviewPane`: compact Back, file title/path/size, safe read-only renderer, **Hide files** / **Show files** expansion, and the only **Open in tab** escape.
+- `FolderRailDisclosure`: Areas/Programs control that retracts or restores the root list while preserving route, folder, focus, and assistive-technology state.
 - `FolderRootRow`: area or program name, file count, modified time, open action.
 - `QueueRow`: direct safe, supported file from a configured active queue; queue lists are complete rather than preview-capped.
 - `PersonRow`: initials, name, agenda count, modified time.
@@ -86,8 +89,9 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 
 - Clicking a file previews it inside the dashboard without replacing the dashboard leaf.
 - Clicking an area, program, or folder drills into its route detail; only file rows invoke the preview.
+- The Areas/Programs root rail retracts independently of the preview. Its disclosure retains focus, exposes its expanded state, and does not reset the selected root or folder.
 - **Open in tab** is the only file action that deliberately opens Obsidian's native viewer/editor in another tab.
-- **Hide files** temporarily collapses the route browser on desktop; **Show files** restores the original compact split without changing route state.
+- **Hide files** temporarily collapses the whole route browser on desktop; **Show files** restores the wider preview split and the previous root-rail state without changing route state.
 - Markdown internal links resolve into the same preview pane; HTTP(S) links remain external.
 - Back and Escape close the preview and restore route-row focus. Slow earlier renders cannot overwrite a later file selection.
 - Rendered Markdown, long note titles, and long paths must wrap within the preview's actual inner width at every display scale; tables and code blocks may scroll inside their own bounded region.
@@ -108,6 +112,8 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 | `760–1179px` | Two-column work grid; People moves to a full-width row; preview keeps a minimum readable width. |
 | `< 760px` | One-column route, horizontally scrollable route strip, 2×2 capture and signal grids; preview replaces the route region and hides the mobile dock until closed. |
 | `< 420px` | Compact labels and metadata; preserve 44px targets and never truncate the primary action. |
+
+When the Areas or Programs route region itself falls below 640px, its root rail and detail browser stack. A retracted rail becomes a compact horizontal disclosure row so its restore action remains available.
 
 At narrow widths, content order is Capture → Signals → Current work → Latest files → People. No desktop-only action may become unreachable.
 

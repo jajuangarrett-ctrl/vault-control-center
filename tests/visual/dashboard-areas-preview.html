@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vault Control Center Areas preview fixture</title>
+    <link rel="stylesheet" href="../../styles.css">
+    <style>
+      html, body { margin: 0; min-height: 100%; }
+      body { background: #0a1238; }
+      .preview-icon { display: inline-grid; width: 1.4em; height: 1.4em; place-items: center; font-size: .8em; font-weight: 800; }
+    </style>
+  </head>
+  <body class="fjg-vcc-shell-enabled fjg-vcc-theme-dark">
+    <div class="fjg-vcc" data-theme="dark">
+      <header class="fjg-vcc-header">
+        <div class="fjg-vcc-title-group">
+          <h1 class="fjg-vcc-title">Vault Control Center</h1>
+          <p class="fjg-vcc-subtitle">Live vault operations</p>
+        </div>
+        <div class="fjg-vcc-header-actions">
+          <label class="fjg-vcc-search"><span class="preview-icon">⌕</span><input type="search" placeholder="Search vault" aria-label="Search the current dashboard view"></label>
+          <button class="fjg-vcc-button" type="button"><span class="preview-icon">↻</span><span>Refresh</span></button>
+          <button class="fjg-vcc-theme-toggle" type="button" id="theme-toggle"><span class="preview-icon">☀</span><span>Light mode</span></button>
+        </div>
+      </header>
+      <nav class="fjg-vcc-route-tabs" aria-label="Dashboard views">
+        <button class="fjg-vcc-route-tab">Home</button>
+        <button class="fjg-vcc-route-tab is-active" aria-selected="true">Areas</button>
+        <button class="fjg-vcc-route-tab">Programs</button>
+        <button class="fjg-vcc-route-tab">AI Team</button>
+        <button class="fjg-vcc-route-tab">Recent</button>
+        <button class="fjg-vcc-route-tab">Bookmarks</button>
+        <button class="fjg-vcc-route-tab">People</button>
+        <button class="fjg-vcc-route-tab">Clipboard</button>
+        <button class="fjg-vcc-route-tab">Settings</button>
+      </nav>
+      <div class="fjg-vcc-content-frame">
+        <main class="fjg-vcc-content" id="fixture-file-browser" aria-label="Dashboard content">
+          <div class="fjg-vcc-route-view" data-route="areas">
+            <div class="fjg-vcc-page-layout fjg-vcc-program-layout">
+              <section class="fjg-vcc-panel fjg-vcc-folder-rail">
+                <header class="fjg-vcc-panel-header">
+                  <h2>Areas · 29</h2>
+                  <button class="fjg-vcc-text-action fjg-vcc-folder-rail-toggle" id="rail-toggle" type="button" aria-controls="fixture-folder-rail" aria-expanded="true" aria-label="Hide areas list" title="Hide areas list"><span class="preview-icon">⇤</span><span>Hide areas list</span></button>
+                </header>
+                <div class="fjg-vcc-panel-body" id="fixture-folder-rail">
+                  <div class="fjg-vcc-select-list">
+                    <button class="fjg-vcc-row fjg-vcc-select-row"><span class="preview-icon">▱</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">All Areas</span><span class="fjg-vcc-row-meta">801 files</span></span><span class="fjg-vcc-row-end">3h ago</span></button>
+                    <button class="fjg-vcc-row fjg-vcc-select-row"><span class="preview-icon">▱</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Professional-Dev</span><span class="fjg-vcc-row-meta">176 files</span></span><span class="fjg-vcc-row-end">3d ago</span></button>
+                    <button class="fjg-vcc-row fjg-vcc-select-row"><span class="preview-icon">▱</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Recruitment</span><span class="fjg-vcc-row-meta">147 files</span></span><span class="fjg-vcc-row-end">15h ago</span></button>
+                    <button class="fjg-vcc-row fjg-vcc-select-row"><span class="preview-icon">▱</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">How-To</span><span class="fjg-vcc-row-meta">69 files</span></span><span class="fjg-vcc-row-end">3h ago</span></button>
+                    <button class="fjg-vcc-row fjg-vcc-select-row is-selected" aria-pressed="true"><span class="preview-icon">▱</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Scheduling Information</span><span class="fjg-vcc-row-meta">69 files</span></span><span class="fjg-vcc-row-end">2d ago</span></button>
+                    <button class="fjg-vcc-row fjg-vcc-select-row"><span class="preview-icon">▱</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Student-Support</span><span class="fjg-vcc-row-meta">68 files</span></span><span class="fjg-vcc-row-end">23h ago</span></button>
+                    <button class="fjg-vcc-row fjg-vcc-select-row"><span class="preview-icon">▱</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">Fiscal</span><span class="fjg-vcc-row-meta">48 files</span></span><span class="fjg-vcc-row-end">19h ago</span></button>
+                  </div>
+                </div>
+              </section>
+              <section class="fjg-vcc-panel">
+                <header class="fjg-vcc-panel-header"><h2>Scheduling Information</h2><button class="fjg-vcc-text-action" type="button">Preview latest</button></header>
+                <div class="fjg-vcc-panel-body">
+                  <div class="fjg-vcc-detail-summary"><strong>69 files</strong><span>Latest activity 2d ago</span></div>
+                  <div class="fjg-vcc-program-browser">
+                    <h3 class="fjg-vcc-folder-heading">Scheduling Information</h3>
+                    <div class="fjg-vcc-section-label">Folders</div>
+                    <div class="fjg-vcc-folder-list">
+                      <button class="fjg-vcc-folder-chip"><span class="preview-icon">▱</span><span class="fjg-vcc-folder-name">Federal Time Reporting</span><span class="fjg-vcc-folder-count">12</span></button>
+                      <button class="fjg-vcc-folder-chip"><span class="preview-icon">▱</span><span class="fjg-vcc-folder-name">Summer 2026 Non-Classroom Assignment</span><span class="fjg-vcc-folder-count">10</span></button>
+                      <button class="fjg-vcc-folder-chip"><span class="preview-icon">▱</span><span class="fjg-vcc-folder-name">Overload Hours Analysis and Schedules</span><span class="fjg-vcc-folder-count">8</span></button>
+                      <button class="fjg-vcc-folder-chip"><span class="preview-icon">▱</span><span class="fjg-vcc-folder-name">Academic Calendar</span><span class="fjg-vcc-folder-count">2</span></button>
+                    </div>
+                    <div class="fjg-vcc-section-label fjg-vcc-files-label">Files in this folder</div>
+                    <button class="fjg-vcc-row" id="preview-trigger" data-file-path="03 Areas/Scheduling Information/SDCCE Academic Calendars.md" aria-label="Preview SDCCE Academic Calendars"><span class="preview-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">SDCCE Academic Calendars</span><span class="fjg-vcc-row-path">03 Areas/Scheduling Information/SDCCE Academic Calendars.md</span></span><span class="fjg-vcc-row-end">2d ago</span></button>
+                    <button class="fjg-vcc-row"><span class="preview-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">2026-27 Student Support Services Schedule</span><span class="fjg-vcc-row-path">03 Areas/Scheduling Information/2026-27 Student Support Services Schedule.md</span></span><span class="fjg-vcc-row-end">2d ago</span></button>
+                    <button class="fjg-vcc-row"><span class="preview-icon">▤</span><span class="fjg-vcc-row-main"><span class="fjg-vcc-row-title">SARS Scheduling Task Reassignment</span><span class="fjg-vcc-row-path">03 Areas/Scheduling Information/SARS Scheduling Task Reassignment.md</span></span><span class="fjg-vcc-row-end">2d ago</span></button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </main>
+        <aside class="fjg-vcc-preview-pane" id="preview-pane" role="region" aria-labelledby="fixture-preview-title" aria-hidden="true" hidden>
+          <header class="fjg-vcc-preview-header">
+            <button class="fjg-vcc-preview-back" id="preview-close" type="button" aria-label="Close preview and return to the dashboard" title="Back"><span class="preview-icon">←</span><span>Back</span></button>
+            <div class="fjg-vcc-preview-heading"><span class="fjg-vcc-preview-kicker">MD preview</span><h2 class="fjg-vcc-preview-title" id="fixture-preview-title" tabindex="-1">SDCCE Academic Calendars and Continuing Education Scheduling Resources</h2></div>
+            <div class="fjg-vcc-preview-actions">
+              <button class="fjg-vcc-button fjg-vcc-preview-open-tab" type="button" aria-label="Open in tab" title="Open in tab"><span class="preview-icon">↗</span><span>Open in tab</span></button>
+              <button class="fjg-vcc-button fjg-vcc-preview-browser-toggle" id="browser-toggle" type="button" aria-controls="fixture-file-browser" aria-expanded="true" aria-label="Hide files while previewing this file" title="Hide files"><span class="preview-icon">▥</span><span>Hide files</span></button>
+            </div>
+          </header>
+          <div class="fjg-vcc-preview-pathbar"><span class="fjg-vcc-preview-path">03 Areas/Scheduling Information/SDCCE Academic Calendars and Continuing Education Scheduling Resources.md</span><span class="fjg-vcc-preview-size">7.2 KB</span></div>
+          <div class="fjg-vcc-preview-body markdown-rendered fjg-vcc-preview-markdown" tabindex="0">
+            <h1>SDCCE Academic Calendars</h1>
+            <p>Official SDCCD and SDCCE Continuing Education academic calendar resources remain fully visible inside the enlarged dashboard preview pane.</p>
+            <h2>Official calendar page</h2>
+            <ul><li>Academic Calendars — Continuing Education</li><li>Fall, spring, and summer term milestones</li><li>Faculty and student-support scheduling references</li></ul>
+            <h2>Saved PDFs</h2>
+            <p>2025–2026 SDCCE Noncredit CE Academic Calendar and related planning documents.</p>
+          </div>
+        </aside>
+      </div>
+      <nav class="fjg-vcc-mobile-dock"><button class="fjg-vcc-mobile-dock-item">⌂<span>Home</span></button><button class="fjg-vcc-mobile-dock-item is-active">▦<span>Areas</span></button><button class="fjg-vcc-mobile-dock-item">▱<span>Programs</span></button><button class="fjg-vcc-mobile-dock-item">＋<span>Capture</span></button><button class="fjg-vcc-mobile-dock-item">◷<span>Recent</span></button><button class="fjg-vcc-mobile-dock-item">•••<span>More</span></button></nav>
+    </div>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const root = document.querySelector('.fjg-vcc');
+      const previewPane = document.querySelector('#preview-pane');
+      const previewTrigger = document.querySelector('#preview-trigger');
+      const browserToggle = document.querySelector('#browser-toggle');
+      const fileBrowser = document.querySelector('#fixture-file-browser');
+      const railToggle = document.querySelector('#rail-toggle');
+      let browserCollapsed = false;
+      let railCollapsed = false;
+
+      if (params.get('theme') === 'light') {
+        root.dataset.theme = 'light';
+        document.body.className = 'fjg-vcc-shell-enabled fjg-vcc-theme-light';
+        document.querySelector('#theme-toggle').lastElementChild.textContent = 'Dark mode';
+      }
+      document.querySelector('#theme-toggle').addEventListener('click', (event) => {
+        const light = root.dataset.theme === 'light';
+        root.dataset.theme = light ? 'dark' : 'light';
+        document.body.className = `fjg-vcc-shell-enabled fjg-vcc-theme-${light ? 'dark' : 'light'}`;
+        event.currentTarget.lastElementChild.textContent = light ? 'Light mode' : 'Dark mode';
+      });
+
+      const syncRail = () => {
+        if (railCollapsed) root.setAttribute('data-folder-rail-collapsed', 'true');
+        else root.removeAttribute('data-folder-rail-collapsed');
+        const label = `${railCollapsed ? 'Show' : 'Hide'} areas list`;
+        railToggle.setAttribute('aria-expanded', String(!railCollapsed));
+        railToggle.setAttribute('aria-label', label);
+        railToggle.setAttribute('title', label);
+        railToggle.firstElementChild.textContent = railCollapsed ? '⇥' : '⇤';
+        railToggle.lastElementChild.textContent = label;
+      };
+      railToggle.addEventListener('click', () => {
+        railCollapsed = !railCollapsed;
+        syncRail();
+      });
+
+      const syncPreviewMode = () => {
+        if (!root.hasAttribute('data-preview-open')) {
+          root.removeAttribute('data-preview-mode');
+          root.removeAttribute('data-browser-collapsed');
+          fileBrowser.removeAttribute('inert');
+          fileBrowser.removeAttribute('aria-hidden');
+          return;
+        }
+        const overlay = root.getBoundingClientRect().width < 760;
+        root.dataset.previewMode = overlay ? 'overlay' : 'split';
+        if (browserCollapsed && !overlay) root.setAttribute('data-browser-collapsed', 'true');
+        else root.removeAttribute('data-browser-collapsed');
+        if (overlay || browserCollapsed) {
+          fileBrowser.setAttribute('inert', '');
+          fileBrowser.setAttribute('aria-hidden', 'true');
+        } else {
+          fileBrowser.removeAttribute('inert');
+          fileBrowser.removeAttribute('aria-hidden');
+        }
+      };
+      const setBrowserCollapsed = (collapsed) => {
+        browserCollapsed = collapsed;
+        const label = collapsed ? 'Show files' : 'Hide files';
+        browserToggle.setAttribute('aria-expanded', String(!collapsed));
+        browserToggle.setAttribute('aria-label', `${label} while previewing this file`);
+        browserToggle.setAttribute('title', label);
+        browserToggle.lastElementChild.textContent = label;
+        syncPreviewMode();
+      };
+      const openPreview = () => {
+        root.dataset.previewOpen = 'true';
+        previewPane.hidden = false;
+        previewPane.setAttribute('aria-hidden', 'false');
+        previewTrigger.classList.add('is-selected');
+        previewTrigger.setAttribute('aria-current', 'true');
+        syncPreviewMode();
+        document.querySelector('#fixture-preview-title').focus({ preventScroll: true });
+      };
+      const closePreview = () => {
+        root.removeAttribute('data-preview-open');
+        setBrowserCollapsed(false);
+        previewPane.hidden = true;
+        previewPane.setAttribute('aria-hidden', 'true');
+        previewTrigger.classList.remove('is-selected');
+        previewTrigger.setAttribute('aria-current', 'false');
+        syncPreviewMode();
+        previewTrigger.focus();
+      };
+      previewTrigger.addEventListener('click', openPreview);
+      document.querySelector('#preview-close').addEventListener('click', closePreview);
+      browserToggle.addEventListener('click', () => setBrowserCollapsed(!browserCollapsed));
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && root.hasAttribute('data-preview-open')) closePreview();
+      });
+      window.addEventListener('resize', syncPreviewMode);
+
+      if (params.get('rail') === 'collapsed') {
+        railCollapsed = true;
+        syncRail();
+      }
+      if (params.get('preview') === '1') openPreview();
+      if (params.get('collapsed') === '1') {
+        openPreview();
+        setBrowserCollapsed(true);
+      }
+    </script>
+  </body>
+</html>

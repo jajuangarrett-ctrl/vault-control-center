@@ -63,6 +63,7 @@ interface PersistedViewState {
   selectedAiQueue?: unknown;
   recentFilter?: unknown;
   bookmarkFilter?: unknown;
+  folderRailCollapsed?: unknown;
   previewPath?: unknown;
   previewHistory?: unknown;
 }
@@ -125,6 +126,7 @@ export class VaultControlCenterView extends ItemView {
   private previewReturnFocusEl: HTMLElement | null = null;
   private previewComponent: Component | null = null;
   private previewBrowserCollapsed = false;
+  private folderRailCollapsed = false;
   private previewRequestId = 0;
   private previewHistory: string[] = [];
   private previewResizeObserver: ResizeObserver | null = null;
@@ -133,6 +135,7 @@ export class VaultControlCenterView extends ItemView {
   private taskboardFetchedAt = 0;
   private taskboardSettingsKey = "";
   private readonly browserRegionId = `fjg-vcc-browser-${++dashboardViewSequence}`;
+  private readonly folderRailId = `fjg-vcc-folder-rail-${dashboardViewSequence}`;
 
   constructor(leaf: WorkspaceLeaf, readonly plugin: VaultControlCenterPlugin) {
     super(leaf);
@@ -183,6 +186,7 @@ export class VaultControlCenterView extends ItemView {
     this.previewReturnFocusEl = null;
     this.activePreviewFile = null;
     this.previewBrowserCollapsed = false;
+    this.folderRailCollapsed = false;
   }
 
   getState(): Record<string, unknown> {
@@ -196,6 +200,7 @@ export class VaultControlCenterView extends ItemView {
       selectedAiQueue: this.renderState.selectedAiQueue,
       recentFilter: this.renderState.recentFilter,
       bookmarkFilter: this.renderState.bookmarkFilter,
+      folderRailCollapsed: this.folderRailCollapsed,
       previewPath: this.activePreviewFile?.path || this.pendingPreviewPath,
       previewHistory: this.previewHistory,
     };
@@ -228,6 +233,9 @@ export class VaultControlCenterView extends ItemView {
     }
     if (typeof saved.bookmarkFilter === "string" && BOOKMARK_FILTERS.includes(saved.bookmarkFilter as BookmarkFilter)) {
       this.renderState.bookmarkFilter = saved.bookmarkFilter as BookmarkFilter;
+    }
+    if (typeof saved.folderRailCollapsed === "boolean") {
+      this.folderRailCollapsed = saved.folderRailCollapsed;
     }
     const savedPreviewPath = typeof saved.previewPath === "string"
       ? normalizeVaultPath(saved.previewPath)
@@ -336,6 +344,7 @@ export class VaultControlCenterView extends ItemView {
         ...(this.previewBrowserCollapsed ? { "data-browser-collapsed": "true" } : {}),
       },
     });
+    this.syncFolderRailAttribute();
     const header = this.rootEl.createEl("header", { cls: "fjg-vcc-header" });
     const titleGroup = header.createDiv({ cls: "fjg-vcc-title-group" });
     titleGroup.createEl("h1", { cls: "fjg-vcc-title", text: "Vault Control Center" });
@@ -502,6 +511,7 @@ export class VaultControlCenterView extends ItemView {
       this.renderLoading();
       return;
     }
+    this.syncFolderRailAttribute();
     renderRoute(this.route, this.contentRegionEl, this.renderContext());
     this.syncPreviewSelection();
   }
@@ -542,6 +552,12 @@ export class VaultControlCenterView extends ItemView {
       settings: this.plugin.settings,
       state: this.renderState,
       activePreviewPath: this.activePreviewFile?.path ?? this.pendingPreviewPath,
+      folderRailId: this.folderRailId,
+      folderRailCollapsed: this.folderRailCollapsed,
+      setFolderRailCollapsed: (collapsed) => {
+        this.folderRailCollapsed = collapsed;
+        this.syncFolderRailAttribute();
+      },
       navigate: (route) => this.navigate(route),
       openFile: (path) => void this.openPreview(path),
       openBookmark: (bookmark) => void this.openBookmark(bookmark),
@@ -618,6 +634,15 @@ export class VaultControlCenterView extends ItemView {
     this.renderMobileDock();
     this.renderContent();
     this.contentRegionEl?.scrollTo({ top: 0 });
+  }
+
+  private syncFolderRailAttribute(): void {
+    const activeRoute = this.route === "areas" || this.route === "programs";
+    if (activeRoute && this.folderRailCollapsed) {
+      this.rootEl?.setAttribute("data-folder-rail-collapsed", "true");
+    } else {
+      this.rootEl?.removeAttribute("data-folder-rail-collapsed");
+    }
   }
 
   private focusFolderHeading(): void {
@@ -744,6 +769,7 @@ export class VaultControlCenterView extends ItemView {
       icon: "arrow-left",
       className: "fjg-vcc-preview-back",
       ariaLabel: "Close preview and return to the dashboard",
+      title: "Back",
       onClick: () => this.closePreview(),
     });
     const headingGroup = header.createDiv({ cls: "fjg-vcc-preview-heading" });
@@ -765,6 +791,7 @@ export class VaultControlCenterView extends ItemView {
       label: "Open in tab",
       icon: "external-link",
       className: "fjg-vcc-button fjg-vcc-preview-open-tab",
+      title: "Open in tab",
       onClick: () => void this.plugin.openVaultFileInTab(file.path),
     });
     this.createPreviewBrowserToggle(actions);
@@ -829,11 +856,13 @@ export class VaultControlCenterView extends ItemView {
       icon: "panel-left",
       className: "fjg-vcc-button fjg-vcc-preview-browser-toggle",
       ariaLabel: `${label} while previewing this file`,
+      title: label,
       onClick: () => {
         this.previewBrowserCollapsed = !this.previewBrowserCollapsed;
         this.updatePreviewLayoutMode();
         const nextLabel = this.previewBrowserCollapsed ? "Show files" : "Hide files";
         button.setAttribute("aria-label", `${nextLabel} while previewing this file`);
+        button.setAttribute("title", nextLabel);
         button.setAttribute("aria-expanded", String(!this.previewBrowserCollapsed));
         const labels = button.querySelectorAll<HTMLSpanElement>("span");
         const textLabel = labels.item(labels.length - 1);

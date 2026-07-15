@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Notice, setIcon } from "obsidian";
 import type {
   AiFolderKey,
   DashboardBookmark,
@@ -51,6 +51,9 @@ export interface DashboardRenderContext {
   settings: DashboardSettings;
   state: DashboardRenderState;
   activePreviewPath: string;
+  folderRailId: string;
+  folderRailCollapsed: boolean;
+  setFolderRailCollapsed: (collapsed: boolean) => void;
   navigate: (route: DashboardRoute) => void;
   openFile: (path: string) => void;
   openBookmark: (bookmark: DashboardBookmark) => void;
@@ -386,7 +389,35 @@ function renderFolderCollection(
   const selected =
     matches.find((root) => root.path === options.selectedRootPath) ?? matches[0];
   const layout = parent.createDiv({ cls: "fjg-vcc-page-layout fjg-vcc-program-layout" });
-  const listPanel = createPanel(layout, `${options.title} · ${options.listCount ?? matches.length}`);
+  const listPanel = createPanel(layout, `${options.title} · ${options.listCount ?? matches.length}`, {
+    className: "fjg-vcc-folder-rail",
+  });
+  listPanel.body.id = context.folderRailId;
+  let railCollapsed = context.folderRailCollapsed;
+  let railToggle: HTMLButtonElement;
+  const syncRailToggle = (): void => {
+    const label = `${railCollapsed ? "Show" : "Hide"} ${options.title.toLocaleLowerCase()} list`;
+    railToggle.setAttribute("aria-label", label);
+    railToggle.setAttribute("aria-expanded", String(!railCollapsed));
+    railToggle.setAttribute("title", label);
+    const icon = railToggle.querySelector<HTMLElement>(".fjg-vcc-icon");
+    if (icon) setIcon(icon, railCollapsed ? "panel-left-open" : "panel-left-close");
+    const labels = railToggle.querySelectorAll<HTMLSpanElement>("span");
+    const textLabel = labels.item(labels.length - 1);
+    if (textLabel) textLabel.textContent = label;
+  };
+  railToggle = createButton(listPanel.header, {
+    label: `${railCollapsed ? "Show" : "Hide"} ${options.title.toLocaleLowerCase()} list`,
+    icon: railCollapsed ? "panel-left-open" : "panel-left-close",
+    className: "fjg-vcc-text-action fjg-vcc-folder-rail-toggle",
+    onClick: () => {
+      railCollapsed = !railCollapsed;
+      context.setFolderRailCollapsed(railCollapsed);
+      syncRailToggle();
+    },
+  });
+  railToggle.setAttribute("aria-controls", context.folderRailId);
+  syncRailToggle();
 
   if (!matches.length) {
     createEmptyState(
