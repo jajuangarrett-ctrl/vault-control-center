@@ -1,16 +1,5 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
-import {
-  isExcludedPath,
-  isSensitivePath,
-  normalizeVaultPath,
-  remapVaultPathAfterRename,
-} from "./data";
-import {
-  canPersistPreviewRecovery,
-  classifyPreviewKind,
-  isEditablePreviewKind,
-  isPreviewRecoveryPayloadWithinLimit,
-} from "./preview";
+import { isExcludedPath, isSensitivePath, normalizeVaultPath } from "./data";
 import { VaultControlCenterSettingTab } from "./settings";
 import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
@@ -22,18 +11,8 @@ type CommandHost = {
   };
 };
 
-export interface PreviewRecoveryDraft {
-  path: string;
-  baselineContent: string;
-  draft: string;
-  savedAt: number;
-}
-
 export default class VaultControlCenterPlugin extends Plugin {
   settings: DashboardSettings = structuredClone(DEFAULT_SETTINGS);
-  private previewRecoveryDraft: PreviewRecoveryDraft | null = null;
-  private recoveryRevisionClock = 0;
-  private dataWritePromise: Promise<void> = Promise.resolve();
   private refreshTimer: number | null = null;
 
   async onload(): Promise<void> {
@@ -67,14 +46,7 @@ export default class VaultControlCenterPlugin extends Plugin {
       this.registerEvent(this.app.vault.on("create", schedule));
       this.registerEvent(this.app.vault.on("modify", schedule));
       this.registerEvent(this.app.vault.on("delete", schedule));
-      this.registerEvent(
-        this.app.vault.on("rename", (file, oldPath) => {
-          schedule();
-          void this.migratePreviewRecoveryAfterRename(file.path, oldPath).catch(() => {
-            new Notice("A retained dashboard draft could not follow its renamed file.");
-          });
-        })
-      );
+      this.registerEvent(this.app.vault.on("rename", schedule));
       this.registerEvent(this.app.workspace.on("file-open", schedule));
     });
   }
@@ -93,13 +65,6 @@ export default class VaultControlCenterPlugin extends Plugin {
       : {};
     const savedSchemaVersion = finiteInteger(saved.schemaVersion, 0);
     const taskboardSecretId = stringSetting(saved.taskboardSecretId, "");
-    this.previewRecoveryDraft = parsePreviewRecoveryDraft(saved.previewRecoveryDraft);
-    this.recoveryRevisionClock = Math.max(
-      this.recoveryRevisionClock,
-      this.previewRecoveryDraft?.savedAt ?? 0
-    );
-    const discardedInvalidRecovery =
-      saved.previewRecoveryDraft != null && !this.previewRecoveryDraft;
     this.settings = {
       schemaVersion: DEFAULT_SETTINGS.schemaVersion,
       theme: saved.theme === "light" ? "light" : "dark",
@@ -148,99 +113,13 @@ export default class VaultControlCenterPlugin extends Plugin {
       },
     };
 
-    if (savedSchemaVersion < DEFAULT_SETTINGS.schemaVersion || discardedInvalidRecovery) {
-      await this.saveSettings();
+    if (savedSchemaVersion < DEFAULT_SETTINGS.schemaVersion) {
+      await this.saveData(this.settings);
     }
   }
 
   async saveSettings(): Promise<void> {
-    const snapshot = {
-      ...this.settings,
-      previewRecoveryDraft: this.previewRecoveryDraft,
-    };
-    const operation = this.dataWritePromise.then(() => this.saveData(snapshot));
-    this.dataWritePromise = operation.catch(() => undefined);
-    await operation;
-  }
-
-  getPreviewRecoveryDraft(): PreviewRecoveryDraft | null {
-    return this.previewRecoveryDraft ? { ...this.previewRecoveryDraft } : null;
-  }
-
-  async storePreviewRecoveryDraft(
-    draft: PreviewRecoveryDraft,
-    options: { preserveSavedAt?: boolean } = {}
-  ): Promise<void> {
-    const previous = this.previewRecoveryDraft;
-    const savedAt = options.preserveSavedAt
-      ? draft.savedAt
-      : Math.max(Date.now(), this.recoveryRevisionClock + 1);
-    this.recoveryRevisionClock = Math.max(this.recoveryRevisionClock, savedAt);
-    const next = { ...draft, savedAt };
-    this.previewRecoveryDraft = next;
-    try {
-      await this.saveSettings();
-    } catch (error) {
-      if (this.previewRecoveryDraft === next) this.previewRecoveryDraft = previous;
-      throw error;
-    }
-  }
-
-  async clearPreviewRecoveryDraft(
-    path?: string,
-    expectedSavedAt?: number
-  ): Promise<boolean> {
-    if (!this.previewRecoveryDraft) return true;
-    if (
-      path &&
-      normalizeVaultPath(path) !== normalizeVaultPath(this.previewRecoveryDraft.path)
-    ) return false;
-    if (
-      expectedSavedAt !== undefined &&
-      this.previewRecoveryDraft.savedAt !== expectedSavedAt
-    ) return false;
-    const previous = this.previewRecoveryDraft;
-    this.previewRecoveryDraft = null;
-    try {
-      await this.saveSettings();
-    } catch (error) {
-      if (this.previewRecoveryDraft === null) this.previewRecoveryDraft = previous;
-      throw error;
-    }
-    return true;
-  }
-
-  private async migratePreviewRecoveryAfterRename(
-    newPath: string,
-    oldPath: string
-  ): Promise<void> {
-    const recovery = this.previewRecoveryDraft;
-    if (!recovery) return;
-    const remappedPath = remapVaultPathAfterRename(recovery.path, oldPath, newPath);
-    if (!remappedPath) return;
-
-    const target = this.app.vault.getAbstractFileByPath(normalizePath(remappedPath));
-    const canMigrate =
-      target instanceof TFile &&
-      canPersistPreviewRecovery({
-        fileIsCurrent: true,
-        pathIsSafe:
-          !isExcludedPath(remappedPath) && !isSensitivePath(remappedPath),
-        kind: classifyPreviewKind(target.extension),
-        fileSize: target.stat.size,
-        baselineContent: recovery.baselineContent,
-        draft: recovery.draft,
-      });
-    if (!(target instanceof TFile) || !canMigrate) {
-      await this.clearPreviewRecoveryDraft(recovery.path, recovery.savedAt);
-      new Notice("A retained dashboard draft was discarded after its file moved outside the safe editor.");
-      return;
-    }
-
-    await this.storePreviewRecoveryDraft({
-      ...recovery,
-      path: target.path,
-    }, { preserveSavedAt: true });
+    await this.saveData(this.settings);
   }
 
   async onExternalSettingsChange(): Promise<void> {
@@ -336,26 +215,4 @@ function stringArraySetting(value: unknown, fallback: string[]): string[] {
     .map((entry) => entry.trim())
     .filter(Boolean);
   return strings.length ? strings : [...fallback];
-}
-
-function parsePreviewRecoveryDraft(value: unknown): PreviewRecoveryDraft | null {
-  if (!isRecord(value)) return null;
-  const path = normalizeVaultPath(stringSetting(value.path, ""));
-  if (
-    !path ||
-    isExcludedPath(path) ||
-    isSensitivePath(path) ||
-    !isEditablePreviewKind(classifyPreviewKind(path)) ||
-    typeof value.baselineContent !== "string" ||
-    typeof value.draft !== "string" ||
-    !isPreviewRecoveryPayloadWithinLimit(value.baselineContent, value.draft)
-  ) return null;
-  return {
-    path,
-    baselineContent: value.baselineContent,
-    draft: value.draft,
-    savedAt: typeof value.savedAt === "number" && Number.isFinite(value.savedAt)
-      ? value.savedAt
-      : Date.now(),
-  };
 }

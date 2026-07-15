@@ -25,10 +25,10 @@ The dashboard keeps nine views in one consistent throwback navy, gold, orange, r
 Additional features:
 
 - Native ribbon icon and command-palette actions
-- Shared preview pane across every file-bearing route; normal clicks keep the dashboard active
-- In-dashboard editing for Markdown, TXT, CSV, HTML source, and JSON with explicit Save/Discard controls, Command/Ctrl+S, external-change conflict protection, and bounded close/reopen draft recovery; **Back** and **Open in tab** remain available throughout the quick-edit workflow
-- Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action for unsupported or native-only formats
-- A note-first desktop split that gives the preview roughly two-thirds of the width, plus **Hide files** / **Show files** for a nearly full-width reading and editing pane
+- Shared read-only preview pane across every file-bearing route; normal clicks keep the dashboard active
+- Compact right-side desktop preview by default, with **Hide files** / **Show files** to temporarily give the read-only note nearly the full dashboard width
+- Pane-safe Markdown wrapping plus responsive title/path controls so preview text remains visible at larger display scales
+- Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action for native editing or unsupported formats
 - Coordinated throwback dark and light themes derived from deep navy, golden yellow, orange, royal blue, and warm cream
 - Optional Obsidian shell theming that is removed cleanly when disabled or unloaded
 - Responsive layouts for desktop, split panes, tablets, and phones
@@ -66,7 +66,7 @@ Open **Settings → Community plugins → Vault Control Center** and configure t
 
 The bundled defaults are generic examples. Missing sources are reported in the dashboard instead of causing the view to fail.
 
-Recent combines three sources in viewed order: files previewed inside Vault Control Center, the optional Recent Files plugin when it is enabled in file-open mode, and Obsidian's native open history. Preview history is capped at 30 safe paths in the Obsidian workspace state; the preview-history record itself stores no file contents. If none of these sources provides usable viewed-file history, the dashboard temporarily falls back to modified-time activity under the configured recent roots.
+Recent combines three sources in viewed order: files previewed inside Vault Control Center, the optional Recent Files plugin when it is enabled in file-open mode, and Obsidian's native open history. Preview history is capped at 30 safe paths in the Obsidian workspace state; no file contents are stored. If none of these sources provides usable viewed-file history, the dashboard temporarily falls back to modified-time activity under the configured recent roots.
 
 Capture buttons dispatch commands from companion capture plugins. Install and enable the corresponding Thought Capture, Email Capture, Agenda Capture, and Program Update Capture plugins for those buttons to work. Vault Control Center does not register the displayed actions as global hotkeys.
 
@@ -87,7 +87,7 @@ Vault Control Center reads the vault-relative folders and files configured in it
 
 Before display, the index excludes hidden/internal folders, archived paths, and names that look like passwords, API keys, secrets, credentials, tokens, or private keys. Bookmark URLs containing basic-auth credentials or obvious sensitive query keys are withheld; visible URL metadata is reduced to the origin while the original URL is retained only for opening.
 
-Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, task records, and secret values are not saved there. If the dashboard closes with an unsaved safe text edit, one bounded temporary recovery record containing that file's baseline and draft text is stored locally until the draft is saved, discarded, or found unusable; privacy, type, current-file, and size checks run before storage and again before recovery. Obsidian workspace state may contain the currently previewed safe path and a capped safe-path preview history so the pane and Recent view survive workspace restoration.
+Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, file contents, task records, and secret values are not saved there. Obsidian workspace state may contain the currently previewed safe path and a capped safe-path preview history so the pane and Recent view survive workspace restoration.
 
 ## Replacing the legacy launcher
 
@@ -111,7 +111,6 @@ npm run check
 - **The old dashboard still opens:** disable the legacy launcher after confirming the native plugin is configured.
 - **Recent does not match files you just viewed:** use Refresh. Files previewed in the dashboard are placed first, followed by Recent Files and native Obsidian history; configured recent roots are used only when no viewed history is available.
 - **A file shows “Native preview required”:** use **Open in tab** for Office documents or formats without a safe embedded renderer.
-- **A note says the vault copy changed:** the dashboard preserved your draft and refused to overwrite the newer vault file. Use **Discard changes** to load the vault copy, then reapply any draft text you still need.
 
 ## Design notes
 

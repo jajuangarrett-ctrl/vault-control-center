@@ -72,7 +72,7 @@ The orange signal rail is the signature visual element. It should remain visible
 - `Signal`: icon, label, live value, optional attention dot.
 - `WorkPanel`: section label, optional action, bordered row region.
 - `FileRow`: file icon, basename, compact path, and relative modified time or a contextual viewed-status label.
-- `PreviewPane`: Back, file title/path/size, safe read-only renderer, and the only **Open in tab** escape.
+- `PreviewPane`: Back, file title/path/size, safe read-only renderer, **Hide files** / **Show files** expansion, and the only **Open in tab** escape.
 - `FolderRootRow`: area or program name, file count, modified time, open action.
 - `QueueRow`: direct safe, supported file from a configured active queue; queue lists are complete rather than preview-capped.
 - `PersonRow`: initials, name, agenda count, modified time.
@@ -86,9 +86,11 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 
 - Clicking a file previews it inside the dashboard without replacing the dashboard leaf.
 - Clicking an area, program, or folder drills into its route detail; only file rows invoke the preview.
-- **Open in tab** is the only file action that deliberately opens Obsidian's native viewer/editor in another tab. It remains visible during quick editing, but an unsaved dashboard draft must be saved or discarded before the saved vault copy opens there.
+- **Open in tab** is the only file action that deliberately opens Obsidian's native viewer/editor in another tab.
+- **Hide files** temporarily collapses the route browser on desktop; **Show files** restores the original compact split without changing route state.
 - Markdown internal links resolve into the same preview pane; HTTP(S) links remain external.
 - Back and Escape close the preview and restore route-row focus. Slow earlier renders cannot overwrite a later file selection.
+- Rendered Markdown, long note titles, and long paths must wrap within the preview's actual inner width at every display scale; tables and code blocks may scroll inside their own bounded region.
 - `/` focuses dashboard search when the view is active.
 - Search filters the current route without leaving the keyboard.
 - Refresh immediately rebuilds the live index and reports completion.

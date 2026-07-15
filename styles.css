@@ -98,10 +98,6 @@ body.fjg-vcc-theme-light .fjg-vcc,
   box-sizing: border-box;
 }
 
-.fjg-vcc [hidden] {
-  display: none !important;
-}
-
 .fjg-vcc :is(button, input, select, textarea) {
   margin: 0;
   color: inherit;
@@ -474,10 +470,10 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 
 .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
   display: grid;
-  grid-template-columns: clamp(260px, 30%, 400px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr);
   align-items: start;
-  gap: 14px;
-  padding-right: var(--vcc-space-5);
+  gap: var(--vcc-space-4);
+  padding-right: var(--vcc-space-6);
 }
 
 .fjg-vcc-content {
@@ -488,21 +484,12 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 }
 
 .fjg-vcc[data-preview-open="true"] .fjg-vcc-content {
-  padding-left: var(--vcc-space-4);
   padding-right: 0;
-}
-
-.fjg-vcc[data-preview-open="true"] .fjg-vcc-program-layout {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.fjg-vcc[data-preview-open="true"] .fjg-vcc-program-layout > .fjg-vcc-panel:first-child {
-  display: none;
 }
 
 .fjg-vcc[data-preview-open="true"][data-browser-collapsed="true"] .fjg-vcc-content-frame {
   grid-template-columns: minmax(0, 1fr);
-  padding-left: var(--vcc-space-4);
+  padding-left: var(--vcc-space-6);
 }
 
 .fjg-vcc[data-preview-open="true"][data-browser-collapsed="true"] .fjg-vcc-content {
@@ -524,8 +511,8 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
   overflow: hidden;
   flex-direction: column;
   min-width: 0;
-  height: calc(100dvh - 140px);
-  min-height: 0;
+  height: min(760px, calc(100vh - 88px));
+  min-height: 520px;
   margin-top: var(--vcc-space-5);
   border: 1px solid var(--vcc-border-strong);
   border-radius: var(--vcc-radius-lg);
@@ -595,14 +582,15 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 
 .fjg-vcc-preview-title {
   margin: 3px 0 0;
-  overflow: hidden;
+  overflow: visible;
   color: var(--vcc-text);
   font-size: 16px;
   font-weight: 750;
   letter-spacing: -0.01em;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .fjg-vcc-preview-actions {
@@ -616,8 +604,9 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 .fjg-vcc-preview-pathbar {
   display: flex;
   flex: 0 0 auto;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   min-height: 38px;
   gap: 12px;
   padding: 7px 14px;
@@ -629,30 +618,17 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 
 .fjg-vcc-preview-path {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1 1 220px;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .fjg-vcc-preview-size {
   flex: 0 0 auto;
   color: var(--vcc-gold-ink);
   font-weight: 700;
-}
-
-.fjg-vcc-preview-edit-status {
-  flex: 0 0 auto;
-  color: var(--vcc-text-muted);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.fjg-vcc-preview-edit-status.is-dirty {
-  color: var(--vcc-gold-ink);
-}
-
-.fjg-vcc-preview-edit-status.is-conflict {
-  color: var(--vcc-critical);
 }
 
 .fjg-vcc-preview-body {
@@ -703,7 +679,7 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 
 .fjg-vcc-preview-source {
   min-width: 100%;
-  width: 100%;
+  width: max-content;
   max-width: none;
   margin: 0;
   padding: 16px;
@@ -719,72 +695,17 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
   overflow-wrap: anywhere;
 }
 
-.fjg-vcc-preview-editor-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  overflow: auto;
-}
-
-.fjg-vcc-preview-editor {
-  width: 100%;
-  min-width: 0;
-  min-height: 240px;
-  flex: 1 0 240px;
-  resize: none;
-  padding: 18px 20px;
-  border: 1px solid var(--vcc-border-strong);
-  border-radius: var(--vcc-radius-md);
-  outline: 0;
-  background: color-mix(in srgb, var(--vcc-surface) 92%, var(--vcc-canvas));
-  color: var(--vcc-text);
-  caret-color: var(--vcc-orange);
-  font-family: var(--font-monospace, "SFMono-Regular", Consolas, monospace);
-  font-size: 14px;
-  line-height: 1.65;
-  tab-size: 2;
-  white-space: pre-wrap;
-}
-
-.fjg-vcc-preview-editor:focus-visible {
-  border-color: var(--vcc-blue);
-}
-
-.fjg-vcc-preview-conflict {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--vcc-critical) 62%, var(--vcc-border));
-  border-radius: var(--vcc-radius-md);
-  background: color-mix(in srgb, var(--vcc-critical) 11%, var(--vcc-surface));
-}
-
-.fjg-vcc-preview-conflict > .fjg-vcc-icon {
-  margin-top: 2px;
-  color: var(--vcc-critical);
-}
-
-.fjg-vcc-preview-conflict strong {
-  display: block;
-  color: var(--vcc-text);
-  font-size: 12px;
-}
-
-.fjg-vcc-preview-conflict p {
-  margin: 2px 0 0;
-  color: var(--vcc-text-muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
 .fjg-vcc-preview-markdown {
+  width: 100%;
   max-width: 78ch;
   margin: 0 auto;
   font-size: 14px;
   line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.fjg-vcc-preview-markdown > * {
+  max-width: 100%;
 }
 
 .fjg-vcc-preview-markdown :is(h1, h2, h3, h4, h5, h6) {
@@ -2278,9 +2199,22 @@ a.fjg-vcc-row {
 
 @container fjg-vcc (max-width: 1100px) {
   .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
-    grid-template-columns: clamp(250px, 32%, 330px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 44%);
     gap: 12px;
     padding-right: 16px;
+  }
+
+  .fjg-vcc-preview-header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .fjg-vcc-preview-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .fjg-vcc-preview-open-tab {
+    width: auto;
   }
 }
 
@@ -2345,7 +2279,7 @@ a.fjg-vcc-row {
 
 }
 
-@container fjg-vcc (max-width: 759px) {
+@container fjg-vcc (max-width: 760px) {
   .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
     display: block;
     padding: 0;
@@ -2364,7 +2298,7 @@ a.fjg-vcc-row {
     top: auto;
     width: 100%;
     height: calc(100vh - 116px);
-    min-height: 0;
+    min-height: 540px;
     margin: 0;
     border-right: 0;
     border-bottom: 0;

@@ -266,23 +266,6 @@ export function normalizeVaultPath(value: string): string {
   return normalizedSegments.join("/");
 }
 
-/** Maps one file path through either a direct file rename or an ancestor-folder rename. */
-export function remapVaultPathAfterRename(
-  path: string,
-  oldPath: string,
-  newPath: string
-): string | null {
-  const normalizedPath = normalizeVaultPath(path);
-  const normalizedOldPath = normalizeVaultPath(oldPath);
-  const normalizedNewPath = normalizeVaultPath(newPath);
-  if (!normalizedPath || !normalizedOldPath || !normalizedNewPath) return null;
-  if (normalizedPath === normalizedOldPath) return normalizedNewPath;
-  if (!normalizedPath.startsWith(`${normalizedOldPath}/`)) return null;
-  return normalizeVaultPath(
-    `${normalizedNewPath}${normalizedPath.slice(normalizedOldPath.length)}`
-  );
-}
-
 export function pathIsWithin(path: string, root: string): boolean {
   const normalizedPath = normalizeVaultPath(path);
   const normalizedRoot = normalizeVaultPath(root);

@@ -1,18 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   PREVIEW_HISTORY_LIMIT,
-  PREVIEW_RECOVERY_PART_SIZE_LIMIT,
   PREVIEW_TEXT_SIZE_LIMIT,
-  canPersistPreviewRecovery,
   classifyPreviewKind,
-  detectPreviewLineEnding,
-  hasPreviewEditConflict,
-  isEditablePreviewKind,
-  isPreviewRecoveryPayloadWithinLimit,
   mergePreviewHistory,
-  normalizePreviewEditorContent,
   parseInternalLinkTarget,
-  serializePreviewEditorContent,
   type PreviewKind,
 } from "./preview";
 
@@ -55,77 +47,6 @@ describe("classifyPreviewKind", () => {
   it("exposes stable, positive safety ceilings", () => {
     expect(PREVIEW_TEXT_SIZE_LIMIT).toBeGreaterThan(0);
     expect(PREVIEW_HISTORY_LIMIT).toBeGreaterThan(0);
-  });
-});
-
-describe("preview editing", () => {
-  it("allows Markdown and safe text-source previews to enter edit mode", () => {
-    expect(isEditablePreviewKind("markdown")).toBe(true);
-    expect(isEditablePreviewKind("text")).toBe(true);
-  });
-
-  it.each<PreviewKind>(["image", "audio", "video", "pdf", "native-fallback"])(
-    "keeps %s previews read-only",
-    (kind) => {
-      expect(isEditablePreviewKind(kind)).toBe(false);
-    }
-  );
-
-  it("detects source changes without altering either payload", () => {
-    const baseline = "# Agenda\n\n- First item\n";
-    const current = "# Agenda\n\n- Updated item\n";
-
-    expect(hasPreviewEditConflict(baseline, baseline)).toBe(false);
-    expect(hasPreviewEditConflict(baseline, current)).toBe(true);
-    expect(baseline).toBe("# Agenda\n\n- First item\n");
-    expect(current).toBe("# Agenda\n\n- Updated item\n");
-  });
-
-  it("preserves CRLF source convention through textarea normalization", () => {
-    const raw = "# Agenda\r\n\r\n- First item\r\n";
-    const editorValue = normalizePreviewEditorContent(raw);
-
-    expect(detectPreviewLineEnding(raw)).toBe("\r\n");
-    expect(editorValue).toBe("# Agenda\n\n- First item\n");
-    expect(serializePreviewEditorContent(editorValue, "\r\n")).toBe(raw);
-  });
-
-  it("uses the dominant newline style and normalizes old-Mac returns", () => {
-    expect(detectPreviewLineEnding("one\r\ntwo\r\nthree\nfour")).toBe("\r\n");
-    expect(detectPreviewLineEnding("one\r\ntwo\nthree\nfour")).toBe("\n");
-    expect(normalizePreviewEditorContent("one\rtwo\r\nthree")).toBe("one\ntwo\nthree");
-  });
-
-  it("bounds both halves of a persisted recovery draft by UTF-8 bytes", () => {
-    expect(isPreviewRecoveryPayloadWithinLimit("baseline", "draft", 8)).toBe(true);
-    expect(isPreviewRecoveryPayloadWithinLimit("baseline!", "draft", 8)).toBe(false);
-    expect(isPreviewRecoveryPayloadWithinLimit("ok", "😀😀", 7)).toBe(false);
-    expect(PREVIEW_RECOVERY_PART_SIZE_LIMIT).toBe(PREVIEW_TEXT_SIZE_LIMIT);
-  });
-
-  it("persists recovery only for the current safe editable file and bounded payload", () => {
-    const safe = {
-      fileIsCurrent: true,
-      pathIsSafe: true,
-      kind: "markdown" as const,
-      fileSize: 12,
-      baselineContent: "# Baseline\n",
-      draft: "# Draft\n",
-    };
-
-    expect(canPersistPreviewRecovery(safe)).toBe(true);
-    expect(canPersistPreviewRecovery({ ...safe, fileIsCurrent: false })).toBe(false);
-    expect(canPersistPreviewRecovery({ ...safe, pathIsSafe: false })).toBe(false);
-    expect(canPersistPreviewRecovery({ ...safe, kind: "pdf" })).toBe(false);
-    expect(
-      canPersistPreviewRecovery({ ...safe, fileSize: PREVIEW_TEXT_SIZE_LIMIT + 1 })
-    ).toBe(false);
-    expect(
-      canPersistPreviewRecovery({
-        ...safe,
-        draft: "x".repeat(PREVIEW_RECOVERY_PART_SIZE_LIMIT + 1),
-      })
-    ).toBe(false);
   });
 });
 

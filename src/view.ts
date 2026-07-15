@@ -29,17 +29,9 @@ import type VaultControlCenterPlugin from "./plugin";
 import { resolveProgramFolderPath } from "./program-navigation";
 import {
   PREVIEW_TEXT_SIZE_LIMIT,
-  canPersistPreviewRecovery,
   classifyPreviewKind,
-  detectPreviewLineEnding,
-  hasPreviewEditConflict,
-  isEditablePreviewKind,
-  isPreviewRecoveryPayloadWithinLimit,
   mergePreviewHistory,
-  normalizePreviewEditorContent,
   parseInternalLinkTarget,
-  serializePreviewEditorContent,
-  type PreviewLineEnding,
   type PreviewKind,
 } from "./preview";
 import {
@@ -86,6 +78,7 @@ const AI_QUEUE_KEYS: AiFolderKey[] = ["emailQueue", "formattedNotes", "ownerInbo
 const RECENT_FILTERS: RecentFilter[] = ["all", "programs", "ai", "people", "tasks", "areas", "vault"];
 const BOOKMARK_FILTERS: BookmarkFilter[] = ["all", "file", "folder", "url"];
 const TASKBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+let dashboardViewSequence = 0;
 
 interface PreviewOpenOptions {
   focus?: boolean;
@@ -94,28 +87,7 @@ interface PreviewOpenOptions {
 
 interface PreviewCloseOptions {
   restoreFocus?: boolean;
-  discardDraft?: boolean;
 }
-
-interface PreviewEditorState {
-  file: TFile;
-  recoveryPath: string | null;
-  recoverySavedAt: number | null;
-  baselineContent: string;
-  baselineEditorContent: string;
-  draft: string;
-  lineEnding: PreviewLineEnding;
-  dirty: boolean;
-  saving: boolean;
-  conflict: boolean;
-}
-
-interface PreviewSaveOptions {
-  announceSuccess?: boolean;
-  renderAfterSave?: boolean;
-}
-
-let dashboardViewSequence = 0;
 
 export class VaultControlCenterView extends ItemView {
   navigation = false;
@@ -152,9 +124,6 @@ export class VaultControlCenterView extends ItemView {
   private pendingPreviewPath = "";
   private previewReturnFocusEl: HTMLElement | null = null;
   private previewComponent: Component | null = null;
-  private previewEditorState: PreviewEditorState | null = null;
-  private previewEditStartRequestId = 0;
-  private previewSavePromise: Promise<void> | null = null;
   private previewBrowserCollapsed = false;
   private previewRequestId = 0;
   private previewHistory: string[] = [];
@@ -187,65 +156,13 @@ export class VaultControlCenterView extends ItemView {
     this.renderShell();
     const ownerDocument = this.contentEl.ownerDocument;
     this.registerDomEvent(ownerDocument, "keydown", (event: KeyboardEvent) => this.handleKeyboard(event));
-    const recoveredDraft = await this.restorePreviewRecoveryDraft();
-    if (!recoveredDraft && this.pendingPreviewPath) {
+    if (this.pendingPreviewPath) {
       void this.openPreview(this.pendingPreviewPath, { focus: false, recordHistory: false });
     }
     await this.refresh();
   }
 
   async onClose(): Promise<void> {
-    if (this.previewSavePromise) {
-      await this.previewSavePromise;
-    }
-    if (this.previewEditorState?.dirty) {
-      const state = this.previewEditorState;
-      const currentPath = normalizeVaultPath(state.file.path);
-      const currentTarget = currentPath
-        ? this.app.vault.getAbstractFileByPath(normalizePath(currentPath))
-        : null;
-      const canRetain = canPersistPreviewRecovery({
-        fileIsCurrent: currentTarget === state.file,
-        pathIsSafe:
-          Boolean(currentPath) &&
-          !isExcludedPath(currentPath) &&
-          !isSensitivePath(currentPath),
-        kind: classifyPreviewKind(state.file.extension),
-        fileSize: state.file.stat.size,
-        baselineContent: state.baselineContent,
-        draft: state.draft,
-      });
-      try {
-        if (canRetain) {
-          await this.plugin.storePreviewRecoveryDraft({
-            path: state.file.path,
-            baselineContent: state.baselineContent,
-            draft: state.draft,
-            savedAt: Date.now(),
-          });
-          new Notice("The unsaved dashboard draft was retained and will reopen with the dashboard.");
-        } else {
-          if (state.recoveryPath) {
-            await this.clearPreviewRecoveryForState(state);
-          }
-          new Notice("This draft could not be retained because the file is no longer safe for dashboard editing.");
-        }
-      } catch {
-        new Notice("The dashboard could not save or retain this draft before closing.");
-      }
-    }
-    if (
-      this.previewEditorState &&
-      !this.previewEditorState.dirty &&
-      this.previewEditorState.recoveryPath
-    ) {
-      try {
-        const cleared = await this.clearPreviewRecoveryForState(this.previewEditorState);
-        if (!cleared) throw new Error("Recovery path mismatch");
-      } catch {
-        new Notice("The clean dashboard draft closed, but its old recovery marker could not be cleared yet.");
-      }
-    }
     if (this.templateSaveTimer !== null) {
       window.clearTimeout(this.templateSaveTimer);
       this.templateSaveTimer = null;
@@ -265,9 +182,6 @@ export class VaultControlCenterView extends ItemView {
     this.searchInputEl = null;
     this.previewReturnFocusEl = null;
     this.activePreviewFile = null;
-    this.previewEditorState = null;
-    this.previewEditStartRequestId += 1;
-    this.previewSavePromise = null;
     this.previewBrowserCollapsed = false;
   }
 
@@ -396,10 +310,7 @@ export class VaultControlCenterView extends ItemView {
       this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
       this.renderContent();
-      if (
-        (this.activePreviewFile || this.pendingPreviewPath) &&
-        !this.previewEditorState
-      ) {
+      if (this.activePreviewFile || this.pendingPreviewPath) {
         void this.restoreActivePreview();
       }
     } catch (error) {
@@ -501,10 +412,7 @@ export class VaultControlCenterView extends ItemView {
       this.previewResizeObserver = new ResizeObserver(() => this.updatePreviewLayoutMode());
       this.previewResizeObserver.observe(this.rootEl);
     }
-    if (
-      (this.activePreviewFile || this.pendingPreviewPath) &&
-      (this.previewEditorState || !this.plugin.getPreviewRecoveryDraft())
-    ) {
+    if (this.activePreviewFile || this.pendingPreviewPath) {
       void this.restoreActivePreview();
     }
 
@@ -704,7 +612,7 @@ export class VaultControlCenterView extends ItemView {
 
   private navigate(route: DashboardRoute): void {
     if (this.route === route) return;
-    if (!this.closePreview({ restoreFocus: false })) return;
+    this.closePreview({ restoreFocus: false });
     this.route = route;
     this.renderRouteTabs();
     this.renderMobileDock();
@@ -749,157 +657,14 @@ export class VaultControlCenterView extends ItemView {
     if (this.app.workspace.getActiveViewOfType(VaultControlCenterView) !== this) return;
     const target = event.target as HTMLElement | null;
     const isEditing = target?.matches("input, textarea, select, [contenteditable='true']") ?? false;
-    if (
-      this.previewEditorState &&
-      (event.metaKey || event.ctrlKey) &&
-      event.key.toLocaleLowerCase() === "s"
-    ) {
-      event.preventDefault();
-      void this.savePreviewEditing();
-      return;
-    }
     if (event.key === "Escape" && (this.activePreviewFile || this.pendingPreviewPath)) {
       event.preventDefault();
-      if (this.previewEditorState) {
-        if (this.previewEditorState.dirty) {
-          this.noticeUnsavedPreviewChanges();
-          this.focusPreviewEditor();
-        } else if (this.activePreviewFile) {
-          void this.cancelPreviewEditing(this.activePreviewFile);
-        }
-        return;
-      }
       this.closePreview();
       return;
     }
     if (event.key === "/" && !isEditing) {
       event.preventDefault();
       this.searchInputEl?.focus();
-    }
-  }
-
-  private async restorePreviewRecoveryDraft(): Promise<boolean> {
-    const recovery = this.plugin.getPreviewRecoveryDraft();
-    if (!recovery) return false;
-
-    const path = normalizeVaultPath(recovery.path);
-    const target = path
-      ? this.app.vault.getAbstractFileByPath(normalizePath(path))
-      : null;
-    const canRestore =
-      target instanceof TFile &&
-      canPersistPreviewRecovery({
-        fileIsCurrent: true,
-        pathIsSafe: !isExcludedPath(path) && !isSensitivePath(path),
-        kind: classifyPreviewKind(target.extension),
-        fileSize: target.stat.size,
-        baselineContent: recovery.baselineContent,
-        draft: recovery.draft,
-      });
-    if (!(target instanceof TFile) || !canRestore) {
-      try {
-        await this.plugin.clearPreviewRecoveryDraft(path, recovery.savedAt);
-        new Notice("An unusable dashboard recovery draft was discarded because its file is no longer safe to open here.");
-      } catch {
-        new Notice("An unusable dashboard recovery draft could not be cleared yet.");
-      }
-      return false;
-    }
-
-    const restoreRequestId = this.previewRequestId;
-    const restoreEditStartRequestId = this.previewEditStartRequestId;
-    const restoreActiveFile = this.activePreviewFile;
-    const restorePendingPath = this.pendingPreviewPath;
-    try {
-      const currentContent = await this.app.vault.read(target);
-      if (
-        restoreRequestId !== this.previewRequestId ||
-        restoreEditStartRequestId !== this.previewEditStartRequestId ||
-        this.previewEditorState !== null ||
-        this.activePreviewFile !== restoreActiveFile ||
-        this.pendingPreviewPath !== restorePendingPath
-      ) return false;
-      const latestRecovery = this.plugin.getPreviewRecoveryDraft();
-      if (
-        !latestRecovery ||
-        latestRecovery.baselineContent !== recovery.baselineContent ||
-        latestRecovery.draft !== recovery.draft
-      ) return false;
-      const currentPath = normalizeVaultPath(target.path);
-      const latestRecoveryPath = normalizeVaultPath(latestRecovery.path);
-      if (
-        latestRecoveryPath !== path &&
-        latestRecoveryPath !== currentPath
-      ) return false;
-      const currentTarget = currentPath
-        ? this.app.vault.getAbstractFileByPath(normalizePath(currentPath))
-        : null;
-      const stillSafe = canPersistPreviewRecovery({
-        fileIsCurrent: currentTarget === target,
-        pathIsSafe:
-          Boolean(currentPath) &&
-          !isExcludedPath(currentPath) &&
-          !isSensitivePath(currentPath),
-        kind: classifyPreviewKind(target.extension),
-        fileSize: target.stat.size,
-        baselineContent: latestRecovery.baselineContent,
-        draft: latestRecovery.draft,
-      });
-      if (!stillSafe) {
-        try {
-          await this.clearPreviewRecoveryPaths(
-            [path, currentPath],
-            latestRecovery.savedAt
-          );
-          new Notice("An unusable dashboard recovery draft was discarded after its file changed.");
-        } catch {
-          new Notice("An unusable dashboard recovery draft could not be cleared yet.");
-        }
-        return false;
-      }
-      const recoveryPath = latestRecoveryPath || path;
-      const baselineEditorContent = normalizePreviewEditorContent(latestRecovery.baselineContent);
-      const draft = normalizePreviewEditorContent(latestRecovery.draft);
-      if (draft === baselineEditorContent) {
-        await this.clearPreviewRecoveryPaths(
-          [recoveryPath, currentPath],
-          latestRecovery.savedAt
-        );
-        return false;
-      }
-      const lineEnding = detectPreviewLineEnding(latestRecovery.baselineContent);
-      if (currentContent === serializePreviewEditorContent(draft, lineEnding)) {
-        await this.clearPreviewRecoveryPaths(
-          [recoveryPath, currentPath],
-          latestRecovery.savedAt
-        );
-        return false;
-      }
-      this.previewEditorState = {
-        file: target,
-        recoveryPath,
-        recoverySavedAt: latestRecovery.savedAt,
-        baselineContent: latestRecovery.baselineContent,
-        baselineEditorContent,
-        draft,
-        lineEnding,
-        dirty: true,
-        saving: false,
-        conflict: hasPreviewEditConflict(latestRecovery.baselineContent, currentContent),
-      };
-      this.activePreviewFile = target;
-      this.pendingPreviewPath = target.path;
-      this.syncPreviewSelection();
-      await this.renderPreview(target, true);
-      new Notice(
-        this.previewEditorState.conflict
-          ? "Recovered your dashboard draft. The vault copy changed, so it was not overwritten."
-          : "Recovered your unsaved dashboard draft."
-      );
-      return true;
-    } catch {
-      new Notice("A dashboard draft is retained, but it could not be reopened yet.");
-      return false;
     }
   }
 
@@ -921,26 +686,6 @@ export class VaultControlCenterView extends ItemView {
     if (!(target instanceof TFile)) {
       new Notice("That file is no longer available.");
       return;
-    }
-
-    if (
-      this.previewEditorState?.dirty &&
-      this.previewEditorState.file !== target &&
-      this.previewEditorState.file.path !== target.path
-    ) {
-      this.noticeUnsavedPreviewChanges();
-      this.focusPreviewEditor();
-      return;
-    }
-    if (
-      this.previewEditorState &&
-      this.previewEditorState.file !== target &&
-      this.previewEditorState.file.path !== target.path
-    ) {
-      if (this.previewEditorState.recoveryPath) {
-        this.clearPreviewRecoveryInBackground(this.previewEditorState);
-      }
-      this.previewEditorState = null;
     }
 
     const activeElement = this.contentEl.ownerDocument.activeElement;
@@ -992,12 +737,6 @@ export class VaultControlCenterView extends ItemView {
     pane.hidden = false;
     pane.setAttribute("aria-hidden", "false");
     this.rootEl?.setAttribute("data-preview-open", "true");
-    const kind = classifyPreviewKind(file.extension);
-    const editorState =
-      this.previewEditorState &&
-      (this.previewEditorState.file === file || this.previewEditorState.file.path === file.path)
-      ? this.previewEditorState
-      : null;
 
     const header = pane.createEl("header", { cls: "fjg-vcc-preview-header" });
     createButton(header, {
@@ -1010,9 +749,7 @@ export class VaultControlCenterView extends ItemView {
     const headingGroup = header.createDiv({ cls: "fjg-vcc-preview-heading" });
     headingGroup.createSpan({
       cls: "fjg-vcc-preview-kicker",
-      text: editorState
-        ? `Editing ${file.extension.toLocaleUpperCase() || "FILE"}`
-        : `${file.extension.toLocaleUpperCase() || "FILE"} preview`,
+      text: `${file.extension.toLocaleUpperCase() || "FILE"} preview`,
     });
     const headingId = `fjg-vcc-preview-title-${requestId}`;
     const heading = headingGroup.createEl("h2", {
@@ -1024,64 +761,23 @@ export class VaultControlCenterView extends ItemView {
     pane.removeAttribute("aria-label");
 
     const actions = header.createDiv({ cls: "fjg-vcc-preview-actions" });
-    if (editorState) {
-      createButton(actions, {
-        label: editorState.dirty || editorState.conflict ? "Discard changes" : "Cancel",
-        icon: "x",
-        className: "fjg-vcc-button fjg-vcc-preview-cancel",
-        disabled: editorState.saving,
-        onClick: () => void this.cancelPreviewEditing(file),
-      });
-      createButton(actions, {
-        label: editorState.saving ? "Saving…" : "Save",
-        icon: "save",
-        className: "fjg-vcc-button is-primary fjg-vcc-preview-save",
-        disabled: !editorState.dirty || editorState.saving || editorState.conflict,
-        onClick: () => void this.savePreviewEditing(),
-      });
-    } else {
-      if (isEditablePreviewKind(kind) && file.stat.size <= PREVIEW_TEXT_SIZE_LIMIT) {
-        createButton(actions, {
-          label: "Edit",
-          icon: "pencil",
-          className: "fjg-vcc-button fjg-vcc-preview-edit",
-          onClick: () => void this.startPreviewEditing(file),
-        });
-      }
-    }
     createButton(actions, {
       label: "Open in tab",
       icon: "external-link",
       className: "fjg-vcc-button fjg-vcc-preview-open-tab",
-      disabled: editorState?.saving ?? false,
-      onClick: () => void this.openPreviewInTab(file),
+      onClick: () => void this.plugin.openVaultFileInTab(file.path),
     });
     this.createPreviewBrowserToggle(actions);
     const pathBar = pane.createDiv({ cls: "fjg-vcc-preview-pathbar" });
     pathBar.createSpan({ cls: "fjg-vcc-preview-path", text: file.path });
-    if (editorState) {
-      pathBar.createSpan({
-        cls: `fjg-vcc-preview-edit-status${editorState.conflict ? " is-conflict" : editorState.dirty ? " is-dirty" : ""}`,
-        text: this.previewEditorStatus(editorState),
-        attr: { role: "status", "aria-live": "polite" },
-      });
-    } else {
-      pathBar.createSpan({
-        cls: "fjg-vcc-preview-size",
-        text: formatFileSize(file.stat.size),
-      });
-    }
+    pathBar.createSpan({
+      cls: "fjg-vcc-preview-size",
+      text: formatFileSize(file.stat.size),
+    });
     const body = pane.createDiv({
       cls: "fjg-vcc-preview-body",
       attr: { tabindex: "0" },
     });
-
-    if (editorState) {
-      this.renderPreviewEditor(file, body, editorState, focus);
-      this.updatePreviewLayoutMode();
-      return;
-    }
-
     const loading = body.createDiv({
       cls: "fjg-vcc-preview-loading",
       attr: { role: "status" },
@@ -1094,6 +790,7 @@ export class VaultControlCenterView extends ItemView {
     this.previewComponent = session;
 
     try {
+      const kind = classifyPreviewKind(file.extension);
       if (
         (kind === "markdown" || kind === "text") &&
         file.stat.size > PREVIEW_TEXT_SIZE_LIMIT
@@ -1122,346 +819,6 @@ export class VaultControlCenterView extends ItemView {
         0
       );
     }
-  }
-
-  private async startPreviewEditing(file: TFile): Promise<void> {
-    const kind = classifyPreviewKind(file.extension);
-    if (!isEditablePreviewKind(kind) || file.stat.size > PREVIEW_TEXT_SIZE_LIMIT) {
-      new Notice("This file type cannot be edited safely inside the dashboard.");
-      return;
-    }
-    if (
-      this.previewEditorState &&
-      (this.previewEditorState.file === file || this.previewEditorState.file.path === file.path)
-    ) {
-      this.focusPreviewEditor();
-      return;
-    }
-
-    const editStartRequestId = ++this.previewEditStartRequestId;
-    const previewRequestId = this.previewRequestId;
-    try {
-      const content = await this.app.vault.read(file);
-      const currentPath = normalizeVaultPath(file.path);
-      const currentTarget = currentPath
-        ? this.app.vault.getAbstractFileByPath(normalizePath(currentPath))
-        : null;
-      if (
-        editStartRequestId !== this.previewEditStartRequestId ||
-        previewRequestId !== this.previewRequestId ||
-        this.activePreviewFile?.path !== file.path ||
-        currentTarget !== file ||
-        isExcludedPath(currentPath) ||
-        isSensitivePath(currentPath) ||
-        !isEditablePreviewKind(classifyPreviewKind(file.extension)) ||
-        file.stat.size > PREVIEW_TEXT_SIZE_LIMIT
-      ) return;
-      const baselineEditorContent = normalizePreviewEditorContent(content);
-      this.previewEditorState = {
-        file,
-        recoveryPath: null,
-        recoverySavedAt: null,
-        baselineContent: content,
-        baselineEditorContent,
-        draft: baselineEditorContent,
-        lineEnding: detectPreviewLineEnding(content),
-        dirty: false,
-        saving: false,
-        conflict: false,
-      };
-      await this.renderPreview(file, true);
-    } catch (error) {
-      if (
-        editStartRequestId !== this.previewEditStartRequestId ||
-        previewRequestId !== this.previewRequestId
-      ) return;
-      const message = error instanceof Error ? error.message : "The file could not be loaded for editing.";
-      new Notice(`Could not start editing: ${message}`);
-    }
-  }
-
-  private renderPreviewEditor(
-    file: TFile,
-    body: HTMLElement,
-    state: PreviewEditorState,
-    focus: boolean
-  ): void {
-    body.empty();
-    body.addClass("fjg-vcc-preview-editor-body");
-    const conflictHelpId = `fjg-vcc-preview-conflict-help-${this.previewRequestId}`;
-
-    if (state.conflict) {
-      const warning = body.createDiv({
-        cls: "fjg-vcc-preview-conflict",
-        attr: { role: "alert", id: conflictHelpId },
-      });
-      createIcon(warning, "triangle-alert");
-      const message = warning.createDiv();
-      message.createEl("strong", { text: "A newer vault copy is available" });
-      message.createEl("p", {
-        text: "Your draft is still here and was not saved. Use Discard changes to reload the vault copy, then reapply the changes you want to keep.",
-      });
-    }
-
-    const editorId = `fjg-vcc-preview-editor-${this.previewRequestId}`;
-    body.createEl("label", {
-      cls: "fjg-vcc-visually-hidden",
-      text: `Edit ${normalizeFileTitle(file.name) || file.name}`,
-      attr: { for: editorId },
-    });
-    const editor = body.createEl("textarea", {
-      cls: "fjg-vcc-preview-editor",
-      attr: {
-        id: editorId,
-        "aria-label": `Edit ${normalizeFileTitle(file.name) || file.name}`,
-        "aria-describedby": state.conflict ? conflictHelpId : "",
-        autocapitalize: "off",
-        autocomplete: "off",
-        autocorrect: "off",
-      },
-    });
-    if (!state.conflict) editor.removeAttribute("aria-describedby");
-    editor.value = state.draft;
-    editor.spellcheck = ["md", "txt"].includes(file.extension.toLocaleLowerCase());
-    editor.disabled = state.saving;
-    editor.addEventListener("input", () => {
-      if (this.previewEditorState !== state) return;
-      state.draft = editor.value;
-      state.dirty = state.draft !== state.baselineEditorContent;
-      this.updatePreviewEditorChrome(state);
-    });
-
-    if (focus) {
-      this.contentEl.ownerDocument.defaultView?.setTimeout(() => {
-        editor.focus({ preventScroll: true });
-        editor.setSelectionRange(0, 0);
-      }, 0);
-    }
-  }
-
-  private savePreviewEditing(options: PreviewSaveOptions = {}): Promise<void> {
-    if (this.previewSavePromise) return this.previewSavePromise;
-    let operation!: Promise<void>;
-    operation = (async () => {
-      try {
-        await this.performSavePreviewEditing(options);
-      } finally {
-        if (this.previewSavePromise === operation) this.previewSavePromise = null;
-      }
-    })();
-    this.previewSavePromise = operation;
-    return operation;
-  }
-
-  private async performSavePreviewEditing(options: PreviewSaveOptions): Promise<void> {
-    const state = this.previewEditorState;
-    if (!state || !state.dirty || state.saving || state.conflict) return;
-
-    const target = state.file;
-    const previewRequestId = this.previewRequestId;
-    const currentPath = normalizeVaultPath(target.path);
-    const currentTarget = currentPath
-      ? this.app.vault.getAbstractFileByPath(normalizePath(currentPath))
-      : null;
-    if (
-      currentTarget !== target ||
-      isExcludedPath(currentPath) ||
-      isSensitivePath(currentPath) ||
-      !isEditablePreviewKind(classifyPreviewKind(target.extension)) ||
-      target.stat.size > PREVIEW_TEXT_SIZE_LIMIT
-    ) {
-      new Notice("This file moved outside the dashboard's safe editor. Your draft has not been discarded.");
-      this.focusPreviewEditor();
-      return;
-    }
-    if (!isPreviewRecoveryPayloadWithinLimit(state.baselineContent, state.draft)) {
-      new Notice("This draft is too large for the dashboard editor. Shorten it before saving.");
-      this.focusPreviewEditor();
-      return;
-    }
-
-    state.saving = true;
-    this.updatePreviewEditorChrome(state);
-    try {
-      await this.app.vault.process(target, (currentContent) => {
-        if (hasPreviewEditConflict(state.baselineContent, currentContent)) {
-          throw new PreviewEditConflictError();
-        }
-        return serializePreviewEditorContent(state.draft, state.lineEnding);
-      });
-      if (this.previewEditorState !== state) return;
-
-      this.previewEditorState = null;
-      try {
-        const cleared = await this.clearPreviewRecoveryForState(state);
-        if (!cleared) throw new Error("Recovery path mismatch");
-      } catch {
-        new Notice("The note was saved, but the old recovery marker could not be cleared yet.");
-      }
-      const savedFile = this.app.vault.getAbstractFileByPath(normalizePath(target.path));
-      if (savedFile instanceof TFile && options.announceSuccess !== false) {
-        new Notice(`Saved ${normalizeFileTitle(savedFile.name) || savedFile.name} to the vault.`);
-      }
-      if (previewRequestId !== this.previewRequestId) {
-        const stillShowingSavedFile =
-          savedFile instanceof TFile &&
-          !this.previewEditorState &&
-          (this.activePreviewFile === savedFile ||
-            this.activePreviewFile?.path === savedFile.path ||
-            this.pendingPreviewPath === savedFile.path);
-        if (stillShowingSavedFile && options.renderAfterSave !== false) {
-          await this.renderPreview(savedFile, false);
-        }
-        return;
-      }
-      if (!(savedFile instanceof TFile)) {
-        this.activePreviewFile = null;
-        this.pendingPreviewPath = target.path;
-        if (options.renderAfterSave !== false) this.renderMissingPreview(target.path);
-        return;
-      }
-      this.activePreviewFile = savedFile;
-      this.pendingPreviewPath = savedFile.path;
-      if (options.renderAfterSave !== false) await this.renderPreview(savedFile, true);
-    } catch (error) {
-      if (this.previewEditorState !== state) return;
-      state.saving = false;
-      if (error instanceof PreviewEditConflictError) {
-        state.conflict = true;
-        new Notice("The vault file changed elsewhere. Your dashboard draft was not overwritten.");
-        await this.renderPreview(target, true);
-        return;
-      }
-      this.updatePreviewEditorChrome(state);
-      const message = error instanceof Error ? error.message : "The vault write failed.";
-      new Notice(`Could not save this file: ${message}`);
-      this.focusPreviewEditor();
-    }
-  }
-
-  private async cancelPreviewEditing(file: TFile): Promise<void> {
-    const state = this.previewEditorState;
-    if (
-      !state ||
-      (state.file !== file && state.file.path !== file.path) ||
-      state.saving
-    ) return;
-    const previewRequestId = this.previewRequestId;
-    this.previewEditorState = null;
-    try {
-      const cleared = await this.clearPreviewRecoveryForState(state);
-      if (!cleared) throw new Error("Recovery path mismatch");
-    } catch {
-      new Notice("The draft was discarded, but its recovery marker could not be cleared yet.");
-    }
-    if (previewRequestId !== this.previewRequestId) return;
-    const currentFile = this.app.vault.getAbstractFileByPath(normalizePath(state.file.path));
-    if (!(currentFile instanceof TFile)) {
-      this.activePreviewFile = null;
-      this.pendingPreviewPath = state.file.path;
-      this.renderMissingPreview(state.file.path);
-      return;
-    }
-    this.activePreviewFile = currentFile;
-    this.pendingPreviewPath = currentFile.path;
-    await this.renderPreview(currentFile, true);
-  }
-
-  private previewEditorStatus(state: PreviewEditorState): string {
-    if (state.conflict) return "Vault copy changed · Draft not saved";
-    if (state.saving) return "Saving to vault…";
-    if (state.dirty) return "Unsaved changes";
-    return "Ready to edit";
-  }
-
-  private updatePreviewEditorChrome(state: PreviewEditorState): void {
-    if (this.previewEditorState !== state || !this.previewPaneEl) return;
-    const saveButton = this.previewPaneEl.querySelector<HTMLButtonElement>(".fjg-vcc-preview-save");
-    if (saveButton) {
-      saveButton.disabled = !state.dirty || state.saving || state.conflict;
-      const labels = saveButton.querySelectorAll<HTMLSpanElement>("span");
-      const label = labels.item(labels.length - 1);
-      if (label) label.textContent = state.saving ? "Saving…" : "Save";
-    }
-    const cancelButton = this.previewPaneEl.querySelector<HTMLButtonElement>(".fjg-vcc-preview-cancel");
-    if (cancelButton) {
-      cancelButton.disabled = state.saving;
-      const cancelLabel = state.dirty || state.conflict ? "Discard changes" : "Cancel";
-      cancelButton.setAttribute("aria-label", cancelLabel);
-      const labels = cancelButton.querySelectorAll<HTMLSpanElement>("span");
-      const label = labels.item(labels.length - 1);
-      if (label) label.textContent = cancelLabel;
-    }
-    const openTabButton = this.previewPaneEl.querySelector<HTMLButtonElement>(
-      ".fjg-vcc-preview-open-tab"
-    );
-    if (openTabButton) openTabButton.disabled = state.saving;
-    const status = this.previewPaneEl.querySelector<HTMLElement>(".fjg-vcc-preview-edit-status");
-    if (status) {
-      status.textContent = this.previewEditorStatus(state);
-      status.classList.toggle("is-dirty", state.dirty && !state.conflict);
-      status.classList.toggle("is-conflict", state.conflict);
-    }
-    const editor = this.previewPaneEl.querySelector<HTMLTextAreaElement>(".fjg-vcc-preview-editor");
-    if (editor) editor.disabled = state.saving;
-  }
-
-  private noticeUnsavedPreviewChanges(): void {
-    new Notice("Save or discard your dashboard edits before leaving this note.");
-  }
-
-  private async openPreviewInTab(file: TFile): Promise<void> {
-    const state = this.previewEditorState;
-    const isCurrentEditor =
-      state && (state.file === file || state.file.path === file.path);
-    if (isCurrentEditor && (state.dirty || state.conflict)) {
-      new Notice("Save or discard your dashboard edits before opening this note in a tab.");
-      this.focusPreviewEditor();
-      return;
-    }
-    if (isCurrentEditor && state.saving) {
-      new Notice("Wait for the dashboard save to finish before opening this note in a tab.");
-      return;
-    }
-    await this.plugin.openVaultFileInTab(file.path);
-  }
-
-  private focusPreviewEditor(): void {
-    this.contentEl.ownerDocument.defaultView?.setTimeout(
-      () => this.previewPaneEl?.querySelector<HTMLTextAreaElement>(".fjg-vcc-preview-editor")?.focus({ preventScroll: true }),
-      0
-    );
-  }
-
-  private async clearPreviewRecoveryForState(state: PreviewEditorState): Promise<boolean> {
-    if (state.recoverySavedAt === null) return true;
-    return this.clearPreviewRecoveryPaths(
-      [state.recoveryPath, state.file.path],
-      state.recoverySavedAt
-    );
-  }
-
-  private async clearPreviewRecoveryPaths(
-    candidates: Array<string | null | undefined>,
-    expectedSavedAt?: number
-  ): Promise<boolean> {
-    const paths = [...new Set(candidates.filter(Boolean))] as string[];
-    for (const path of paths) {
-      if (await this.plugin.clearPreviewRecoveryDraft(path, expectedSavedAt)) return true;
-    }
-    return this.plugin.getPreviewRecoveryDraft() === null;
-  }
-
-  private clearPreviewRecoveryInBackground(state: PreviewEditorState): void {
-    void this.clearPreviewRecoveryForState(state)
-      .then((cleared) => {
-        if (!cleared) {
-          new Notice("The old dashboard recovery marker could not be matched for cleanup.");
-        }
-      })
-      .catch(() => {
-        new Notice("The old dashboard recovery marker could not be cleared yet.");
-      });
   }
 
   private createPreviewBrowserToggle(parent: HTMLElement): void {
@@ -1697,24 +1054,14 @@ export class VaultControlCenterView extends ItemView {
     this.syncPreviewSelection();
   }
 
-  private closePreview(options: PreviewCloseOptions = {}): boolean {
-    if (this.previewEditorState?.dirty && options.discardDraft !== true) {
-      this.noticeUnsavedPreviewChanges();
-      this.focusPreviewEditor();
-      return false;
-    }
+  private closePreview(options: PreviewCloseOptions = {}): void {
     const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
-    if (this.previewEditorState?.recoveryPath) {
-      this.clearPreviewRecoveryInBackground(this.previewEditorState);
-    }
     const returnFocus = this.previewReturnFocusEl;
     this.previewRequestId += 1;
-    this.previewEditStartRequestId += 1;
     this.disposePreviewComponent();
     this.activePreviewFile = null;
     this.pendingPreviewPath = "";
     this.previewReturnFocusEl = null;
-    this.previewEditorState = null;
     this.previewBrowserCollapsed = false;
     if (this.previewPaneEl) {
       this.previewPaneEl.empty();
@@ -1728,7 +1075,7 @@ export class VaultControlCenterView extends ItemView {
     this.updatePreviewLayoutMode();
     this.syncPreviewSelection();
 
-    if (options.restoreFocus === false) return true;
+    if (options.restoreFocus === false) return;
     const fallback = Array.from(
       this.contentRegionEl?.querySelectorAll<HTMLElement>("[data-file-path]") ?? []
     )
@@ -1737,7 +1084,6 @@ export class VaultControlCenterView extends ItemView {
       if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
       else fallback?.focus({ preventScroll: true });
     }, 0);
-    return true;
   }
 
   private disposePreviewComponent(): void {
@@ -1940,11 +1286,4 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1_024) return `${bytes} B`;
   if (bytes < 1_048_576) return `${(bytes / 1_024).toFixed(bytes < 10_240 ? 1 : 0)} KB`;
   return `${(bytes / 1_048_576).toFixed(bytes < 10_485_760 ? 1 : 0)} MB`;
-}
-
-class PreviewEditConflictError extends Error {
-  constructor() {
-    super("The vault file changed after dashboard editing began.");
-    this.name = "PreviewEditConflictError";
-  }
 }

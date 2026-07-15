@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 — 2026-07-15
+
+- Restored the v0.1.4 read-only preview workflow and original compact desktop split after the enlarged editable pane disrupted the dashboard UX.
+- Removed in-dashboard note editing, draft recovery, conflict handling, and the enlarged default preview layout; native editing remains available through **Open in tab**.
+- Retained **Hide files** / **Show files** so the left file browser can still collapse and give the read-only preview nearly the full dashboard width when needed.
+- Constrained rendered Markdown to the pane's true inner width and made long preview titles and paths wrap, preventing text from being clipped at the right edge at larger display scales.
+
 ## 0.1.6 — 2026-07-15
 
 - Kept **Back** and **Open in tab** visible while a note is in dashboard edit mode, so quick edits and full-tab editing remain part of one clear workflow.

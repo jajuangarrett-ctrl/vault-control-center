@@ -7,13 +7,8 @@ export type PreviewKind =
   | "pdf"
   | "native-fallback";
 
-export type PreviewLineEnding = "\n" | "\r\n";
-
 /** Largest UTF-8 text payload rendered directly inside the dashboard preview. */
 export const PREVIEW_TEXT_SIZE_LIMIT = 1_048_576;
-
-/** Each half of the single persisted recovery record is capped at the editor limit. */
-export const PREVIEW_RECOVERY_PART_SIZE_LIMIT = PREVIEW_TEXT_SIZE_LIMIT;
 
 /** Hard ceiling for the dashboard's persisted preview history. */
 export const PREVIEW_HISTORY_LIMIT = 30;
@@ -48,9 +43,6 @@ const VIDEO_EXTENSIONS = new Set([
   "mkv",
 ]);
 
-/** Preview kinds that can be safely edited as UTF-8 source text. */
-const EDITABLE_PREVIEW_KINDS = new Set<PreviewKind>(["markdown", "text"]);
-
 /**
  * Classifies a file extension for the in-dashboard preview. A bare extension,
  * dotted extension, or full vault path is accepted to keep call sites simple.
@@ -64,74 +56,6 @@ export function classifyPreviewKind(extension: string): PreviewKind {
   if (VIDEO_EXTENSIONS.has(normalizedExtension)) return "video";
   if (normalizedExtension === "pdf") return "pdf";
   return "native-fallback";
-}
-
-/** Returns whether a rendered preview can switch into the source editor. */
-export function isEditablePreviewKind(kind: PreviewKind): boolean {
-  return EDITABLE_PREVIEW_KINDS.has(kind);
-}
-
-/** Bounds the one temporary recovery draft that can be written to plugin data. */
-export function isPreviewRecoveryPayloadWithinLimit(
-  baselineContent: string,
-  draft: string,
-  limit = PREVIEW_RECOVERY_PART_SIZE_LIMIT
-): boolean {
-  if (!Number.isFinite(limit) || limit < 0) return false;
-  const byteLength = (value: string): number => new TextEncoder().encode(value).byteLength;
-  return byteLength(baselineContent) <= limit && byteLength(draft) <= limit;
-}
-
-/** Central close/reopen eligibility check for a recoverable dashboard edit. */
-export function canPersistPreviewRecovery(input: {
-  fileIsCurrent: boolean;
-  pathIsSafe: boolean;
-  kind: PreviewKind;
-  fileSize: number;
-  baselineContent: string;
-  draft: string;
-}): boolean {
-  return (
-    input.fileIsCurrent &&
-    input.pathIsSafe &&
-    isEditablePreviewKind(input.kind) &&
-    Number.isFinite(input.fileSize) &&
-    input.fileSize >= 0 &&
-    input.fileSize <= PREVIEW_TEXT_SIZE_LIMIT &&
-    isPreviewRecoveryPayloadWithinLimit(input.baselineContent, input.draft)
-  );
-}
-
-/**
- * Detects an external edit before saving a dashboard draft. Exact source text
- * is authoritative so harmless mtime-only changes do not block the user.
- */
-export function hasPreviewEditConflict(
-  baselineContent: string,
-  currentContent: string
-): boolean {
-  return baselineContent !== currentContent;
-}
-
-/** Chooses the dominant source newline convention before textarea editing. */
-export function detectPreviewLineEnding(content: string): PreviewLineEnding {
-  const crlfCount = content.match(/\r\n/g)?.length ?? 0;
-  const loneLfCount = content.replace(/\r\n/g, "").match(/\n/g)?.length ?? 0;
-  return crlfCount > loneLfCount ? "\r\n" : "\n";
-}
-
-/** Normalizes source text to the newline representation exposed by textarea. */
-export function normalizePreviewEditorContent(content: string): string {
-  return content.replace(/\r\n?/g, "\n");
-}
-
-/** Restores the original dominant newline convention for the vault write. */
-export function serializePreviewEditorContent(
-  content: string,
-  lineEnding: PreviewLineEnding
-): string {
-  const normalized = normalizePreviewEditorContent(content);
-  return lineEnding === "\r\n" ? normalized.replace(/\n/g, "\r\n") : normalized;
 }
 
 /**
