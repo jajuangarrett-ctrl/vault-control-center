@@ -1,5 +1,10 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import { isExcludedPath, isSensitivePath, normalizeVaultPath } from "./data";
+import {
+  classifyPreviewKind,
+  isEditablePreviewKind,
+  isPreviewRecoveryPayloadWithinLimit,
+} from "./preview";
 import { VaultControlCenterSettingTab } from "./settings";
 import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
@@ -11,8 +16,16 @@ type CommandHost = {
   };
 };
 
+export interface PreviewRecoveryDraft {
+  path: string;
+  baselineContent: string;
+  draft: string;
+  savedAt: number;
+}
+
 export default class VaultControlCenterPlugin extends Plugin {
   settings: DashboardSettings = structuredClone(DEFAULT_SETTINGS);
+  private previewRecoveryDraft: PreviewRecoveryDraft | null = null;
   private refreshTimer: number | null = null;
 
   async onload(): Promise<void> {
@@ -65,6 +78,9 @@ export default class VaultControlCenterPlugin extends Plugin {
       : {};
     const savedSchemaVersion = finiteInteger(saved.schemaVersion, 0);
     const taskboardSecretId = stringSetting(saved.taskboardSecretId, "");
+    this.previewRecoveryDraft = parsePreviewRecoveryDraft(saved.previewRecoveryDraft);
+    const discardedInvalidRecovery =
+      saved.previewRecoveryDraft != null && !this.previewRecoveryDraft;
     this.settings = {
       schemaVersion: DEFAULT_SETTINGS.schemaVersion,
       theme: saved.theme === "light" ? "light" : "dark",
@@ -113,13 +129,48 @@ export default class VaultControlCenterPlugin extends Plugin {
       },
     };
 
-    if (savedSchemaVersion < DEFAULT_SETTINGS.schemaVersion) {
-      await this.saveData(this.settings);
+    if (savedSchemaVersion < DEFAULT_SETTINGS.schemaVersion || discardedInvalidRecovery) {
+      await this.saveSettings();
     }
   }
 
   async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
+    await this.saveData({
+      ...this.settings,
+      previewRecoveryDraft: this.previewRecoveryDraft,
+    });
+  }
+
+  getPreviewRecoveryDraft(): PreviewRecoveryDraft | null {
+    return this.previewRecoveryDraft ? { ...this.previewRecoveryDraft } : null;
+  }
+
+  async storePreviewRecoveryDraft(draft: PreviewRecoveryDraft): Promise<void> {
+    const previous = this.previewRecoveryDraft;
+    this.previewRecoveryDraft = { ...draft };
+    try {
+      await this.saveSettings();
+    } catch (error) {
+      this.previewRecoveryDraft = previous;
+      throw error;
+    }
+  }
+
+  async clearPreviewRecoveryDraft(path?: string): Promise<boolean> {
+    if (!this.previewRecoveryDraft) return true;
+    if (
+      path &&
+      normalizeVaultPath(path) !== normalizeVaultPath(this.previewRecoveryDraft.path)
+    ) return false;
+    const previous = this.previewRecoveryDraft;
+    this.previewRecoveryDraft = null;
+    try {
+      await this.saveSettings();
+    } catch (error) {
+      this.previewRecoveryDraft = previous;
+      throw error;
+    }
+    return true;
   }
 
   async onExternalSettingsChange(): Promise<void> {
@@ -215,4 +266,26 @@ function stringArraySetting(value: unknown, fallback: string[]): string[] {
     .map((entry) => entry.trim())
     .filter(Boolean);
   return strings.length ? strings : [...fallback];
+}
+
+function parsePreviewRecoveryDraft(value: unknown): PreviewRecoveryDraft | null {
+  if (!isRecord(value)) return null;
+  const path = normalizeVaultPath(stringSetting(value.path, ""));
+  if (
+    !path ||
+    isExcludedPath(path) ||
+    isSensitivePath(path) ||
+    !isEditablePreviewKind(classifyPreviewKind(path)) ||
+    typeof value.baselineContent !== "string" ||
+    typeof value.draft !== "string" ||
+    !isPreviewRecoveryPayloadWithinLimit(value.baselineContent, value.draft)
+  ) return null;
+  return {
+    path,
+    baselineContent: value.baselineContent,
+    draft: value.draft,
+    savedAt: typeof value.savedAt === "number" && Number.isFinite(value.savedAt)
+      ? value.savedAt
+      : Date.now(),
+  };
 }

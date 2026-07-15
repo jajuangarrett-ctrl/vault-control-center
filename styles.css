@@ -98,6 +98,10 @@ body.fjg-vcc-theme-light .fjg-vcc,
   box-sizing: border-box;
 }
 
+.fjg-vcc [hidden] {
+  display: none !important;
+}
+
 .fjg-vcc :is(button, input, select, textarea) {
   margin: 0;
   color: inherit;
@@ -470,10 +474,10 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 
 .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr);
+  grid-template-columns: clamp(260px, 30%, 400px) minmax(0, 1fr);
   align-items: start;
-  gap: var(--vcc-space-4);
-  padding-right: var(--vcc-space-6);
+  gap: 14px;
+  padding-right: var(--vcc-space-5);
 }
 
 .fjg-vcc-content {
@@ -484,7 +488,25 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 }
 
 .fjg-vcc[data-preview-open="true"] .fjg-vcc-content {
+  padding-left: var(--vcc-space-4);
   padding-right: 0;
+}
+
+.fjg-vcc[data-preview-open="true"] .fjg-vcc-program-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fjg-vcc[data-preview-open="true"] .fjg-vcc-program-layout > .fjg-vcc-panel:first-child {
+  display: none;
+}
+
+.fjg-vcc[data-preview-open="true"][data-browser-collapsed="true"] .fjg-vcc-content-frame {
+  grid-template-columns: minmax(0, 1fr);
+  padding-left: var(--vcc-space-4);
+}
+
+.fjg-vcc[data-preview-open="true"][data-browser-collapsed="true"] .fjg-vcc-content {
+  display: none;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -502,17 +524,20 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
   overflow: hidden;
   flex-direction: column;
   min-width: 0;
-  height: min(760px, calc(100vh - 88px));
-  min-height: 520px;
+  height: calc(100dvh - 140px);
+  min-height: 0;
   margin-top: var(--vcc-space-5);
   border: 1px solid var(--vcc-border-strong);
   border-radius: var(--vcc-radius-lg);
   background: color-mix(in srgb, var(--vcc-surface) 94%, var(--vcc-canvas));
   box-shadow: var(--vcc-shadow), inset 0 3px 0 var(--vcc-gold);
+  container-name: fjg-vcc-preview;
+  container-type: inline-size;
 }
 
 .fjg-vcc-preview-header {
   display: grid;
+  flex: 0 0 auto;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   min-height: 72px;
@@ -584,10 +609,13 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .fjg-vcc-preview-pathbar {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   min-height: 38px;
@@ -610,6 +638,21 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
   flex: 0 0 auto;
   color: var(--vcc-gold-ink);
   font-weight: 700;
+}
+
+.fjg-vcc-preview-edit-status {
+  flex: 0 0 auto;
+  color: var(--vcc-text-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fjg-vcc-preview-edit-status.is-dirty {
+  color: var(--vcc-gold-ink);
+}
+
+.fjg-vcc-preview-edit-status.is-conflict {
+  color: var(--vcc-critical);
 }
 
 .fjg-vcc-preview-body {
@@ -660,7 +703,7 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 
 .fjg-vcc-preview-source {
   min-width: 100%;
-  width: max-content;
+  width: 100%;
   max-width: none;
   margin: 0;
   padding: 16px;
@@ -674,6 +717,67 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
   tab-size: 2;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.fjg-vcc-preview-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.fjg-vcc-preview-editor {
+  width: 100%;
+  min-width: 0;
+  min-height: 240px;
+  flex: 1 0 240px;
+  resize: none;
+  padding: 18px 20px;
+  border: 1px solid var(--vcc-border-strong);
+  border-radius: var(--vcc-radius-md);
+  outline: 0;
+  background: color-mix(in srgb, var(--vcc-surface) 92%, var(--vcc-canvas));
+  color: var(--vcc-text);
+  caret-color: var(--vcc-orange);
+  font-family: var(--font-monospace, "SFMono-Regular", Consolas, monospace);
+  font-size: 14px;
+  line-height: 1.65;
+  tab-size: 2;
+  white-space: pre-wrap;
+}
+
+.fjg-vcc-preview-editor:focus-visible {
+  border-color: var(--vcc-blue);
+}
+
+.fjg-vcc-preview-conflict {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--vcc-critical) 62%, var(--vcc-border));
+  border-radius: var(--vcc-radius-md);
+  background: color-mix(in srgb, var(--vcc-critical) 11%, var(--vcc-surface));
+}
+
+.fjg-vcc-preview-conflict > .fjg-vcc-icon {
+  margin-top: 2px;
+  color: var(--vcc-critical);
+}
+
+.fjg-vcc-preview-conflict strong {
+  display: block;
+  color: var(--vcc-text);
+  font-size: 12px;
+}
+
+.fjg-vcc-preview-conflict p {
+  margin: 2px 0 0;
+  color: var(--vcc-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .fjg-vcc-preview-markdown {
@@ -2174,21 +2278,24 @@ a.fjg-vcc-row {
 
 @container fjg-vcc (max-width: 1100px) {
   .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 44%);
+    grid-template-columns: clamp(250px, 32%, 330px) minmax(0, 1fr);
     gap: 12px;
     padding-right: 16px;
   }
+}
 
+@container fjg-vcc-preview (max-width: 620px) {
   .fjg-vcc-preview-header {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
   .fjg-vcc-preview-actions {
     grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 
   .fjg-vcc-preview-open-tab {
-    width: 100%;
+    width: auto;
   }
 }
 
@@ -2238,7 +2345,7 @@ a.fjg-vcc-row {
 
 }
 
-@container fjg-vcc (max-width: 760px) {
+@container fjg-vcc (max-width: 759px) {
   .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
     display: block;
     padding: 0;
@@ -2257,7 +2364,7 @@ a.fjg-vcc-row {
     top: auto;
     width: 100%;
     height: calc(100vh - 116px);
-    min-height: 540px;
+    min-height: 0;
     margin: 0;
     border-right: 0;
     border-bottom: 0;
@@ -2280,6 +2387,10 @@ a.fjg-vcc-row {
 
   .fjg-vcc-preview-open-tab {
     width: auto;
+  }
+
+  .fjg-vcc-preview-browser-toggle {
+    display: none;
   }
 
   .fjg-vcc-preview-body {

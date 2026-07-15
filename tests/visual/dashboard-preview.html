@@ -107,11 +107,17 @@
       <aside class="fjg-vcc-preview-pane" id="preview-pane" role="region" aria-labelledby="fixture-preview-title" aria-hidden="true" hidden>
         <header class="fjg-vcc-preview-header">
           <button class="fjg-vcc-preview-back" id="preview-close" type="button"><span class="preview-icon">←</span><span>Back</span></button>
-          <div class="fjg-vcc-preview-heading"><span class="fjg-vcc-preview-kicker">MD preview</span><h2 class="fjg-vcc-preview-title" id="fixture-preview-title" tabindex="-1">Daily Note — Monday</h2></div>
-          <div class="fjg-vcc-preview-actions"><button class="fjg-vcc-button fjg-vcc-preview-open-tab" type="button"><span class="preview-icon">↗</span><span>Open in tab</span></button></div>
+          <div class="fjg-vcc-preview-heading"><span class="fjg-vcc-preview-kicker" id="preview-kicker">MD preview</span><h2 class="fjg-vcc-preview-title" id="fixture-preview-title" tabindex="-1">Daily Note — Monday</h2></div>
+          <div class="fjg-vcc-preview-actions">
+            <button class="fjg-vcc-button fjg-vcc-preview-edit" id="preview-edit" type="button"><span class="preview-icon">✎</span><span>Edit</span></button>
+            <button class="fjg-vcc-button fjg-vcc-preview-cancel" id="preview-cancel" type="button" hidden><span class="preview-icon">×</span><span>Cancel</span></button>
+            <button class="fjg-vcc-button is-primary fjg-vcc-preview-save" id="preview-save" type="button" disabled hidden><span class="preview-icon">✓</span><span>Save</span></button>
+            <button class="fjg-vcc-button fjg-vcc-preview-open-tab" id="preview-open-tab" type="button"><span class="preview-icon">↗</span><span>Open in tab</span></button>
+            <button class="fjg-vcc-button fjg-vcc-preview-browser-toggle" id="browser-toggle" type="button" aria-expanded="true"><span class="preview-icon">▥</span><span>Hide files</span></button>
+          </div>
         </header>
-        <div class="fjg-vcc-preview-pathbar"><span class="fjg-vcc-preview-path">Daily Notes/Monday.md</span><span class="fjg-vcc-preview-size">4.8 KB</span></div>
-        <div class="fjg-vcc-preview-body markdown-rendered fjg-vcc-preview-markdown" tabindex="0">
+        <div class="fjg-vcc-preview-pathbar"><span class="fjg-vcc-preview-path">Daily Notes/Monday.md</span><span class="fjg-vcc-preview-size" id="preview-status">4.8 KB</span></div>
+        <div class="fjg-vcc-preview-body markdown-rendered fjg-vcc-preview-markdown" id="preview-body" tabindex="0">
           <h1>Monday leadership brief</h1>
           <p>This preview stays inside Vault Control Center, so the dashboard route, filters, and scroll position remain intact.</p>
           <h2>Today’s priorities</h2>
@@ -142,6 +148,34 @@
       const fixtureRoot = document.querySelector('.fjg-vcc');
       const previewPane = document.querySelector('#preview-pane');
       const previewTrigger = document.querySelector('#preview-trigger');
+      const contentRegion = document.querySelector('.fjg-vcc-content');
+      const previewBody = document.querySelector('#preview-body');
+      const previewStatus = document.querySelector('#preview-status');
+      const previewKicker = document.querySelector('#preview-kicker');
+      const editButton = document.querySelector('#preview-edit');
+      const cancelButton = document.querySelector('#preview-cancel');
+      const saveButton = document.querySelector('#preview-save');
+      const openTabButton = document.querySelector('#preview-open-tab');
+      const browserToggle = document.querySelector('#browser-toggle');
+      const sourceText = `# Monday leadership brief
+
+This note is editable inside Vault Control Center. Saving writes the Markdown source back to the same vault file.
+
+## Today’s priorities
+
+- Review student-support program updates.
+- Prepare the program leads agenda.
+- Confirm follow-up owners and deadlines.
+
+## Decisions
+
+| Item | Owner | Status |
+| --- | --- | --- |
+| Basic Needs intake review | Franklin | Ready |
+| CARE Team dashboard | Program leads | In progress |
+`;
+      let editing = false;
+      let savedText = sourceText;
       const syncPreviewMode = () => {
         if (!fixtureRoot.hasAttribute('data-preview-open')) return fixtureRoot.removeAttribute('data-preview-mode');
         fixtureRoot.dataset.previewMode = fixtureRoot.getBoundingClientRect().width < 760 ? 'overlay' : 'split';
@@ -155,7 +189,13 @@
         syncPreviewMode();
       };
       const closePreview = () => {
+        if (editing && document.querySelector('#fixture-editor')?.value !== savedText) return;
         fixtureRoot.removeAttribute('data-preview-open');
+        fixtureRoot.removeAttribute('data-browser-collapsed');
+        contentRegion.removeAttribute('inert');
+        contentRegion.removeAttribute('aria-hidden');
+        browserToggle.setAttribute('aria-expanded', 'true');
+        browserToggle.lastElementChild.textContent = 'Hide files';
         previewPane.hidden = true;
         previewPane.setAttribute('aria-hidden', 'true');
         previewTrigger.classList.remove('is-selected');
@@ -163,6 +203,81 @@
         syncPreviewMode();
         previewTrigger.focus();
       };
+      const renderReadMode = () => {
+        editing = false;
+        previewKicker.textContent = 'MD preview';
+        editButton.hidden = false;
+        openTabButton.hidden = false;
+        cancelButton.hidden = true;
+        saveButton.hidden = true;
+        previewStatus.className = 'fjg-vcc-preview-size';
+        previewStatus.textContent = '4.8 KB';
+        previewBody.className = 'fjg-vcc-preview-body markdown-rendered fjg-vcc-preview-markdown';
+        previewBody.replaceChildren();
+        const heading = document.createElement('h1');
+        heading.textContent = 'Monday leadership brief';
+        const paragraph = document.createElement('p');
+        paragraph.textContent = savedText.split('\n').find((line) => line.startsWith('This note')) || 'Saved inside the dashboard.';
+        const subheading = document.createElement('h2');
+        subheading.textContent = 'Saved Markdown source';
+        const source = document.createElement('pre');
+        source.className = 'fjg-vcc-preview-source';
+        const code = document.createElement('code');
+        code.textContent = savedText;
+        source.append(code);
+        previewBody.append(heading, paragraph, subheading, source);
+      };
+      const enterEditMode = () => {
+        editing = true;
+        previewKicker.textContent = 'Editing MD';
+        editButton.hidden = true;
+        openTabButton.hidden = true;
+        cancelButton.hidden = false;
+        saveButton.hidden = false;
+        saveButton.disabled = true;
+        previewStatus.className = 'fjg-vcc-preview-edit-status';
+        previewStatus.textContent = 'Ready to edit';
+        previewBody.className = 'fjg-vcc-preview-body fjg-vcc-preview-editor-body';
+        previewBody.replaceChildren();
+        const label = document.createElement('label');
+        label.className = 'fjg-vcc-visually-hidden';
+        label.htmlFor = 'fixture-editor';
+        label.textContent = 'Edit Daily Note — Monday';
+        const editor = document.createElement('textarea');
+        editor.className = 'fjg-vcc-preview-editor';
+        editor.id = 'fixture-editor';
+        editor.value = savedText;
+        editor.addEventListener('input', () => {
+          const dirty = editor.value !== savedText;
+          saveButton.disabled = !dirty;
+          previewStatus.classList.toggle('is-dirty', dirty);
+          previewStatus.textContent = dirty ? 'Unsaved changes' : 'Ready to edit';
+        });
+        previewBody.append(label, editor);
+        editor.focus();
+      };
+      editButton.addEventListener('click', enterEditMode);
+      cancelButton.addEventListener('click', renderReadMode);
+      saveButton.addEventListener('click', () => {
+        const editor = document.querySelector('#fixture-editor');
+        if (!editor || saveButton.disabled) return;
+        savedText = editor.value;
+        renderReadMode();
+      });
+      browserToggle.addEventListener('click', () => {
+        const collapsed = fixtureRoot.dataset.browserCollapsed === 'true';
+        if (collapsed) {
+          fixtureRoot.removeAttribute('data-browser-collapsed');
+          contentRegion.removeAttribute('inert');
+          contentRegion.removeAttribute('aria-hidden');
+        } else {
+          fixtureRoot.dataset.browserCollapsed = 'true';
+          contentRegion.setAttribute('inert', '');
+          contentRegion.setAttribute('aria-hidden', 'true');
+        }
+        browserToggle.setAttribute('aria-expanded', String(collapsed));
+        browserToggle.lastElementChild.textContent = collapsed ? 'Hide files' : 'Show files';
+      });
       previewTrigger.addEventListener('click', openPreview);
       document.querySelector('#preview-close').addEventListener('click', closePreview);
       document.addEventListener('keydown', (event) => {
@@ -170,6 +285,8 @@
       });
       window.addEventListener('resize', syncPreviewMode);
       if (previewParams.get('preview') === '1') openPreview();
+      if (previewParams.get('edit') === '1') enterEditMode();
+      if (previewParams.get('collapsed') === '1') browserToggle.click();
     </script>
   </body>
 </html>

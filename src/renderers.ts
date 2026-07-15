@@ -734,7 +734,7 @@ function renderSettings(parent: HTMLElement, context: DashboardRenderContext): v
   const privacy = parent.createEl("section", { cls: "fjg-vcc-settings-section" });
   privacy.createEl("h2", { text: "Privacy boundary" });
   privacy.createEl("p", {
-    text: "Indexes are derived in memory. Sensitive and archived paths are excluded before rendering. Only a capped list of safe preview paths is kept in Obsidian workspace state so Recent stays accurate; no vault content or snapshot is written to plugin data.",
+    text: "Indexes are derived in memory. Sensitive and archived paths are excluded before rendering. A capped list of safe preview paths is kept in Obsidian workspace state so Recent stays accurate. If the dashboard closes with an unsaved safe text edit, one bounded temporary recovery draft is stored in local plugin data until it is saved, discarded, or found unusable.",
   });
 }
 

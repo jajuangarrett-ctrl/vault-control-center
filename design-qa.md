@@ -18,6 +18,10 @@ The supplied jersey is a color reference, not a request to place sports imagery 
 | Dark mobile preview | 390×844 | Preview replaces only route content, route tabs remain available, mobile dock hides, icon controls fit, and no horizontal page overflow occurs. |
 | Close and reopen | 390×844 | Back restores the dashboard/dock and clears row selection; the file row reopens the preview. |
 | Escape | 390×844 | Escape closes the visible preview and restores the route state. |
+| Editable split pane | 760–1600px wide | Note pane receives 63–73% of the dashboard width; the file browser receives 27–37%; no horizontal overflow. |
+| Collapsed file browser | 1280×900 | **Hide files** expands the note pane to 97% of the available dashboard width; **Show files** restores the split. |
+| Live save and restore | Obsidian 1.12.7 | A reversible Markdown edit saved to the vault, rendered immediately, and restored byte-for-byte to its original SHA-256. |
+| Conflict and recovery | Obsidian 1.12.7 | An external vault edit blocked Save; the dashboard draft survived tab close/reopen and cleared cleanly on Discard without changing the note. |
 
 ## Full-view comparison
 
@@ -32,9 +36,9 @@ The palette source and final dark implementation were opened together in one vis
 
 ## Functional coverage
 
-- Unit coverage: preview-kind dispatch, safe history filtering/deduplication/cap, internal-link parsing, preview-history precedence, image/media indexing, recursive folder behavior, privacy filtering, queues, and taskboard behavior.
-- Browser fixture: dark/light toggle, split preview, mobile overlay, Back, reopen, Escape, selected row, dock visibility, and runtime logs.
-- Live Obsidian verification: installed v0.1.4 in Obsidian 1.12.7, force-reloaded the app, and exercised the actual plugin through Computer Use plus the live Electron DOM.
+- Unit coverage: preview-kind dispatch, editor eligibility, UTF-8 recovery bounds, conflict detection, line-ending preservation, safe history filtering/deduplication/cap, internal-link parsing, preview-history precedence, image/media indexing, recursive folder behavior, privacy filtering, queues, and taskboard behavior.
+- Browser fixture: dark/light toggle, split and collapsed preview, Edit/Save/Discard controls, mobile overlay, Back, reopen, Escape, selected row, dock visibility, exact 760px breakpoint, and runtime logs.
+- Live Obsidian verification: installed the v0.1.5 candidate in Obsidian 1.12.7, cleanly restarted the app, and exercised the actual plugin through Computer Use plus the live Electron DOM.
 
 ## Live Obsidian results
 

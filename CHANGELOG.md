@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5 — 2026-07-15
+
+- Made Markdown, TXT, CSV, HTML-source, and JSON previews editable inside the dashboard with explicit **Edit**, **Save**, and **Discard changes** actions plus Command/Ctrl+S.
+- Added exact-source conflict protection so a vault file changed elsewhere is never overwritten by an older dashboard draft.
+- Added one bounded temporary recovery draft for safe unsaved text edits, including close/reopen recovery, file-rename-safe cleanup, privacy/type/size revalidation, and automatic removal of unusable recovery records.
+- Rebalanced the desktop preview to use roughly 63–73% of the available width and most of the available height; added **Hide files** / **Show files** so the note can expand to nearly the full dashboard.
+- Kept compact mobile behavior below 760px, removed pane-height overflow, and prevented the preview header and path bar from shrinking into the note body.
+
 ## 0.1.4 — 2026-07-14
 
 - Added a shared in-dashboard preview pane across Home, Areas, Programs, AI Team, Recent, Bookmarks, and People, so normal file clicks no longer replace or leave the dashboard.
