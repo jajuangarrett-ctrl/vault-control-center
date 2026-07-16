@@ -26,10 +26,10 @@ Additional features:
 
 - Native ribbon icon and command-palette actions
 - Shared read-only preview pane across every file-bearing route; normal clicks keep the dashboard active
-- Wider right-side desktop preview by default, with the Areas and Programs root rail independently retractable to give the folder detail and note more room
+- Near-even desktop workspace with a slightly larger right-side preview, plus an independently retractable Areas and Programs root rail for additional folder-detail and note space
 - Compact **Back**, **Open in tab**, and **Hide files** / **Show files** controls that remain accessible when labels collapse in constrained panes
 - **Hide files** / **Show files** can still temporarily give the read-only note nearly the full dashboard width without changing the root-rail state
-- Pane-safe Markdown wrapping plus responsive title/path controls so preview text remains visible at larger display scales
+- Full-pane Markdown layout plus responsive title/path controls so note text uses the available preview width without clipping at larger display scales
 - Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action for native editing or unsupported formats
 - Coordinated throwback dark and light themes derived from deep navy, golden yellow, orange, royal blue, and warm cream
 - Optional Obsidian shell theming that is removed cleanly when disabled or unloaded

@@ -57,7 +57,7 @@ The plugin renders one native `ItemView` with five persistent layers:
 4. Preview pane: a sibling of route content, split beside it on desktop and replacing only the route region on mobile.
 5. Mobile action dock: Home, Areas, Programs, Capture, Recent, More; hidden while the full-width mobile preview is open.
 
-Areas and Programs divide route content into a root-folder rail and a detail browser. The rail can retract to a 44px disclosure strip without losing the selected root or nested folder. With a preview open, the note receives roughly 44% of the desktop frame by default and roughly 55% while that rail is retracted; hiding all files gives the note nearly the full frame.
+Areas and Programs divide route content into a root-folder rail and a detail browser. The rail can retract to a 44px disclosure strip without losing the selected root or nested folder. With a preview open, the default two-column workspace uses a measured 49/51 route-to-preview balance, and the note receives roughly 55% while that rail is retracted; hiding all files gives the note nearly the full frame. Rendered Markdown fills the preview's inner width rather than introducing a second character-based width cap.
 
 A nonblank query temporarily replaces that rail/detail composition with one wide route-level result panel. The result set spans every safe file in the active Areas or Programs route, while the underlying root and nested-folder selection remains unchanged for clearing search.
 
@@ -118,7 +118,7 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 | `< 760px` | One-column route, horizontally scrollable route strip, 2×2 capture and signal grids; preview replaces the route region and hides the mobile dock until closed. |
 | `< 420px` | Compact labels and metadata; preserve 44px targets and never truncate the primary action. |
 
-When the Areas or Programs route region itself falls below 640px, its root rail and detail browser stack. A retracted rail becomes a compact horizontal disclosure row so its restore action remains available.
+When the Areas or Programs route region itself falls below 560px, its root rail and detail browser stack. A retracted rail becomes a compact horizontal disclosure row so its restore action remains available. The lower threshold preserves the two-column folder browser in medium desktop panes after the outer workspace was rebalanced.
 
 Route-wide search results stay a single column at every width. File names and full paths wrap inside each row, and opening a result uses the existing full-width mobile preview below 760px; Back restores the responsive result list.
 

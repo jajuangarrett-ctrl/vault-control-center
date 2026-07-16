@@ -44,7 +44,11 @@ Automatic refreshes reuse remote data for five minutes. Initial open, changed in
 
 Any nonblank query on Areas or Programs replaces the folder drill-down with one wide list of every safe matching file across the active route. Matching uses the file name and full folder path. Exact paths repeated through the synthetic **All Areas** root are shown once, while same-named files in different folders remain separate.
 
-Search does not mutate the selected root or nested folder. **Clear search** restores the exact pre-search folder view. Opening a result uses the shared dashboard preview, and Back returns to the same query and result row. A route-level empty state handles zero matches, and long result paths wrap across desktop, split-pane, and mobile layouts.
+Search does not mutate the selected root or nested folder. **Clear search** restores the exact pre-search folder view. Opening a result uses the shared dashboard preview, and Back returns to the same query and result row. A route-level empty state handles zero matches, and long result file names and paths wrap across desktop, split-pane, and mobile layouts.
+
+## Preview layout
+
+The normal desktop workspace gives roughly 49% of the two-column space to route content and 51% to the read-only preview. Rendered Markdown uses the pane's full inner width rather than a separate character-based cap. Retracting the Areas/Programs root rail still gives the preview roughly 55%, **Hide files** still expands it to nearly the full dashboard, and widths below 760px still use the full-width overlay.
 
 ## Build and verification
 

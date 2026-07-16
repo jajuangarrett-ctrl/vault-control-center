@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.10 — 2026-07-16
+
+- Rebalanced the normal desktop workspace to a measured 49/51 file-results-to-preview split, matching the annotated divider position without returning to the earlier oversized preview UX.
+- Removed the preview Markdown's internal 78-character width cap so rendered notes use the full pane instead of leaving broad blank side margins.
+- Allowed long search-result file names as well as paths to wrap safely beside their timestamps, and kept the Areas/Programs rail and detail browser side-by-side at medium desktop widths.
+- Preserved the retracted-rail split, **Hide files** / **Show files**, **Back**, **Open in tab**, and the full-width mobile overlay; verified light/dark modes and the 760/759-pixel transition without horizontal overflow.
+
 ## 0.1.9 — 2026-07-15
 
 - Changed nonblank search on Areas and Programs from folder-by-folder filtering to one route-wide list of every safe matching file, without requiring drill-down.

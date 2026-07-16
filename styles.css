@@ -470,7 +470,7 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 
 .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(400px, 1fr);
+  grid-template-columns: minmax(0, 0.96fr) minmax(400px, 1fr);
   align-items: start;
   gap: var(--vcc-space-4);
   padding-right: var(--vcc-space-6);
@@ -703,8 +703,8 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 
 .fjg-vcc-preview-markdown {
   width: 100%;
-  max-width: 78ch;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   font-size: 14px;
   line-height: 1.65;
   overflow-wrap: anywhere;
@@ -1666,7 +1666,7 @@ a.fjg-vcc-row {
   border-bottom: 1px solid var(--vcc-border);
 }
 
-.fjg-vcc-folder-search-results .fjg-vcc-row-path {
+.fjg-vcc-folder-search-results :is(.fjg-vcc-row-title, .fjg-vcc-row-path) {
   overflow-wrap: anywhere;
   text-overflow: clip;
   white-space: normal;
@@ -2260,7 +2260,7 @@ a.fjg-vcc-row {
 
 @container fjg-vcc (max-width: 1100px) {
   .fjg-vcc[data-preview-open="true"] .fjg-vcc-content-frame {
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 44%);
+    grid-template-columns: minmax(0, 0.96fr) minmax(340px, 1fr);
     gap: 12px;
     padding-right: 16px;
   }
@@ -2352,7 +2352,7 @@ a.fjg-vcc-row {
   }
 }
 
-@container fjg-vcc-route (max-width: 639px) {
+@container fjg-vcc-route (max-width: 559px) {
   .fjg-vcc-program-layout,
   .fjg-vcc[data-folder-rail-collapsed="true"] .fjg-vcc-program-layout {
     grid-template-columns: minmax(0, 1fr);
