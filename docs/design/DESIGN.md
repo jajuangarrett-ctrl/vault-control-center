@@ -93,7 +93,7 @@ Use Obsidian's icon set through `setIcon`. Do not ship an unrelated icon family.
 - Clicking a file previews it inside the dashboard without replacing the dashboard leaf.
 - Clicking an area, program, or folder drills into its route detail; only file rows invoke the preview.
 - The Areas/Programs root rail retracts independently of the preview. Its disclosure retains focus, exposes its expanded state, and does not reset the selected root or folder.
-- **Open in tab** is the only file action that deliberately opens Obsidian's native viewer/editor in another tab.
+- **Open in tab** is the only file action that deliberately opens Obsidian's native viewer/editor outside the dashboard. Its first use creates one editor tab, and later uses reuse that tab unless Franklin closes or pins it.
 - **Hide files** temporarily collapses the whole route browser on desktop; **Show files** restores the wider preview split and the previous root-rail state without changing route state.
 - Markdown internal links resolve into the same preview pane; HTTP(S) links remain external.
 - Back and Escape close the preview and restore route-row focus. Slow earlier renders cannot overwrite a later file selection.

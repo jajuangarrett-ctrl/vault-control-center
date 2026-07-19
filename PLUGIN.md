@@ -7,7 +7,8 @@ Vault Control Center is a standalone native Obsidian community plugin. It presen
 ## Architecture
 
 - `src/plugin.ts` owns lifecycle, commands, settings migration, refresh scheduling, and theme cleanup.
-- `src/view.ts` owns the native `ItemView`, routes, search, cache policy, and native opening behavior.
+- `src/view.ts` owns the native `ItemView`, routes, search, cache policy, and in-dashboard preview behavior.
+- `src/reusable-file-leaf.ts` keeps one unpinned native editor tab available for repeated **Open in tab** actions without replacing the dashboard.
 - `src/data.ts` builds the in-memory vault index and applies privacy filters.
 - `src/program-navigation.ts` owns recursive folder views and safe route-wide Areas/Programs file search.
 - `src/taskboard.ts` owns optional read-only network access and credential boundaries.
@@ -48,7 +49,7 @@ Search does not mutate the selected root or nested folder. **Clear search** rest
 
 ## Preview layout
 
-The normal desktop workspace gives roughly 49% of the two-column space to route content and 51% to the read-only preview. Rendered Markdown uses the pane's full inner width rather than a separate character-based cap. Retracting the Areas/Programs root rail still gives the preview roughly 55%, **Hide files** still expands it to nearly the full dashboard, and widths below 760px still use the full-width overlay.
+The normal desktop workspace gives roughly 49% of the two-column space to route content and 51% to the read-only preview. Rendered Markdown uses the pane's full inner width rather than a separate character-based cap. Retracting the Areas/Programs root rail still gives the preview roughly 55%, **Hide files** still expands it to nearly the full dashboard, and widths below 760px still use the full-width overlay. **Open in tab** creates one native editor tab when needed and reuses it for later files; closing or pinning that tab makes the next action create a fresh reusable tab.
 
 ## Build and verification
 
@@ -60,7 +61,7 @@ npm run check
 Before a release:
 
 1. Confirm both theme modes and coordinated-shell cleanup in Obsidian.
-2. Verify all nine routes, route-wide Areas/Programs search and clearing, no-results recovery, search-result preview/Back, refresh, the root-rail disclosure, compact preview actions, wrapped paths, split-pane responsiveness, and mobile-width layout.
+2. Verify all nine routes, route-wide Areas/Programs search and clearing, no-results recovery, search-result preview/Back, refresh, the root-rail disclosure, compact preview actions, reusable native editor-tab behavior, wrapped paths, split-pane responsiveness, and mobile-width layout.
 3. Run a credential and machine-path scan across source and `main.js`.
 4. Confirm `npm audit` reports no known vulnerabilities.
 5. Update `package.json`, `package-lock.json`, `manifest.json`, `versions.json`, and `CHANGELOG.md` together.

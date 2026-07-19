@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.11 — 2026-07-19
+
+- Changed **Open in tab** to preserve the dashboard while reusing one dedicated Obsidian editor tab, preventing a new tab from accumulating for every file.
+- Created a fresh reusable editor tab when the prior one has been closed or pinned, so protected tabs are never overwritten.
+- Added regression coverage for initial creation, repeated reuse, closed-tab recovery, and pinned-tab protection.
+
 ## 0.1.10 — 2026-07-16
 
 - Rebalanced the normal desktop workspace to a measured 49/51 file-results-to-preview split, matching the annotated divider position without returning to the earlier oversized preview UX.

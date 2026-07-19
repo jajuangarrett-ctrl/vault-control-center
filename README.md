@@ -30,7 +30,7 @@ Additional features:
 - Compact **Back**, **Open in tab**, and **Hide files** / **Show files** controls that remain accessible when labels collapse in constrained panes
 - **Hide files** / **Show files** can still temporarily give the read-only note nearly the full dashboard width without changing the root-rail state
 - Full-pane Markdown layout plus responsive title/path controls so note text uses the available preview width without clipping at larger display scales
-- Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action for native editing or unsupported formats
+- Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action that preserves the dashboard and reuses one editor tab for native editing or unsupported formats
 - Coordinated throwback dark and light themes derived from deep navy, golden yellow, orange, royal blue, and warm cream
 - Optional Obsidian shell theming that is removed cleanly when disabled or unloaded
 - Responsive layouts for desktop, split panes, tablets, and phones
@@ -116,6 +116,7 @@ npm run check
 - **The old dashboard still opens:** disable the legacy launcher after confirming the native plugin is configured.
 - **Recent does not match files you just viewed:** use Refresh. Files previewed in the dashboard are placed first, followed by Recent Files and native Obsidian history; configured recent roots are used only when no viewed history is available.
 - **A file shows “Native preview required”:** use **Open in tab** for Office documents or formats without a safe embedded renderer.
+- **Open in tab keeps returning to the same editor tab:** this is intentional. The dashboard stays open while subsequent files replace the note in one reusable editor tab; closing or pinning that tab makes the next action create a fresh one.
 
 ## Design notes
 

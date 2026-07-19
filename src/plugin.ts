@@ -1,5 +1,6 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import { isExcludedPath, isSensitivePath, normalizeVaultPath } from "./data";
+import { ReusableFileLeafController } from "./reusable-file-leaf";
 import { VaultControlCenterSettingTab } from "./settings";
 import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
@@ -14,6 +15,7 @@ type CommandHost = {
 export default class VaultControlCenterPlugin extends Plugin {
   settings: DashboardSettings = structuredClone(DEFAULT_SETTINGS);
   private refreshTimer: number | null = null;
+  private reusableFileLeafController: ReusableFileLeafController | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -53,6 +55,8 @@ export default class VaultControlCenterPlugin extends Plugin {
 
   onunload(): void {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
+    this.reusableFileLeafController?.reset();
+    this.reusableFileLeafController = null;
     clearDashboardTheme();
   }
 
@@ -187,7 +191,10 @@ export default class VaultControlCenterPlugin extends Plugin {
       new Notice("That file is no longer available.");
       return;
     }
-    await this.app.workspace.getLeaf("tab").openFile(file);
+    this.reusableFileLeafController ??= new ReusableFileLeafController(
+      this.app.workspace
+    );
+    await this.reusableFileLeafController.openFile(file);
   }
 }
 
