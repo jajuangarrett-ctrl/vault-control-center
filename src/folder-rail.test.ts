@@ -19,6 +19,7 @@ vi.mock("obsidian", () => {
     Component: class {},
     ItemView: MockItemView,
     MarkdownRenderer: { render: vi.fn() },
+    MarkdownView: class extends MockItemView {},
     Notice: class {},
     TFile: class {},
     TFolder: class {},

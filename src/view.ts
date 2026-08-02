@@ -2,6 +2,7 @@ import {
   Component,
   ItemView,
   MarkdownRenderer,
+  MarkdownView,
   Notice,
   TFile,
   TFolder,
@@ -34,6 +35,10 @@ import {
   parseInternalLinkTarget,
   type PreviewKind,
 } from "./preview";
+import {
+  NativeMarkdownEditorSession,
+  type EmbeddedMarkdownView,
+} from "./native-markdown-editor";
 import {
   copyText,
   renderRoute,
@@ -90,6 +95,27 @@ interface PreviewCloseOptions {
   restoreFocus?: boolean;
 }
 
+type MarkdownPaneMode = "preview" | "edit";
+
+class DashboardMarkdownView extends MarkdownView implements EmbeddedMarkdownView {
+  constructor(leaf: WorkspaceLeaf) {
+    super(leaf);
+    this.containerEl.addClass("fjg-vcc-native-markdown-view");
+  }
+
+  async openIn(parent: HTMLElement): Promise<void> {
+    parent.appendChild(this.containerEl);
+    this.load();
+    await this.onOpen();
+  }
+
+  async closeEmbedded(): Promise<void> {
+    this.containerEl.detach();
+    this.unload();
+    await this.onClose();
+  }
+}
+
 export class VaultControlCenterView extends ItemView {
   navigation = false;
   private route: DashboardRoute = "home";
@@ -125,6 +151,8 @@ export class VaultControlCenterView extends ItemView {
   private pendingPreviewPath = "";
   private previewReturnFocusEl: HTMLElement | null = null;
   private previewComponent: Component | null = null;
+  private readonly nativeMarkdownEditor: NativeMarkdownEditorSession;
+  private markdownPaneMode: MarkdownPaneMode = "preview";
   private previewBrowserCollapsed = false;
   private folderRailCollapsed = false;
   private previewRequestId = 0;
@@ -139,6 +167,9 @@ export class VaultControlCenterView extends ItemView {
 
   constructor(leaf: WorkspaceLeaf, readonly plugin: VaultControlCenterPlugin) {
     super(leaf);
+    this.nativeMarkdownEditor = new NativeMarkdownEditorSession(
+      () => new DashboardMarkdownView(leaf)
+    );
   }
 
   getViewType(): string {
@@ -173,6 +204,7 @@ export class VaultControlCenterView extends ItemView {
     }
     this.previewRequestId += 1;
     this.disposePreviewComponent();
+    await this.nativeMarkdownEditor.dispose();
     this.previewResizeObserver?.disconnect();
     this.previewResizeObserver = null;
     this.contentEl.empty();
@@ -185,6 +217,7 @@ export class VaultControlCenterView extends ItemView {
     this.searchInputEl = null;
     this.previewReturnFocusEl = null;
     this.activePreviewFile = null;
+    this.markdownPaneMode = "preview";
     this.previewBrowserCollapsed = false;
     this.folderRailCollapsed = false;
   }
@@ -271,7 +304,7 @@ export class VaultControlCenterView extends ItemView {
       if (this.pendingPreviewPath) {
         void this.openPreview(this.pendingPreviewPath, { focus: false, recordHistory: false });
       } else if (this.activePreviewFile) {
-        this.closePreview({ restoreFocus: false });
+        void this.closePreview({ restoreFocus: false });
       }
     }
   }
@@ -319,7 +352,10 @@ export class VaultControlCenterView extends ItemView {
       this.canonicalizeProgramSelection();
       this.renderContent();
       if (this.activePreviewFile || this.pendingPreviewPath) {
-        void this.restoreActivePreview();
+        const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
+        if (!this.nativeMarkdownEditor.isEditing(activePath)) {
+          void this.restoreActivePreview();
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Dashboard refresh failed.";
@@ -626,7 +662,7 @@ export class VaultControlCenterView extends ItemView {
 
   private navigate(route: DashboardRoute): void {
     if (this.route === route) return;
-    this.closePreview({ restoreFocus: false });
+    void this.closePreview({ restoreFocus: false });
     this.route = route;
     this.renderRouteTabs();
     this.renderMobileDock();
@@ -681,9 +717,13 @@ export class VaultControlCenterView extends ItemView {
     if (this.app.workspace.getActiveViewOfType(VaultControlCenterView) !== this) return;
     const target = event.target as HTMLElement | null;
     const isEditing = target?.matches("input, textarea, select, [contenteditable='true']") ?? false;
-    if (event.key === "Escape" && (this.activePreviewFile || this.pendingPreviewPath)) {
+    if (
+      event.key === "Escape" &&
+      !isEditing &&
+      (this.activePreviewFile || this.pendingPreviewPath)
+    ) {
       event.preventDefault();
-      this.closePreview();
+      void this.closePreview();
       return;
     }
     if (event.key === "/" && !isEditing) {
@@ -723,8 +763,10 @@ export class VaultControlCenterView extends ItemView {
       this.previewReturnFocusEl = activeElement;
     }
 
+    const fileChanged = this.activePreviewFile?.path !== target.path;
     this.activePreviewFile = target;
     this.pendingPreviewPath = target.path;
+    if (fileChanged) this.markdownPaneMode = "preview";
     if (options.recordHistory !== false) this.recordPreviewHistory(target);
     this.syncPreviewSelection();
     await this.renderPreview(target, options.focus !== false);
@@ -736,14 +778,14 @@ export class VaultControlCenterView extends ItemView {
     );
     if (!path) return;
     if (isExcludedPath(path) || isSensitivePath(path)) {
-      this.closePreview({ restoreFocus: false });
+      await this.closePreview({ restoreFocus: false });
       return;
     }
     const target = this.app.vault.getAbstractFileByPath(normalizePath(path));
     if (!(target instanceof TFile)) {
       this.activePreviewFile = null;
       this.pendingPreviewPath = path;
-      this.renderMissingPreview(path);
+      await this.renderMissingPreview(path);
       return;
     }
     this.activePreviewFile = target;
@@ -757,6 +799,7 @@ export class VaultControlCenterView extends ItemView {
 
     const requestId = ++this.previewRequestId;
     this.disposePreviewComponent();
+    await this.nativeMarkdownEditor.dispose();
     pane.empty();
     pane.hidden = false;
     pane.setAttribute("aria-hidden", "false");
@@ -769,12 +812,15 @@ export class VaultControlCenterView extends ItemView {
       className: "fjg-vcc-preview-back",
       ariaLabel: "Close preview and return to the dashboard",
       title: "Back",
-      onClick: () => this.closePreview(),
+      onClick: () => void this.closePreview(),
     });
     const headingGroup = header.createDiv({ cls: "fjg-vcc-preview-heading" });
     headingGroup.createSpan({
       cls: "fjg-vcc-preview-kicker",
-      text: `${file.extension.toLocaleUpperCase() || "FILE"} preview`,
+      text:
+        file.extension.toLocaleLowerCase() === "md" && this.markdownPaneMode === "edit"
+          ? "MD editor"
+          : `${file.extension.toLocaleUpperCase() || "FILE"} preview`,
     });
     const headingId = `fjg-vcc-preview-title-${requestId}`;
     const heading = headingGroup.createEl("h2", {
@@ -786,6 +832,22 @@ export class VaultControlCenterView extends ItemView {
     pane.removeAttribute("aria-label");
 
     const actions = header.createDiv({ cls: "fjg-vcc-preview-actions" });
+    if (file.extension.toLocaleLowerCase() === "md") {
+      const editing = this.markdownPaneMode === "edit";
+      createButton(actions, {
+        label: editing ? "Preview" : "Edit",
+        icon: editing ? "eye" : "pencil",
+        className: "fjg-vcc-button fjg-vcc-preview-mode-toggle",
+        ariaLabel: editing
+          ? "Switch this note back to preview"
+          : "Edit this note in Obsidian's native editor",
+        title: editing ? "Preview" : "Edit",
+        onClick: () => void this.setMarkdownPaneMode(
+          file,
+          editing ? "preview" : "edit"
+        ),
+      });
+    }
     createButton(actions, {
       label: "Open in tab",
       icon: "external-link",
@@ -817,7 +879,12 @@ export class VaultControlCenterView extends ItemView {
 
     try {
       const kind = classifyPreviewKind(file.extension);
-      if (
+      if (kind === "markdown" && this.markdownPaneMode === "edit") {
+        body.empty();
+        body.removeAttribute("tabindex");
+        body.addClass("fjg-vcc-preview-native-editor");
+        await this.nativeMarkdownEditor.mount(body, file.path, focus);
+      } else if (
         (kind === "markdown" || kind === "text") &&
         file.stat.size > PREVIEW_TEXT_SIZE_LIMIT
       ) {
@@ -839,12 +906,21 @@ export class VaultControlCenterView extends ItemView {
 
     if (!this.isCurrentPreviewRequest(requestId, file.path)) return;
     this.updatePreviewLayoutMode();
-    if (focus) {
+    if (focus && this.markdownPaneMode !== "edit") {
       this.contentEl.ownerDocument.defaultView?.setTimeout(
         () => heading.focus({ preventScroll: true }),
         0
       );
     }
+  }
+
+  private async setMarkdownPaneMode(
+    file: TFile,
+    mode: MarkdownPaneMode
+  ): Promise<void> {
+    if (this.activePreviewFile?.path !== file.path) return;
+    this.markdownPaneMode = mode;
+    await this.renderPreview(file, true);
   }
 
   private createPreviewBrowserToggle(parent: HTMLElement): void {
@@ -1046,11 +1122,12 @@ export class VaultControlCenterView extends ItemView {
     state.createEl("p", { text: description });
   }
 
-  private renderMissingPreview(path: string): void {
+  private async renderMissingPreview(path: string): Promise<void> {
     const pane = this.previewPaneEl;
     if (!pane) return;
     this.previewRequestId += 1;
     this.disposePreviewComponent();
+    await this.nativeMarkdownEditor.dispose();
     pane.empty();
     pane.hidden = false;
     pane.setAttribute("aria-hidden", "false");
@@ -1062,7 +1139,7 @@ export class VaultControlCenterView extends ItemView {
       label: "Back",
       icon: "arrow-left",
       className: "fjg-vcc-preview-back",
-      onClick: () => this.closePreview(),
+      onClick: () => void this.closePreview(),
     });
     const heading = header.createDiv({ cls: "fjg-vcc-preview-heading" });
     heading.createSpan({ cls: "fjg-vcc-preview-kicker", text: "Preview unavailable" });
@@ -1082,7 +1159,7 @@ export class VaultControlCenterView extends ItemView {
     this.syncPreviewSelection();
   }
 
-  private closePreview(options: PreviewCloseOptions = {}): void {
+  private async closePreview(options: PreviewCloseOptions = {}): Promise<void> {
     const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
     const returnFocus = this.previewReturnFocusEl;
     this.previewRequestId += 1;
@@ -1091,6 +1168,8 @@ export class VaultControlCenterView extends ItemView {
     this.pendingPreviewPath = "";
     this.previewReturnFocusEl = null;
     this.previewBrowserCollapsed = false;
+    this.markdownPaneMode = "preview";
+    await this.nativeMarkdownEditor.dispose();
     if (this.previewPaneEl) {
       this.previewPaneEl.empty();
       this.previewPaneEl.hidden = true;

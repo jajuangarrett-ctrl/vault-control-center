@@ -25,12 +25,12 @@ The dashboard keeps nine views in one consistent throwback navy, gold, orange, r
 Additional features:
 
 - Native ribbon icon and command-palette actions
-- Shared read-only preview pane across every file-bearing route; normal clicks keep the dashboard active
+- Shared preview pane across every file-bearing route; normal clicks keep the dashboard active, and Markdown notes can switch into Obsidian's native editor in place
 - Near-even desktop workspace with a slightly larger right-side preview, plus an independently retractable Areas and Programs root rail for additional folder-detail and note space
-- Compact **Back**, **Open in tab**, and **Hide files** / **Show files** controls that remain accessible when labels collapse in constrained panes
+- Compact **Back**, Markdown **Edit** / **Preview**, **Open in tab**, and **Hide files** / **Show files** controls that remain accessible when labels collapse in constrained panes
 - **Hide files** / **Show files** can still temporarily give the read-only note nearly the full dashboard width without changing the root-rail state
 - Full-pane Markdown layout plus responsive title/path controls so note text uses the available preview width without clipping at larger display scales
-- Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews, with an explicit **Open in tab** action that preserves the dashboard and reuses one editor tab for native editing or unsupported formats
+- Markdown, text/CSV/HTML source, JSON, image, audio, video, PDF, and Canvas-summary previews; Markdown **Edit** embeds Obsidian's real `MarkdownView` and CodeMirror editor, while **Open in tab** preserves the dashboard and reuses one separate editor tab
 - Coordinated throwback dark and light themes derived from deep navy, golden yellow, orange, royal blue, and warm cream
 - Optional Obsidian shell theming that is removed cleanly when disabled or unloaded
 - Responsive layouts for desktop, split panes, tablets, and phones
@@ -115,6 +115,7 @@ npm run check
 - **BRAT cannot install or update:** confirm the GitHub release includes `main.js`, `manifest.json`, and `styles.css` and that its tag matches the manifest version.
 - **The old dashboard still opens:** disable the legacy launcher after confirming the native plugin is configured.
 - **Recent does not match files you just viewed:** use Refresh. Files previewed in the dashboard are placed first, followed by Recent Files and native Obsidian history; configured recent roots are used only when no viewed history is available.
+- **A Markdown note opens in preview:** choose **Edit** to replace the rendered preview with Obsidian's native editor. Choose **Preview** to save pending editor changes and return to rendered Markdown.
 - **A file shows “Native preview required”:** use **Open in tab** for Office documents or formats without a safe embedded renderer.
 - **Open in tab keeps returning to the same editor tab:** this is intentional. The dashboard stays open while subsequent files replace the note in one reusable editor tab; closing or pinning that tab makes the next action create a fresh one.
 

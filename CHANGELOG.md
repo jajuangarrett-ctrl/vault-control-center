@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added an in-dashboard **Edit** mode for Markdown notes backed by Obsidian's native `MarkdownView` and CodeMirror editor instead of a custom textarea.
+- Kept the existing rendered preview, **Back**, **Hide files**, and reusable **Open in tab** flows; **Preview** closes the native view through Obsidian's save lifecycle before re-rendering the note.
+- Prevented automatic vault refreshes and editor Escape handling from resetting native cursor, scroll, or transient editing state, and added lifecycle regression coverage.
+
 ## 0.1.11 — 2026-07-19
 
 - Changed **Open in tab** to preserve the dashboard while reusing one dedicated Obsidian editor tab, preventing a new tab from accumulating for every file.
