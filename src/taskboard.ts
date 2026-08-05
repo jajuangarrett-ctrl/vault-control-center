@@ -8,6 +8,7 @@ export interface TaskboardItem {
   assignee: string;
   dueDate: string;
   updatedAt: string;
+  vaultPath: string;
 }
 
 export interface TaskboardSnapshot {
@@ -128,10 +129,63 @@ function emptySnapshot(
   };
 }
 
+function parseFrontmatter(text: string): Record<string, string> | null {
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return null;
+  return Object.fromEntries(
+    match[1]
+      .split(/\r?\n/)
+      .map((line) => line.match(/^([\w_]+):\s*(.*)$/))
+      .filter((entry): entry is RegExpMatchArray => Boolean(entry))
+      .map(([, key, value]) => [key, value.replace(/^['\"]|['\"]$/g, "").trim()])
+  );
+}
+
+function localTaskDueTimestamp(task: TaskboardItem): number {
+  const timestamp = new Date(task.dueDate).getTime();
+  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp;
+}
+
 export async function fetchTaskboardSnapshot(
   app: App,
-  settings: TaskboardSettings
+  _settings: TaskboardSettings
 ): Promise<TaskboardSnapshot> {
+  const taskFiles = app.vault
+    .getMarkdownFiles()
+    .filter((file) => /^08 Tasks\/Workspaces\/.+\/task\.md$/i.test(file.path));
+  const tasks = (await Promise.all(taskFiles.map(async (file) => {
+    const frontmatter = parseFrontmatter(await app.vault.cachedRead(file));
+    if (!frontmatter) return null;
+    const bucket = asString(frontmatter.status).toLocaleLowerCase() || "inbox";
+    if (bucket === "completed" || bucket === "archived") return null;
+    return {
+      id: asString(frontmatter.task_id),
+      title: asString(frontmatter.title) || "Untitled task",
+      bucket,
+      project: asString(frontmatter.project),
+      assignee: asString(frontmatter.delegated_to),
+      dueDate: asString(frontmatter.due),
+      updatedAt: asString(frontmatter.updated_at),
+      vaultPath: file.path,
+    } satisfies TaskboardItem;
+  }))).filter((task): task is TaskboardItem => Boolean(task));
+  const buckets: Record<string, number> = {};
+  for (const task of tasks) buckets[task.bucket] = (buckets[task.bucket] ?? 0) + 1;
+  const doFirst = tasks
+    .filter((task) => task.bucket === "do-first")
+    .sort((left, right) => localTaskDueTimestamp(left) - localTaskDueTimestamp(right) || left.title.localeCompare(right.title));
+  return {
+    status: "ready",
+    totalCount: taskFiles.length,
+    openCount: tasks.length,
+    buckets,
+    items: doFirst,
+    updatedAt: "",
+    sourceUrl: "",
+    error: "",
+  };
+
+  /*
   let sourceUrl = "";
   let password = "";
 
@@ -210,6 +264,7 @@ export async function fetchTaskboardSnapshot(
   }
 
   return emptySnapshot("error", sourceUrl, lastError);
+  */
 }
 
 function taskCaptureConnection(app: App): TaskCaptureConnection | null {

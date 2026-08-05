@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { App } from "obsidian";
 
 const mocks = vi.hoisted(() => ({ requestUrl: vi.fn() }));
@@ -35,94 +35,32 @@ describe("normalizeTaskboardUrl", () => {
 });
 
 describe("fetchTaskboardSnapshot", () => {
-  beforeEach(() => mocks.requestUrl.mockReset());
-
-  it("does not make a network request until an integration is enabled", async () => {
+  it("reads active workspace tasks, excludes completed work, and sorts Do First by due date", async () => {
     const result = await fetchTaskboardSnapshot(fakeApp(), DISABLED_SETTINGS);
-    expect(result.status).toBe("disabled");
+
+    expect(result.status).toBe("ready");
+    expect(result.totalCount).toBe(3);
+    expect(result.openCount).toBe(2);
+    expect(result.items.map((task) => task.title)).toEqual(["Earlier task", "Later task"]);
+    expect(result.items.every((task) => task.bucket === "do-first" && task.vaultPath.endsWith("/task.md"))).toBe(true);
     expect(mocks.requestUrl).not.toHaveBeenCalled();
-  });
-
-  it("uses an enabled Secret Storage connection before the optional adapter", async () => {
-    mocks.requestUrl.mockResolvedValue({ status: 200, json: { tasks: [] } });
-    const result = await fetchTaskboardSnapshot(fakeApp(), {
-      reuseTaskCaptureConnection: true,
-      enableRemoteTaskboard: true,
-      taskboardUrl: "https://tasks.example.com",
-      taskboardSecretId: "dashboard-password",
-    });
-
-    expect(result.status).toBe("ready");
-    expect(mocks.requestUrl).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: "https://tasks.example.com/api/tasks",
-        headers: { "X-Dashboard-Password": "separate-secret" },
-      })
-    );
-  });
-
-  it("accepts a short non-whitespace secret managed by Obsidian", async () => {
-    mocks.requestUrl.mockResolvedValue({ status: 200, json: { tasks: [] } });
-    const result = await fetchTaskboardSnapshot(fakeApp({ secret: "abc" }), {
-      ...DISABLED_SETTINGS,
-      enableRemoteTaskboard: true,
-      taskboardUrl: "https://tasks.example.com",
-      taskboardSecretId: "short-secret",
-    });
-
-    expect(result.status).toBe("ready");
-    expect(mocks.requestUrl).toHaveBeenCalledWith(
-      expect.objectContaining({ headers: { "X-Dashboard-Password": "abc" } })
-    );
-  });
-
-  it("rejects missing secrets and malformed responses without leaking request details", async () => {
-    const missingSecret = await fetchTaskboardSnapshot(fakeApp({ secret: null }), {
-      ...DISABLED_SETTINGS,
-      enableRemoteTaskboard: true,
-      taskboardUrl: "https://tasks.example.com",
-      taskboardSecretId: "missing",
-    });
-    expect(missingSecret.status).toBe("unconfigured");
-    expect(mocks.requestUrl).not.toHaveBeenCalled();
-
-    mocks.requestUrl.mockResolvedValue({ status: 200, json: { unexpected: [] } });
-    const malformed = await fetchTaskboardSnapshot(fakeApp(), {
-      ...DISABLED_SETTINGS,
-      enableRemoteTaskboard: true,
-      taskboardUrl: "https://tasks.example.com",
-      taskboardSecretId: "dashboard-password",
-    });
-    expect(malformed.status).toBe("error");
-    expect(malformed.error).toBe("Taskboard returned an invalid response.");
-  });
-
-  it("uses the best-effort Task Capture adapter only when explicitly enabled", async () => {
-    mocks.requestUrl.mockResolvedValue({ status: 200, json: { tasks: [] } });
-    const result = await fetchTaskboardSnapshot(fakeApp(), {
-      ...DISABLED_SETTINGS,
-      reuseTaskCaptureConnection: true,
-    });
-
-    expect(result.status).toBe("ready");
-    expect(mocks.requestUrl).toHaveBeenCalledWith(
-      expect.objectContaining({ url: "https://capture.example.com/api/tasks" })
-    );
   });
 });
 
-function fakeApp(options: { secret?: string | null } = {}): App {
+function fakeApp(): App {
+  const files = [
+    { path: "08 Tasks/Workspaces/Earlier task/task.md", contents: task("Earlier task", "2026-08-04", "do-first") },
+    { path: "08 Tasks/Workspaces/Later task/task.md", contents: task("Later task", "2026-08-06", "do-first") },
+    { path: "08 Tasks/Workspaces/Finished task/task.md", contents: task("Finished task", "2026-08-01", "completed") },
+  ];
   return {
-    secretStorage: {
-      getSecret: () => (Object.prototype.hasOwnProperty.call(options, "secret") ? options.secret ?? null : "separate-secret"),
-    },
-    plugins: {
-      getPlugin: () => ({
-        settings: {
-          taskboardApiUrl: "https://capture.example.com",
-          dashboardPassword: "capture-secret",
-        },
-      }),
+    vault: {
+      getMarkdownFiles: () => files,
+      cachedRead: async (file: { contents: string }) => file.contents,
     },
   } as unknown as App;
+}
+
+function task(title: string, due: string, status: string): string {
+  return `---\ntask_id: tsk_${title}\ntitle: ${title}\nstatus: ${status}\ndue: ${due}\nproject: Test\ndelegated_to: ""\nupdated_at: 2026-08-01T12:00:00.000Z\n---\n`;
 }

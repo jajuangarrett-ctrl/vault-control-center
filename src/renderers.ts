@@ -290,16 +290,12 @@ function renderCurrentWork(parent: HTMLElement, context: DashboardRenderContext)
 
 function renderTaskManagement(parent: HTMLElement, context: DashboardRenderContext): void {
   const remote = context.taskboard;
-  const ready = remote.status === "ready";
-  const open = ready ? remote.openCount : context.data.tasks.open;
-  const total = ready ? remote.totalCount : context.data.tasks.total;
+  const open = remote.openCount;
+  const total = remote.totalCount;
   const panel = createPanel(parent, "Task management", {
-    actionLabel: ready && remote.sourceUrl ? "Taskboard" : "Capture task",
-    actionIcon: ready && remote.sourceUrl ? "external-link" : "circle-plus",
-    onAction: () => {
-      if (ready && remote.sourceUrl) context.openExternal(remote.sourceUrl);
-      else context.capture("task-capture:capture", "Task Capture");
-    },
+    actionLabel: "Task Manager",
+    actionIcon: "list-checks",
+    onAction: () => context.capture("fjg-task-manager:open-dashboard", "FJG Task Manager"),
     className: "fjg-vcc-task-panel",
   });
   const summary = panel.body.createDiv({ cls: "fjg-vcc-task-summary" });
@@ -307,34 +303,20 @@ function renderTaskManagement(parent: HTMLElement, context: DashboardRenderConte
   summary.createSpan({ text: ` of ${total} total tasks` });
   summary.createSpan({
     cls: "fjg-vcc-badge",
-    text: ready ? "Remote · view only" : "Local task file",
+    text: "Obsidian task workspaces",
   });
-
-  if (ready) {
-    const bucketBar = panel.body.createDiv({ cls: "fjg-vcc-filter-bar", attr: { "aria-label": "Task buckets" } });
-    for (const [bucket, count] of Object.entries(remote.buckets)) {
-      bucketBar.createSpan({ cls: "fjg-vcc-filter-chip is-static", text: `${bucket} ${count}` });
-    }
-    const visible = remote.items
-      .filter((task) => matchesQuery(context.state.query, task.title, task.bucket, task.project, task.assignee))
-      .slice(0, 8);
-    const list = panel.body.createDiv({ cls: "fjg-vcc-row-list" });
-    for (const task of visible) {
-      const row = list.createDiv({ cls: "fjg-vcc-row", attr: { "data-tone": "task" } });
-      createIcon(row, "circle-dot", "fjg-vcc-row-icon");
-      const main = row.createDiv({ cls: "fjg-vcc-row-main" });
-      main.createSpan({ cls: "fjg-vcc-row-title", text: task.title });
-      main.createSpan({ cls: "fjg-vcc-row-meta", text: [task.bucket, task.project, task.assignee].filter(Boolean).join(" · ") });
-      row.createSpan({ cls: "fjg-vcc-row-end", text: task.dueDate || "Open" });
-    }
-  } else {
-    panel.body.createEl("p", {
-      cls: "fjg-vcc-panel-note",
-      text:
-        remote.status === "error" || remote.status === "unconfigured"
-          ? `${remote.error} Local task counts remain available.`
-          : "Enable the optional view-only taskboard connection in Settings for bucket summaries.",
-    });
+  const visible = remote.items
+    .filter((task) => matchesQuery(context.state.query, task.title, task.project, task.assignee))
+    .slice(0, 8);
+  const list = panel.body.createDiv({ cls: "fjg-vcc-row-list" });
+  for (const task of visible) {
+    const row = list.createEl("button", { cls: "fjg-vcc-row", attr: { type: "button", "data-tone": "task" } });
+    createIcon(row, "circle-dot", "fjg-vcc-row-icon");
+    const main = row.createDiv({ cls: "fjg-vcc-row-main" });
+    main.createSpan({ cls: "fjg-vcc-row-title", text: task.title });
+    main.createSpan({ cls: "fjg-vcc-row-meta", text: ["Do First", task.project, task.assignee].filter(Boolean).join(" · ") });
+    row.createSpan({ cls: "fjg-vcc-row-end", text: task.dueDate || "No due date" });
+    row.addEventListener("click", () => context.openFile(task.vaultPath));
   }
 }
 
