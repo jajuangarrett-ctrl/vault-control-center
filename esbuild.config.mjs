@@ -28,6 +28,9 @@ const context = await esbuild.context({
     "@lezer/highlight",
     "@lezer/lr",
     ...builtins,
+    ...builtins.map((moduleName) => `node:${moduleName}`),
+    "fs/promises",
+    "node:fs/promises",
   ],
   format: "cjs",
   target: "es2018",
@@ -45,4 +48,3 @@ if (prod) {
 }
 
 await context.watch();
-

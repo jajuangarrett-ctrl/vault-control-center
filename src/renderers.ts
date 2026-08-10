@@ -23,6 +23,16 @@ import {
   programMatchesNavigationQuery,
   searchProgramFiles,
 } from "./program-navigation";
+import {
+  filterHtmlGalleryItems,
+  type HtmlGallerySnapshot,
+} from "./html-gallery";
+import type {
+  AutomationGroup,
+  AutomationItemSnapshot,
+  AutomationSnapshot,
+} from "./automations";
+import type { SystemMemorySnapshot } from "./system-memory";
 import type { TaskboardSnapshot } from "./taskboard";
 import {
   DEFAULT_SETTINGS,
@@ -49,6 +59,12 @@ export interface DashboardRenderState {
 export interface DashboardRenderContext {
   data: DashboardData;
   taskboard: TaskboardSnapshot;
+  htmlGallery: HtmlGallerySnapshot;
+  htmlThumbnailsGenerating: boolean;
+  automations: AutomationSnapshot;
+  memory: SystemMemorySnapshot;
+  automationStartingIds: ReadonlySet<string>;
+  operationsRefreshing: boolean;
   settings: DashboardSettings;
   state: DashboardRenderState;
   activePreviewPath: string;
@@ -58,6 +74,11 @@ export interface DashboardRenderContext {
   clearSearch: () => void;
   navigate: (route: DashboardRoute) => void;
   openFile: (path: string) => void;
+  openHtml: (path: string) => void;
+  resourceUrl: (path: string) => string;
+  refreshHtmlThumbnails: () => void;
+  refreshOperations: () => void;
+  runAutomation: (id: string) => void;
   openBookmark: (bookmark: DashboardBookmark) => void;
   openExternal: (url: string) => void;
   capture: (commandId: string, label: string) => void;
@@ -108,8 +129,14 @@ export function renderRoute(
     case "programs":
       renderPrograms(view, context);
       break;
+    case "html":
+      renderHtmlGallery(view, context);
+      break;
     case "ai-team":
       renderAiTeam(view, context);
+      break;
+    case "automations":
+      renderAutomations(view, context);
       break;
     case "recent":
       renderRecent(view, context);
@@ -127,6 +154,278 @@ export function renderRoute(
       renderSettings(view, context);
       break;
   }
+}
+
+function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext): void {
+  const items = filterHtmlGalleryItems(
+    context.htmlGallery.items,
+    context.state.query
+  );
+  const toolbar = parent.createDiv({ cls: "fjg-vcc-html-toolbar" });
+  const copy = toolbar.createDiv({ cls: "fjg-vcc-html-toolbar-copy" });
+  copy.createEl("h2", {
+    text: `${items.length} HTML artifact${items.length === 1 ? "" : "s"}`,
+  });
+  copy.createEl("p", {
+    text:
+      "Clickable previews for finished HTML dashboards and tools across the configured vault folders.",
+  });
+  createButton(toolbar, {
+    label: context.htmlThumbnailsGenerating
+      ? "Updating previews…"
+      : "Update previews",
+    icon: context.htmlThumbnailsGenerating ? "loader-circle" : "images",
+    className: "fjg-vcc-button is-primary",
+    disabled: context.htmlThumbnailsGenerating,
+    onClick: context.refreshHtmlThumbnails,
+  });
+
+  if (!items.length) {
+    createEmptyState(
+      parent,
+      context.state.query ? "No HTML artifacts match" : "No HTML artifacts found",
+      context.state.query
+        ? "Try another search or clear the current query."
+        : "Check the HTML gallery roots in plugin settings, then refresh.",
+      "panels-top-left"
+    );
+    return;
+  }
+
+  const grid = parent.createDiv({
+    cls: "fjg-vcc-html-grid",
+    attr: { "aria-label": "HTML artifact gallery" },
+  });
+  for (const item of items) {
+    const card = grid.createEl("button", {
+      cls: "fjg-vcc-html-card",
+      attr: {
+        type: "button",
+        "aria-label": `Open ${item.title} in Obsidian`,
+        "data-file-path": item.path,
+      },
+    });
+    const thumbnail = card.createDiv({ cls: "fjg-vcc-html-thumbnail" });
+    if (item.thumbnailFile) {
+      const placeholder = thumbnail.createDiv({
+        cls: "fjg-vcc-html-thumbnail-placeholder",
+        attr: { hidden: "" },
+      });
+      createIcon(placeholder, "panels-top-left");
+      placeholder.createSpan({ text: "Preview unavailable" });
+      const image = thumbnail.createEl("img", {
+        attr: {
+          src: context.resourceUrl(item.thumbnailPath),
+          alt: `Preview of ${item.title}`,
+          loading: "lazy",
+        },
+      });
+      image.addEventListener("error", () => {
+        image.remove();
+        placeholder.removeAttribute("hidden");
+      });
+    } else {
+      const placeholder = thumbnail.createDiv({
+        cls: "fjg-vcc-html-thumbnail-placeholder",
+      });
+      createIcon(placeholder, "panels-top-left");
+      placeholder.createSpan({ text: "Select Update previews to create a thumbnail" });
+    }
+    const cardCopy = card.createDiv({ cls: "fjg-vcc-html-card-copy" });
+    cardCopy.createSpan({ cls: "fjg-vcc-html-card-title", text: item.title });
+    cardCopy.createEl("p", {
+      cls: "fjg-vcc-html-card-description",
+      text: item.description || "Interactive HTML artifact",
+    });
+    const meta = cardCopy.createDiv({ cls: "fjg-vcc-html-card-meta" });
+    meta.createSpan({ text: `${item.category} · ${item.folder}` });
+    meta.createSpan({ text: formatRelativeTime(item.modifiedAt) });
+    card.addEventListener("click", () => context.openHtml(item.path));
+  }
+}
+
+function renderAutomations(parent: HTMLElement, context: DashboardRenderContext): void {
+  const toolbar = parent.createDiv({ cls: "fjg-vcc-operations-toolbar" });
+  const copy = toolbar.createDiv({ cls: "fjg-vcc-operations-toolbar-copy" });
+  copy.createEl("h2", { text: "Automation control center" });
+  copy.createEl("p", {
+    text:
+      "See synchronized results on any device. Run controls unlock only on the Mac that owns the loaded vault-processing jobs.",
+  });
+  createButton(toolbar, {
+    label: context.operationsRefreshing ? "Refreshing…" : "Refresh status",
+    icon: "refresh-cw",
+    className: "fjg-vcc-button",
+    disabled: context.operationsRefreshing,
+    onClick: context.refreshOperations,
+  });
+
+  const hostNote = parent.createDiv({ cls: "fjg-vcc-automation-host-note" });
+  createIcon(
+    hostNote,
+    context.automations.isExecutor ? "server-cog" : "monitor-dot"
+  );
+  hostNote.createSpan({ text: context.automations.message });
+
+  renderMemoryCard(parent, context);
+
+  const groups: Array<{ id: AutomationGroup; label: string }> = [
+    { id: "routine-vault", label: "Scheduled vault processors" },
+    { id: "services-sync", label: "Services and repository sync" },
+    { id: "external-cloud", label: "External and cloud automations" },
+  ];
+  for (const group of groups) {
+    const visible = context.automations.items.filter(
+      (item) =>
+        item.group === group.id &&
+        matchesQuery(
+          context.state.query,
+          item.label,
+          item.description,
+          item.schedule,
+          item.lastResult ?? "",
+          item.runMessage
+        )
+    );
+    if (!visible.length && context.state.query) continue;
+    const panel = createPanel(parent, `${group.label} · ${visible.length}`, {
+      className: "fjg-vcc-automation-section",
+    });
+    if (!visible.length) {
+      createEmptyState(
+        panel.body,
+        "No automations match",
+        "Clear search to restore this automation group.",
+        "workflow"
+      );
+      continue;
+    }
+    const grid = panel.body.createDiv({ cls: "fjg-vcc-automation-grid" });
+    for (const item of visible) renderAutomationCard(grid, item, context);
+  }
+}
+
+function renderMemoryCard(parent: HTMLElement, context: DashboardRenderContext): void {
+  const memory = context.memory;
+  const tone = memory.status === "ready" ? memory.tone : "attention";
+  const card = parent.createEl("section", {
+    cls: "fjg-vcc-memory-card",
+    attr: { "data-tone": tone, "aria-label": "Always-on Mac RAM usage" },
+  });
+  const copy = card.createDiv({ cls: "fjg-vcc-memory-copy" });
+  copy.createSpan({ cls: "fjg-vcc-memory-kicker", text: "Always-on Mac RAM" });
+  const value = copy.createDiv({ cls: "fjg-vcc-memory-value" });
+  if (memory.status === "ready") {
+    value.createEl("strong", { text: `${formatNumber(memory.usedPercent)}%` });
+    value.createSpan({ text: "in use" });
+    copy.createDiv({
+      cls: "fjg-vcc-memory-detail",
+      text: `${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)} · ${formatNumber(memory.freePercent)}% available`,
+    });
+  } else {
+    value.createEl("strong", { text: "Unavailable" });
+    copy.createDiv({ cls: "fjg-vcc-memory-detail", text: memory.message });
+  }
+
+  const meter = card.createDiv({ cls: "fjg-vcc-memory-meter" });
+  const track = meter.createDiv({
+    cls: "fjg-vcc-memory-track",
+    attr: {
+      role: "progressbar",
+      "aria-label": "RAM in use",
+      "aria-valuemin": "0",
+      "aria-valuemax": "100",
+      "aria-valuenow": String(memory.status === "ready" ? memory.usedPercent : 0),
+    },
+  });
+  const fill = track.createSpan({ cls: "fjg-vcc-memory-fill" });
+  fill.style.width = `${memory.status === "ready" ? memory.usedPercent : 0}%`;
+  meter.createDiv({
+    cls: "fjg-vcc-memory-detail",
+    text: memory.checkedAt
+      ? `Checked ${formatRelativeTime(Date.parse(memory.checkedAt))}`
+      : "Waiting for the first status check",
+  });
+  createButton(meter, {
+    label: context.operationsRefreshing ? "Refreshing…" : "Refresh RAM",
+    icon: "refresh-cw",
+    className: "fjg-vcc-button",
+    disabled: context.operationsRefreshing,
+    onClick: context.refreshOperations,
+  });
+}
+
+function renderAutomationCard(
+  parent: HTMLElement,
+  item: AutomationItemSnapshot,
+  context: DashboardRenderContext
+): void {
+  const starting = context.automationStartingIds.has(item.id);
+  const state = starting
+    ? "running"
+    : item.statusReadState === "error" || item.healthTone === "critical"
+      ? "error"
+      : "idle";
+  const card = parent.createEl("article", {
+    cls: "fjg-vcc-automation-card",
+    attr: { "data-state": state },
+  });
+  const header = card.createDiv({ cls: "fjg-vcc-automation-card-header" });
+  header.createSpan({ cls: "fjg-vcc-automation-card-title", text: item.label });
+  header.createSpan({ cls: "fjg-vcc-badge", text: item.schedule });
+  card.createEl("p", { text: item.description });
+  card.createEl("p", {
+    text: item.lastResult
+      ? `${item.lastResult}${item.lastCompletedAt ? ` · ${item.lastCompletedAt}` : ""}`
+      : item.statusMessage,
+  });
+  const footer = card.createDiv({ cls: "fjg-vcc-automation-card-footer" });
+  const statusTone = starting ? "attention" : automationStatusTone(item);
+  footer.createSpan({
+    cls: "fjg-vcc-automation-status",
+    text: starting ? "Starting with launchd…" : item.healthMessage,
+    attr: { "data-tone": statusTone },
+  });
+  const actions = footer.createDiv({ cls: "fjg-vcc-form-actions" });
+  if (item.resolvedStatusPath) {
+    createButton(actions, {
+      label: "View",
+      icon: "file-clock",
+      className: "fjg-vcc-button",
+      ariaLabel: `View the latest status for ${item.label}`,
+      title: "View latest status",
+      onClick: () => context.openFile(item.resolvedStatusPath ?? ""),
+    });
+  }
+  createButton(actions, {
+    label: starting ? "Starting…" : "Run now",
+    icon: starting ? "loader-circle" : "play",
+    className: "fjg-vcc-button is-primary",
+    disabled: starting || !item.canRun,
+    ariaLabel: item.canRun
+      ? `Run ${item.label} now`
+      : `${item.label}: ${item.runMessage}`,
+    title: item.canRun ? "Run now" : item.runMessage,
+    onClick: () => context.runAutomation(item.id),
+  });
+}
+
+function automationStatusTone(
+  item: AutomationItemSnapshot
+): "positive" | "attention" | "critical" | "neutral" {
+  return item.healthTone;
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "Unknown";
+  const gib = bytes / 1_073_741_824;
+  if (gib >= 1) return `${gib.toFixed(gib >= 10 ? 1 : 2)} GB`;
+  const mib = bytes / 1_048_576;
+  return `${mib.toFixed(mib >= 10 ? 0 : 1)} MB`;
+}
+
+function formatNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function renderHome(parent: HTMLElement, context: DashboardRenderContext): void {

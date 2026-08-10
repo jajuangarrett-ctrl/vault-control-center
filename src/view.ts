@@ -4,6 +4,7 @@ import {
   MarkdownRenderer,
   MarkdownView,
   Notice,
+  Platform,
   TFile,
   TFolder,
   Vault,
@@ -25,6 +26,20 @@ import {
   type DashboardFileCategory,
   type DashboardFileItem,
 } from "./data";
+import {
+  buildHtmlGallerySnapshot,
+  generateHtmlThumbnails,
+  type HtmlGallerySnapshot,
+} from "./html-gallery";
+import {
+  buildAutomationSnapshot,
+  runAutomation,
+  type AutomationSnapshot,
+} from "./automations";
+import {
+  buildSystemMemorySnapshot,
+  type SystemMemorySnapshot,
+} from "./system-memory";
 import { createButton, createIcon } from "./dom";
 import type VaultControlCenterPlugin from "./plugin";
 import { resolveProgramFolderPath } from "./program-navigation";
@@ -84,11 +99,13 @@ const AI_QUEUE_KEYS: AiFolderKey[] = ["emailQueue", "formattedNotes", "ownerInbo
 const RECENT_FILTERS: RecentFilter[] = ["all", "programs", "ai", "people", "tasks", "areas", "vault"];
 const BOOKMARK_FILTERS: BookmarkFilter[] = ["all", "file", "folder", "url"];
 const TASKBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+const OPERATIONS_CACHE_TTL_MS = 30_000;
 let dashboardViewSequence = 0;
 
 interface PreviewOpenOptions {
   focus?: boolean;
   recordHistory?: boolean;
+  htmlOpenRequestId?: number;
 }
 
 interface PreviewCloseOptions {
@@ -130,6 +147,40 @@ export class VaultControlCenterView extends ItemView {
     sourceUrl: "",
     error: "",
   };
+  private htmlGallery: HtmlGallerySnapshot = {
+    generatedAt: "",
+    roots: [],
+    thumbnailFolder: "",
+    scannedCount: 0,
+    excludedCount: 0,
+    errorCount: 0,
+    errors: [],
+    items: [],
+  };
+  private htmlThumbnailsGenerating = false;
+  private automations: AutomationSnapshot = {
+    status: "ready",
+    checkedAt: "",
+    isDesktopMac: false,
+    isExecutor: false,
+    executorState: "unsupported",
+    uid: null,
+    message: "Automation status has not been checked yet.",
+    items: [],
+  };
+  private memory: SystemMemorySnapshot = {
+    status: "unavailable",
+    checkedAt: "",
+    reason: "unsupported-platform",
+    message: "RAM status has not been checked yet.",
+  };
+  private readonly automationStartingIds = new Set<string>();
+  private operationsRefreshing = false;
+  private operationsRefreshPromise: Promise<void> | null = null;
+  private operationsRefreshQueued = false;
+  private operationsRefreshQueuedNotice = false;
+  private operationsSnapshotRequests = 0;
+  private systemStatusTimer: number | null = null;
   private renderState: DashboardRenderState = {
     query: "",
     selectedAreaPath: "",
@@ -156,12 +207,20 @@ export class VaultControlCenterView extends ItemView {
   private previewBrowserCollapsed = false;
   private folderRailCollapsed = false;
   private previewRequestId = 0;
+  private htmlOpenRequestId = 0;
   private previewHistory: string[] = [];
   private previewResizeObserver: ResizeObserver | null = null;
   private templateSaveTimer: number | null = null;
   private refreshPromise: Promise<void> | null = null;
+  private refreshQueued = false;
+  private refreshQueuedForce = false;
+  private htmlSnapshotGeneration = 0;
+  private automationSnapshotGeneration = 0;
+  private automationSnapshotAppliedGeneration = 0;
+  private memorySnapshotGeneration = 0;
   private taskboardFetchedAt = 0;
   private taskboardSettingsKey = "";
+  private operationsFetchedAt = 0;
   private readonly browserRegionId = `fjg-vcc-browser-${++dashboardViewSequence}`;
   private readonly folderRailId = `fjg-vcc-folder-rail-${dashboardViewSequence}`;
 
@@ -194,6 +253,9 @@ export class VaultControlCenterView extends ItemView {
       void this.openPreview(this.pendingPreviewPath, { focus: false, recordHistory: false });
     }
     await this.refresh();
+    this.systemStatusTimer = window.setInterval(() => {
+      if (this.route === "automations") void this.refreshMemoryOnly();
+    }, 30_000);
   }
 
   async onClose(): Promise<void> {
@@ -202,6 +264,11 @@ export class VaultControlCenterView extends ItemView {
       this.templateSaveTimer = null;
       await this.plugin.saveSettings();
     }
+    if (this.systemStatusTimer !== null) {
+      window.clearInterval(this.systemStatusTimer);
+      this.systemStatusTimer = null;
+    }
+    this.htmlOpenRequestId += 1;
     this.previewRequestId += 1;
     this.disposePreviewComponent();
     await this.nativeMarkdownEditor.dispose();
@@ -310,10 +377,22 @@ export class VaultControlCenterView extends ItemView {
   }
 
   async refresh(forceRemote = false): Promise<void> {
-    if (this.refreshPromise) return this.refreshPromise;
-    this.refreshPromise = this.performRefresh(forceRemote);
+    this.refreshQueued = true;
+    this.refreshQueuedForce ||= forceRemote;
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.drainRefreshQueue();
+    }
+    return this.refreshPromise;
+  }
+
+  private async drainRefreshQueue(): Promise<void> {
     try {
-      await this.refreshPromise;
+      while (this.refreshQueued) {
+        const forceRemote = this.refreshQueuedForce;
+        this.refreshQueued = false;
+        this.refreshQueuedForce = false;
+        await this.performRefresh(forceRemote);
+      }
     } finally {
       this.refreshPromise = null;
     }
@@ -334,16 +413,51 @@ export class VaultControlCenterView extends ItemView {
         !this.taskboardFetchedAt ||
         this.taskboardSettingsKey !== taskboardSettingsKey ||
         Date.now() - this.taskboardFetchedAt >= TASKBOARD_CACHE_TTL_MS;
-      const [data, taskboard] = await Promise.all([
+      const shouldRefreshOperations =
+        forceRemote ||
+        !this.operationsFetchedAt ||
+        Date.now() - this.operationsFetchedAt >= OPERATIONS_CACHE_TTL_MS;
+      const isDesktopMac = Platform.isDesktopApp && Platform.isMacOS;
+      const htmlGeneration = ++this.htmlSnapshotGeneration;
+      const automationGeneration = shouldRefreshOperations
+        ? ++this.automationSnapshotGeneration
+        : 0;
+      const memoryGeneration = shouldRefreshOperations
+        ? ++this.memorySnapshotGeneration
+        : 0;
+      const operationsPromise = shouldRefreshOperations
+        ? this.buildOperationsState(isDesktopMac)
+        : Promise.resolve(null);
+      const [data, taskboard, htmlGallery, operations] = await Promise.all([
         buildDashboardData(this.app, this.plugin.settings, {
           recentFilePaths: this.previewHistory,
         }),
         shouldRefreshTaskboard
           ? fetchTaskboardSnapshot(this.app, this.plugin.settings)
           : Promise.resolve(this.taskboard),
+        buildHtmlGallerySnapshot(
+          this.app,
+          this.plugin.settings.htmlRoots,
+          this.plugin.settings.htmlThumbnailFolder
+        ),
+        operationsPromise,
       ]);
       this.data = data;
       this.taskboard = taskboard;
+      if (htmlGeneration === this.htmlSnapshotGeneration) {
+        this.htmlGallery = htmlGallery;
+      }
+      if (
+        operations &&
+        automationGeneration === this.automationSnapshotGeneration
+      ) {
+        this.automations = operations.automations;
+        this.automationSnapshotAppliedGeneration = automationGeneration;
+        this.operationsFetchedAt = Date.now();
+      }
+      if (operations && memoryGeneration === this.memorySnapshotGeneration) {
+        this.memory = operations.memory;
+      }
       if (shouldRefreshTaskboard) {
         this.taskboardFetchedAt = Date.now();
         this.taskboardSettingsKey = taskboardSettingsKey;
@@ -517,7 +631,15 @@ export class VaultControlCenterView extends ItemView {
       {
         label: "More",
         icon: "ellipsis",
-        active: ["bookmarks", "people", "clipboard", "settings", "ai-team"].includes(this.route),
+        active: [
+          "bookmarks",
+          "people",
+          "clipboard",
+          "settings",
+          "ai-team",
+          "html",
+          "automations",
+        ].includes(this.route),
         action: () => this.navigate("settings"),
       },
     ];
@@ -577,6 +699,12 @@ export class VaultControlCenterView extends ItemView {
     return {
       data: this.data,
       taskboard: this.taskboard,
+      htmlGallery: this.htmlGallery,
+      htmlThumbnailsGenerating: this.htmlThumbnailsGenerating,
+      automations: this.automations,
+      memory: this.memory,
+      automationStartingIds: this.automationStartingIds,
+      operationsRefreshing: this.operationsRefreshing,
       settings: this.plugin.settings,
       state: this.renderState,
       activePreviewPath: this.activePreviewFile?.path ?? this.pendingPreviewPath,
@@ -594,6 +722,11 @@ export class VaultControlCenterView extends ItemView {
       },
       navigate: (route) => this.navigate(route),
       openFile: (path) => void this.openPreview(path),
+      openHtml: (path) => void this.openHtml(path),
+      resourceUrl: (path) => this.resourceUrl(path),
+      refreshHtmlThumbnails: () => void this.refreshHtmlThumbnails(),
+      refreshOperations: () => void this.refreshOperations(true),
+      runAutomation: (id) => void this.runAutomationNow(id),
       openBookmark: (bookmark) => void this.openBookmark(bookmark),
       openExternal: (url) => this.openExternal(url),
       capture: (commandId, label) => this.plugin.executeCapture(commandId, label),
@@ -658,6 +791,194 @@ export class VaultControlCenterView extends ItemView {
       setShellTheme: (enabled) => void this.setShellTheme(enabled),
       openNativeSettings: () => this.openNativeSettings(),
     };
+  }
+
+  private resourceUrl(path: string): string {
+    const normalizedPath = normalizeVaultPath(path);
+    if (
+      !normalizedPath ||
+      isExcludedPath(normalizedPath) ||
+      isSensitivePath(normalizedPath)
+    ) {
+      return "";
+    }
+    const file = this.app.vault.getAbstractFileByPath(normalizePath(normalizedPath));
+    return file instanceof TFile ? this.app.vault.getResourcePath(file) : "";
+  }
+
+  private async openHtml(path: string): Promise<void> {
+    const requestId = ++this.htmlOpenRequestId;
+    let shouldPreviewSource = false;
+    try {
+      const result = await this.plugin.openHtmlFileInteractively(path);
+      if (requestId !== this.htmlOpenRequestId || result === "superseded") return;
+      if (result === "opened") return;
+      shouldPreviewSource = true;
+    } catch {
+      if (requestId !== this.htmlOpenRequestId) return;
+      shouldPreviewSource = true;
+      new Notice(
+        "The interactive HTML viewer could not open this file. Showing its safe source preview instead."
+      );
+    }
+
+    if (!shouldPreviewSource || requestId !== this.htmlOpenRequestId) return;
+    try {
+      await this.openPreview(path, { htmlOpenRequestId: requestId });
+    } catch {
+      if (requestId === this.htmlOpenRequestId) {
+        new Notice("The HTML source preview could not be opened.");
+      }
+    }
+  }
+
+  private async refreshHtmlThumbnails(): Promise<void> {
+    if (this.htmlThumbnailsGenerating) return;
+    this.htmlThumbnailsGenerating = true;
+    this.renderContent();
+    try {
+      const result = await generateHtmlThumbnails(
+        this.app,
+        this.htmlGallery.items,
+        {
+          isDesktopMac: Platform.isDesktopApp && Platform.isMacOS,
+          force: true,
+        }
+      );
+      const htmlGeneration = ++this.htmlSnapshotGeneration;
+      const htmlGallery = await buildHtmlGallerySnapshot(
+        this.app,
+        this.plugin.settings.htmlRoots,
+        this.plugin.settings.htmlThumbnailFolder
+      );
+      if (htmlGeneration === this.htmlSnapshotGeneration) {
+        this.htmlGallery = htmlGallery;
+      }
+      if (result.status === "unavailable") {
+        new Notice(result.reason || "HTML preview generation is unavailable on this device.");
+      } else if (result.failed > 0) {
+        new Notice(
+          `Updated ${result.generated} HTML preview${result.generated === 1 ? "" : "s"}; ${result.failed} could not be generated.`
+        );
+      } else if (result.generated > 0) {
+        new Notice(
+          `Updated ${result.generated} HTML preview${result.generated === 1 ? "" : "s"}.`
+        );
+      } else {
+        new Notice("HTML previews are already current.");
+      }
+    } catch {
+      new Notice("HTML previews could not be updated. Existing previews were kept.");
+    } finally {
+      this.htmlThumbnailsGenerating = false;
+      this.renderContent();
+    }
+  }
+
+  private async refreshOperations(showNotice: boolean): Promise<void> {
+    this.operationsRefreshQueued = true;
+    this.operationsRefreshQueuedNotice ||= showNotice;
+    if (!this.operationsRefreshPromise) {
+      this.operationsRefreshPromise = this.drainOperationsRefreshQueue();
+    }
+    return this.operationsRefreshPromise;
+  }
+
+  private async drainOperationsRefreshQueue(): Promise<void> {
+    this.operationsRefreshing = true;
+    if (this.route === "automations") this.renderContent();
+    try {
+      while (this.operationsRefreshQueued) {
+        const showNotice = this.operationsRefreshQueuedNotice;
+        this.operationsRefreshQueued = false;
+        this.operationsRefreshQueuedNotice = false;
+        await this.performOperationsRefresh(showNotice);
+      }
+    } finally {
+      this.operationsRefreshing = false;
+      this.operationsRefreshPromise = null;
+      if (this.route === "automations") this.renderContent();
+    }
+  }
+
+  private async performOperationsRefresh(showNotice: boolean): Promise<void> {
+    try {
+      const isDesktopMac = Platform.isDesktopApp && Platform.isMacOS;
+      const automationGeneration = ++this.automationSnapshotGeneration;
+      const memoryGeneration = ++this.memorySnapshotGeneration;
+      const operations = await this.buildOperationsState(isDesktopMac);
+      if (automationGeneration === this.automationSnapshotGeneration) {
+        this.automations = operations.automations;
+        this.automationSnapshotAppliedGeneration = automationGeneration;
+        this.operationsFetchedAt = Date.now();
+      }
+      if (memoryGeneration === this.memorySnapshotGeneration) {
+        this.memory = operations.memory;
+      }
+      if (showNotice) new Notice("Automation and RAM status refreshed.");
+    } catch {
+      new Notice("Automation and RAM status could not be refreshed.");
+    }
+  }
+
+  private async refreshMemoryOnly(): Promise<void> {
+    if (
+      this.operationsRefreshing ||
+      this.operationsSnapshotRequests > 0 ||
+      this.automationSnapshotAppliedGeneration !== this.automationSnapshotGeneration
+    ) {
+      return;
+    }
+    const automationGeneration = this.automationSnapshotGeneration;
+    const memoryGeneration = ++this.memorySnapshotGeneration;
+    try {
+      const memory = await buildSystemMemorySnapshot({
+        isDesktopMac: Platform.isDesktopApp && Platform.isMacOS,
+        isExecutorEligible: this.automations.isExecutor,
+      });
+      if (
+        automationGeneration === this.automationSnapshotGeneration &&
+        memoryGeneration === this.memorySnapshotGeneration
+      ) {
+        this.memory = memory;
+        if (this.route === "automations") this.renderContent();
+      }
+    } catch {
+      // Keep the previous reading; the next timer or explicit refresh can retry.
+    }
+  }
+
+  private async buildOperationsState(
+    isDesktopMac: boolean
+  ): Promise<{ automations: AutomationSnapshot; memory: SystemMemorySnapshot }> {
+    this.operationsSnapshotRequests += 1;
+    try {
+      const automations = await buildAutomationSnapshot(this.app, {
+        isDesktopMac,
+      });
+      const memory = await buildSystemMemorySnapshot({
+        isDesktopMac,
+        isExecutorEligible: automations.isExecutor,
+      });
+      return { automations, memory };
+    } finally {
+      this.operationsSnapshotRequests -= 1;
+    }
+  }
+
+  private async runAutomationNow(id: string): Promise<void> {
+    if (this.automationStartingIds.has(id)) return;
+    this.automationStartingIds.add(id);
+    if (this.route === "automations") this.renderContent();
+    try {
+      const result = await runAutomation(id, { snapshot: this.automations });
+      new Notice(result.message, result.status === "error" ? 8_000 : 6_000);
+    } catch {
+      new Notice("The automation could not be started.", 8_000);
+    } finally {
+      this.automationStartingIds.delete(id);
+      await this.refreshOperations(false);
+    }
   }
 
   private navigate(route: DashboardRoute): void {
@@ -736,6 +1057,15 @@ export class VaultControlCenterView extends ItemView {
     path: string,
     options: PreviewOpenOptions = {}
   ): Promise<void> {
+    if (
+      options.htmlOpenRequestId !== undefined &&
+      options.htmlOpenRequestId !== this.htmlOpenRequestId
+    ) {
+      return;
+    }
+    if (options.htmlOpenRequestId === undefined) {
+      this.htmlOpenRequestId += 1;
+    }
     const normalizedPath = normalizeVaultPath(path);
     if (
       !normalizedPath ||
@@ -1160,6 +1490,7 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private async closePreview(options: PreviewCloseOptions = {}): Promise<void> {
+    this.htmlOpenRequestId += 1;
     const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
     const returnFocus = this.previewReturnFocusEl;
     this.previewRequestId += 1;

@@ -1,10 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-08-10
 
 - Added an in-dashboard **Edit** mode for Markdown notes backed by Obsidian's native `MarkdownView` and CodeMirror editor instead of a custom textarea.
 - Kept the existing rendered preview, **Back**, **Hide files**, and reusable **Open in tab** flows; **Preview** closes the native view through Obsidian's save lifecycle before re-rendering the note.
 - Prevented automatic vault refreshes and editor Escape handling from resetting native cursor, scroll, or transient editing state, and added lifecycle regression coverage.
+- Replaced the Home taskboard feed with a local FJG Task Manager integration that reports open and total folder-based task workspaces, lists the eight **Do First** tasks due soonest, opens their `task.md` notes in the dashboard, and delegates the panel action to FJG Task Manager.
+- Added a searchable HTML gallery for safe finished artifacts under configurable vault roots, using cached, concurrency-bounded title and description metadata. Selected artifacts use the registered desktop HTML viewer when available and fall back to a safe in-dashboard source preview elsewhere.
+- Added explicit desktop-macOS **Update previews** generation through Quick Look. The action regenerates the current gallery so linked CSS, JavaScript, data, and asset changes are reflected; PNGs use stable vault-relative names, bounded concurrency, race-safe writes, and per-file failure isolation.
+- Added an Automations route with a fixed inventory of local, synchronized, disabled, missing, and cloud jobs; status notes remain visible on any device while local launchd state is checked only by desktop Obsidian on macOS.
+- Limited **Run now** to allowlisted routine jobs whose exact launchd labels are loaded on the confirmed executor Mac. Starts use a no-shell `launchctl kickstart` call without `-k`; continuous, high-impact, disabled, external, unverified, and already-starting jobs remain blocked.
+- Added local RAM pressure and usage status for the confirmed automation executor Mac only, with an operating-system fallback when `memory_pressure` is unavailable; other devices show an unavailable state instead of their own RAM.
 
 ## 0.1.11 — 2026-07-19
 

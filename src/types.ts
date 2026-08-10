@@ -4,7 +4,9 @@ export const ROUTES = [
   "home",
   "areas",
   "programs",
+  "html",
   "ai-team",
+  "automations",
   "recent",
   "bookmarks",
   "people",
@@ -25,6 +27,8 @@ export interface DashboardSettings {
   contactListPath: string;
   peopleFolder: string;
   tasksFilePath: string;
+  htmlRoots: string[];
+  htmlThumbnailFolder: string;
   aiFolders: {
     emailQueue: string;
     formattedNotes: string;
@@ -49,7 +53,9 @@ export const ROUTE_DEFINITIONS: readonly RouteDefinition[] = [
   { id: "home", label: "Home", icon: "home" },
   { id: "areas", label: "Areas", icon: "folders" },
   { id: "programs", label: "Programs", icon: "folder" },
+  { id: "html", label: "HTML", icon: "panels-top-left" },
   { id: "ai-team", label: "AI Team", icon: "bot" },
+  { id: "automations", label: "Automations", icon: "workflow" },
   { id: "recent", label: "Recent", icon: "clock-3" },
   { id: "bookmarks", label: "Bookmarks", icon: "bookmark" },
   { id: "people", label: "People", icon: "users" },
@@ -58,7 +64,7 @@ export const ROUTE_DEFINITIONS: readonly RouteDefinition[] = [
 ] as const;
 
 export const DEFAULT_SETTINGS: DashboardSettings = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   theme: "dark",
   applyShellTheme: true,
   areasFolder: "03 Areas",
@@ -66,6 +72,9 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   contactListPath: "People/Contacts.md",
   peopleFolder: "People/Agenda",
   tasksFilePath: "Tasks/Tasks.md",
+  htmlRoots: ["Artifacts", "02 Programs", "03 Areas", "10 Misc", "Wiki"],
+  htmlThumbnailFolder:
+    "Artifacts/Vault Control Center Native Plugin/runtime/html-gallery/thumbnails",
   aiFolders: {
     emailQueue: "Operations/Email Queue",
     formattedNotes: "Operations/Formatted Notes",

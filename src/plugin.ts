@@ -1,6 +1,9 @@
-import { Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
+import { Notice, Platform, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import { isExcludedPath, isSensitivePath, normalizeVaultPath } from "./data";
-import { ReusableFileLeafController } from "./reusable-file-leaf";
+import {
+  ReusableFileLeafController,
+  type ReusableFileLeafOpenResult,
+} from "./reusable-file-leaf";
 import { VaultControlCenterSettingTab } from "./settings";
 import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
@@ -11,6 +14,14 @@ type CommandHost = {
     executeCommandById?: (id: string) => boolean;
   };
 };
+
+type AppWithViewRegistry = {
+  viewRegistry?: {
+    getTypeByExtension?: (extension: string) => string | null | undefined;
+  };
+};
+
+export type InteractiveHtmlOpenResult = ReusableFileLeafOpenResult | "fallback";
 
 export default class VaultControlCenterPlugin extends Plugin {
   settings: DashboardSettings = structuredClone(DEFAULT_SETTINGS);
@@ -78,6 +89,11 @@ export default class VaultControlCenterPlugin extends Plugin {
       contactListPath: stringSetting(saved.contactListPath, DEFAULT_SETTINGS.contactListPath),
       peopleFolder: stringSetting(saved.peopleFolder, DEFAULT_SETTINGS.peopleFolder),
       tasksFilePath: stringSetting(saved.tasksFilePath, DEFAULT_SETTINGS.tasksFilePath),
+      htmlRoots: stringArraySetting(saved.htmlRoots, DEFAULT_SETTINGS.htmlRoots),
+      htmlThumbnailFolder: stringSetting(
+        saved.htmlThumbnailFolder,
+        DEFAULT_SETTINGS.htmlThumbnailFolder
+      ),
       aiFolders: {
         emailQueue: stringSetting(
           aiFolders.emailQueue,
@@ -191,10 +207,57 @@ export default class VaultControlCenterPlugin extends Plugin {
       new Notice("That file is no longer available.");
       return;
     }
+    try {
+      await this.reusableFileLeaf().openFile(file);
+    } catch {
+      new Notice("That file could not be opened in an Obsidian tab.");
+    }
+  }
+
+  async openHtmlFileInteractively(path: string): Promise<InteractiveHtmlOpenResult> {
+    if (!Platform.isDesktopApp) return "fallback";
+
+    const normalizedPath = normalizeVaultPath(path);
+    if (
+      !normalizedPath ||
+      isExcludedPath(normalizedPath) ||
+      isSensitivePath(normalizedPath)
+    ) {
+      return "fallback";
+    }
+    const file = this.app.vault.getAbstractFileByPath(normalizePath(normalizedPath));
+    if (!(file instanceof TFile) || file.extension.toLocaleLowerCase() !== "html") {
+      return "fallback";
+    }
+
+    const registeredViewType = registeredViewTypeForExtension(
+      this.app,
+      file.extension
+    );
+    if (!registeredViewType) return "fallback";
+
+    return this.reusableFileLeaf().openFile(file, {
+      expectedViewType: registeredViewType,
+    });
+  }
+
+  private reusableFileLeaf(): ReusableFileLeafController {
     this.reusableFileLeafController ??= new ReusableFileLeafController(
       this.app.workspace
     );
-    await this.reusableFileLeafController.openFile(file);
+    return this.reusableFileLeafController;
+  }
+}
+
+function registeredViewTypeForExtension(app: unknown, extension: string): string {
+  try {
+    const registry = (app as AppWithViewRegistry).viewRegistry;
+    const viewType = registry?.getTypeByExtension?.(
+      extension.trim().toLocaleLowerCase()
+    );
+    return typeof viewType === "string" ? viewType.trim() : "";
+  } catch {
+    return "";
   }
 }
 

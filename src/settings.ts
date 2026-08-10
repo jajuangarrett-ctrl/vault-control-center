@@ -52,6 +52,30 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
     this.addPathSetting("Contact list", "Opened by the dashboard contact action.", "contactListPath");
     this.addPathSetting("Tasks file", "Used for local open and total task counts.", "tasksFilePath");
 
+    new Setting(containerEl).setName("HTML gallery").setHeading();
+    new Setting(containerEl)
+      .setName("HTML gallery roots")
+      .setDesc("One vault-relative folder per line. Safe finished HTML files under these roots appear as gallery cards.")
+      .addTextArea((text) => {
+        text.inputEl.rows = 5;
+        text
+          .setPlaceholder("Artifacts\n02 Programs\n03 Areas")
+          .setValue(this.plugin.settings.htmlRoots.join("\n"))
+          .onChange(async (value) => {
+            this.plugin.settings.htmlRoots = value
+              .split(/\r?\n/)
+              .map((part) => part.trim())
+              .filter(Boolean);
+            await this.plugin.saveSettings();
+            this.plugin.scheduleRefresh();
+          });
+      });
+    this.addPathSetting(
+      "HTML thumbnail folder",
+      "Generated thumbnails are stored here as portable vault-relative runtime files.",
+      "htmlThumbnailFolder"
+    );
+
     new Setting(containerEl).setName("AI Team queues").setHeading();
     this.addAiPathSetting("Email queue", "emailQueue");
     this.addAiPathSetting("Formatted notes", "formattedNotes");
@@ -117,7 +141,14 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
   private addPathSetting(
     name: string,
     description: string,
-    key: "areasFolder" | "programsFolder" | "peopleFolder" | "contactListPath" | "tasksFilePath" | "taskboardUrl"
+    key:
+      | "areasFolder"
+      | "programsFolder"
+      | "peopleFolder"
+      | "contactListPath"
+      | "tasksFilePath"
+      | "taskboardUrl"
+      | "htmlThumbnailFolder"
   ): void {
     new Setting(this.containerEl)
       .setName(name)
