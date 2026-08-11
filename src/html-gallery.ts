@@ -631,12 +631,10 @@ function fileSystemAdapterBasePath(app: App): string | null {
 }
 
 async function loadNodeThumbnailRuntime(): Promise<HtmlThumbnailRuntime> {
-  const [{ execFile }, fs, os, path] = await Promise.all([
-    import("node:child_process"),
-    import("node:fs/promises"),
-    import("node:os"),
-    import("node:path"),
-  ]);
+  const { execFile } = require("node:child_process") as typeof import("node:child_process");
+  const fs = require("node:fs/promises") as typeof import("node:fs/promises");
+  const os = require("node:os") as typeof import("node:os");
+  const path = require("node:path") as typeof import("node:path");
 
   return {
     makeTempDirectory: (prefix) => fs.mkdtemp(path.join(os.tmpdir(), prefix)),

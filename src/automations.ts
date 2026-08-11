@@ -841,7 +841,7 @@ function boundedText(value: string, maxLength = 240): string {
 }
 
 async function loadAutomationRunner(): Promise<AutomationExecFile> {
-  const childProcess = await import("node:child_process");
+  const childProcess = require("node:child_process") as typeof import("node:child_process");
   return (executable, args, options) =>
     new Promise<AutomationCommandResult>((resolve, reject) => {
       childProcess.execFile(

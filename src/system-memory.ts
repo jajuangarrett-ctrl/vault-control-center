@@ -219,7 +219,7 @@ function roundPercent(value: number): number {
 }
 
 async function loadOsProvider(): Promise<SystemMemoryOsProvider> {
-  const os = await import("node:os");
+  const os = require("node:os") as typeof import("node:os");
   return {
     totalmem: () => os.totalmem(),
     freemem: () => os.freemem(),
@@ -227,7 +227,7 @@ async function loadOsProvider(): Promise<SystemMemoryOsProvider> {
 }
 
 async function loadCommandRunner(): Promise<SystemMemoryCommandRunner> {
-  const childProcess = await import("node:child_process");
+  const childProcess = require("node:child_process") as typeof import("node:child_process");
   return (executable, args, options) =>
     new Promise<SystemMemoryCommandResult>((resolve, reject) => {
       childProcess.execFile(
