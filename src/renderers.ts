@@ -271,7 +271,6 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
 
   const groups: Array<{ id: AutomationGroup; label: string }> = [
     { id: "routine-vault", label: "Scheduled vault processors" },
-    { id: "services-sync", label: "Services and repository sync" },
     { id: "external-cloud", label: "External and cloud automations" },
   ];
   for (const group of groups) {

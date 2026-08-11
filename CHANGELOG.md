@@ -11,6 +11,7 @@
 - Added an Automations route with a fixed inventory of local, synchronized, disabled, missing, and cloud jobs; status notes remain visible on any device while local launchd state is checked only by desktop Obsidian on macOS.
 - Limited **Run now** to allowlisted routine jobs whose exact launchd labels are loaded on the confirmed executor Mac. Starts use a no-shell `launchctl kickstart` call without `-k`; continuous, high-impact, disabled, external, unverified, and already-starting jobs remain blocked.
 - Added local RAM pressure and usage status for the confirmed automation executor Mac only, with an operating-system fallback when `memory_pressure` is unavailable; other devices show an unavailable state instead of their own RAM.
+- Kept the Automations view focused on scheduled vault processors and external/cloud jobs by omitting the services and repository-sync section from the dashboard.
 
 ## 0.1.11 — 2026-07-19
 

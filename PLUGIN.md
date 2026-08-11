@@ -60,7 +60,7 @@ Thumbnail generation is intentionally unavailable outside desktop Obsidian on ma
 
 ## Automation inventory and RAM
 
-The Automations route groups scheduled vault processors, services/repository sync, and external/cloud entries. Synchronized status notes are readable on every device. Desktop macOS additionally checks each verified launchd label with `launchctl print`. This produces an executor/non-executor/unsupported state that governs every manual control and the RAM card; hostname alone is never treated as proof of executor identity.
+The Automations route displays scheduled vault processors and external/cloud entries. Services and repository-sync entries remain part of the internal safety-reviewed inventory but are intentionally omitted from the dashboard. Synchronized status notes are readable on every device. Desktop macOS additionally checks each verified launchd label with `launchctl print`. This produces an executor/non-executor/unsupported state that governs every manual control and the RAM card; hostname alone is never treated as proof of executor identity.
 
 The fixed inventory and manual policies are:
 
@@ -71,7 +71,7 @@ The fixed inventory and manual policies are:
 - **Disabled:** Plugin repository auto-pull and iOS repository auto-pull.
 - **External:** Gmail capture and Netlify retention cleanup.
 
-Only the routine vault processors with verified labels can expose **Run now**, and only when their jobs are loaded on the confirmed executor Mac. Continuous services, repository-committing jobs, disabled legacy sync, external cloud jobs, missing services, and entries without a confirmed label remain visible but non-runnable. RAM refreshes every 30 seconds while this route is open and can also be refreshed with the route status action.
+Only the routine vault processors with verified labels can expose **Run now**, and only when their jobs are loaded on the confirmed executor Mac. External cloud jobs remain visible but non-runnable; continuous services, repository-committing jobs, disabled legacy sync, and missing services are omitted from the visible dashboard. RAM refreshes every 30 seconds while this route is open and can also be refreshed with the route status action.
 
 ## FJG Task Manager
 
