@@ -145,7 +145,7 @@ export async function submitRemoteAutomation(
     if (response.status === 202 && isRequestState(response.json, requestId, id)) {
       return {
         id,
-        status: "started",
+        status: "queued",
         brokerState: "queued",
         requestId,
         message: `${definition.label} was securely queued on the always-on Mac.`,

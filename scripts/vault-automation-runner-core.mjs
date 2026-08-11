@@ -23,7 +23,7 @@ export async function buildExecutorHeartbeat(options = {}) {
   if (sentinel.loaded) {
     for (const [jobId, label] of Object.entries(AUTOMATION_LABELS)) {
       const target = await inspectLaunchdLabel(execFile, uid, label);
-      if (target.loaded && !target.running) runnableJobIds.push(jobId);
+      if (target.loaded && !target.running && !isNearScheduledRun(jobId, now)) runnableJobIds.push(jobId);
     }
   }
   return {
@@ -57,6 +57,9 @@ export async function processAutomationClaim(claim, options = {}) {
   }
   if (target.running) {
     return { ...base, state: "rejected", reasonCode: "already-running" };
+  }
+  if (isNearScheduledRun(request.jobId, now)) {
+    return { ...base, state: "rejected", reasonCode: "scheduled-window" };
   }
 
   try {
@@ -138,6 +141,21 @@ function parseIso(value) {
 
 function roundPercent(value) {
   return Math.round(value * 10) / 10;
+}
+
+export function isNearScheduledRun(jobId, now, windowMinutes = 2) {
+  const minuteOfDay = now.getHours() * 60 + now.getMinutes();
+  const schedules = {
+    clippings: [8 * 60, 12 * 60, 18 * 60],
+    "root-inbox": [8 * 60 + 10, 12 * 60 + 10, 18 * 60 + 10],
+    "iflytek-notes": [8 * 60 + 30, 12 * 60 + 30, 18 * 60 + 30],
+    "youtube-notes": [8 * 60 + 40, 12 * 60 + 40, 18 * 60 + 40],
+    "fjg-capture-transcripts": [8 * 60 + 50, 12 * 60 + 50, 18 * 60 + 50],
+    "weekly-learning-review": now.getDay() === 5 ? [16 * 60] : [],
+  };
+  return (schedules[jobId] ?? []).some((scheduledMinute) =>
+    Math.abs(minuteOfDay - scheduledMinute) <= windowMinutes
+  );
 }
 
 function commandOptions(timeout) {

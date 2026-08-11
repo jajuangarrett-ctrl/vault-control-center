@@ -23,6 +23,7 @@ const REASON_CODES = new Set([
   "sentinel-not-loaded",
   "target-not-loaded",
   "already-running",
+  "scheduled-window",
   "kickstart-failed",
   "runner-error",
   "malformed-claim",
@@ -122,7 +123,7 @@ async function pollExecutor(store, payload, now) {
 
   const listing = await store.list({ prefix: "requests/" });
   const records = [];
-  for (const blob of listing.blobs.slice(0, 250)) {
+  for (const blob of listing.blobs) {
     const entry = await store.getWithMetadata(blob.key, { type: "json", consistency: "strong" });
     if (entry?.data) records.push({ key: blob.key, ...entry });
   }
@@ -170,7 +171,10 @@ async function recordEvent(store, payload, now) {
     if (!current?.data || current.data.jobId !== event.jobId) {
       throw new BrokerError("unknown-request", 404, "The request was not found.");
     }
-    if (TERMINAL_STATES.has(current.data.state)) return publicRequest(current.data);
+    if (TERMINAL_STATES.has(current.data.state)) {
+      await releaseJobLock(store, event.jobId, event.requestId);
+      return publicRequest(current.data);
+    }
     if (current.data.state !== "claimed") {
       throw new BrokerError("invalid-transition", 409, "The request is not currently claimed.");
     }
@@ -330,7 +334,13 @@ async function acquireJobLock(store, jobId, requestId, expiresAt, current) {
 async function releaseJobLock(store, jobId, requestId) {
   const key = `locks/${jobId}`;
   const current = await store.getWithMetadata(key, { type: "json", consistency: "strong" });
-  if (current?.data?.requestId === requestId) await store.delete(key);
+  if (current?.data?.requestId === requestId) {
+    await store.setJSON(
+      key,
+      { requestId, expiresAt: new Date(0).toISOString() },
+      { onlyIfMatch: current.etag }
+    );
+  }
 }
 
 function publicClaim(record) {

@@ -75,7 +75,7 @@ describe("remote automation client", () => {
       request,
       NOW
     );
-    expect(result).toMatchObject({ status: "started", brokerState: "queued" });
+    expect(result).toMatchObject({ status: "queued", brokerState: "queued" });
     const body = JSON.parse(request.mock.calls[0][0].body ?? "{}");
     expect(Object.keys(body).sort()).toEqual(["expiresAt", "jobId", "requestId", "requestedAt"]);
     expect(body).toMatchObject({ jobId: "clippings", requestedAt: NOW.toISOString() });

@@ -1,10 +1,10 @@
 import type { App, TFile } from "obsidian";
 
 export type AutomationGroup = "routine-vault" | "services-sync" | "external-cloud";
-export const VISIBLE_AUTOMATION_GROUPS: readonly AutomationGroup[] = [
+export const VISIBLE_AUTOMATION_GROUPS = [
   "routine-vault",
   "external-cloud",
-] as const;
+] as const satisfies readonly AutomationGroup[];
 export type AutomationManualPolicy =
   | "routine"
   | "status-only"
@@ -275,7 +275,7 @@ export interface AutomationRunContext {
 
 export interface AutomationRunResult {
   id: string;
-  status: "started" | "rejected" | "error";
+  status: "started" | "queued" | "rejected" | "error";
   message: string;
 }
 

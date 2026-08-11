@@ -37,6 +37,7 @@ while (!stopping) {
     if (response.request) {
       const journal = await readJournal();
       let event = journal[response.request.requestId];
+      if (event) event = { ...event, occurredAt: new Date().toISOString() };
       if (!event) {
         try {
           event = await processAutomationClaim(response.request);

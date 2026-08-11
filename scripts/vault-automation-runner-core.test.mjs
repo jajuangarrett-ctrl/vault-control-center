@@ -3,6 +3,7 @@ import {
   AUTOMATION_LABELS,
   EXECUTOR_SENTINEL_LABEL,
   buildExecutorHeartbeat,
+  isNearScheduledRun,
   processAutomationClaim,
 } from "./vault-automation-runner-core.mjs";
 
@@ -86,6 +87,12 @@ describe("vault automation runner security boundary", () => {
       memory: { totalBytes: 1_000, usedBytes: 600, freePercent: 40, usedPercent: 60 },
     });
     expect(JSON.stringify(heartbeat)).not.toContain("franklingarrett");
+  });
+
+  it("blocks manual starts during fixed scheduled-run windows", () => {
+    expect(isNearScheduledRun("clippings", new Date(2026, 7, 10, 8, 1))).toBe(true);
+    expect(isNearScheduledRun("clippings", new Date(2026, 7, 10, 8, 5))).toBe(false);
+    expect(isNearScheduledRun("weekly-learning-review", new Date(2026, 7, 14, 16, 0))).toBe(true);
   });
 });
 
