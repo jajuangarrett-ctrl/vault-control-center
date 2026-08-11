@@ -127,6 +127,8 @@ async function ensurePrivateRuntime() {
   await mkdir(logDir, { recursive: true, mode: 0o700 });
   await chmod(runtimeDir, 0o700);
   await chmod(logDir, 0o700);
+  await writeFile(logPath, "", { flag: "a", mode: 0o600 });
+  await chmod(logPath, 0o600);
 }
 
 async function log(message) {

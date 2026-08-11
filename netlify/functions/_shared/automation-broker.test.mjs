@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BrokerError,
   createAutomationBroker,
+  enforceRateLimit,
 } from "./automation-broker.mjs";
 
 const NOW = new Date("2026-08-10T20:00:00.000Z");
@@ -111,6 +112,23 @@ describe("dedicated automation broker", () => {
         checkedAt: NOW.toISOString(),
       },
     });
+  });
+
+  it("moves an unclaimed request into the explicit expired state", async () => {
+    let current = NOW;
+    const broker = createAutomationBroker(memoryStore(), { now: () => current });
+    await broker.submitRequest(validRequest());
+    current = new Date("2026-08-10T20:02:00.000Z");
+    await broker.pollExecutor({ ...validHeartbeat(), observedAt: current.toISOString() });
+    expect(await broker.getRequestStatus(REQUEST_ID)).toMatchObject({ state: "expired" });
+  });
+
+  it("atomically rate-limits a bounded scope", async () => {
+    const store = memoryStore();
+    await enforceRateLimit(store, "test", 2, NOW);
+    await enforceRateLimit(store, "test", 2, NOW);
+    await expect(enforceRateLimit(store, "test", 2, NOW))
+      .rejects.toMatchObject({ code: "rate-limited", status: 429 });
   });
 });
 

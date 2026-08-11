@@ -11,11 +11,24 @@ sentinel_source="$repo_dir/runner/com.fjg.vault-automation-executor.plist"
 sentinel_target="$launchagents_dir/com.fjg.vault-automation-executor.plist"
 runner_target="$launchagents_dir/com.fjg.vault-automation-runner.plist"
 
+reload_agent() {
+  local label=$1
+  local plist_path=$2
+  local attempt
+  /bin/launchctl bootout "gui/$uid/$label" >/dev/null 2>&1 || true
+  for attempt in 1 2 3; do
+    /bin/sleep "$attempt"
+    if /bin/launchctl bootstrap "gui/$uid" "$plist_path" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  /bin/launchctl bootstrap "gui/$uid" "$plist_path"
+}
+
 /bin/mkdir -p "$launchagents_dir" "$runner_dir"
 /bin/chmod 700 "$runtime_dir" "$runner_dir"
 /usr/bin/install -m 600 "$sentinel_source" "$sentinel_target"
-/bin/launchctl bootout "gui/$uid/com.fjg.vault-automation-executor" >/dev/null 2>&1 || true
-/bin/launchctl bootstrap "gui/$uid" "$sentinel_target"
+reload_agent "com.fjg.vault-automation-executor" "$sentinel_target"
 
 if [[ ${1:-} == "--sentinel-only" ]]; then
   exit 0
@@ -41,5 +54,4 @@ trap '/bin/rm -f "$temp_plist"' EXIT
   "$repo_dir/runner/com.fjg.vault-automation-runner.plist.template" > "$temp_plist"
 /usr/bin/plutil -lint "$temp_plist" >/dev/null
 /usr/bin/install -m 600 "$temp_plist" "$runner_target"
-/bin/launchctl bootout "gui/$uid/com.fjg.vault-automation-runner" >/dev/null 2>&1 || true
-/bin/launchctl bootstrap "gui/$uid" "$runner_target"
+reload_agent "com.fjg.vault-automation-runner" "$runner_target"
