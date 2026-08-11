@@ -18,7 +18,7 @@
   "author": "Franklin Garrett",
   "license": "MIT",
   "dependencies": {
-    "@netlify/blobs": "^10.7.9"
+    "@netlify/blobs": "^10.7.12"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",

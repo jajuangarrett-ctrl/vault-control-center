@@ -132,7 +132,7 @@ export async function submitRemoteAutomation(
     jobId: id,
     requestId,
     requestedAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + 60_000).toISOString(),
+    expiresAt: new Date(now.getTime() + 90_000).toISOString(),
   };
   try {
     const response = await request({
