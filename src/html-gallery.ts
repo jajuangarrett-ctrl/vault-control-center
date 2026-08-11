@@ -11,6 +11,9 @@ export const HTML_METADATA_READ_LIMIT = 256 * 1024;
 export const HTML_METADATA_READ_CONCURRENCY = 4;
 export const DEFAULT_HTML_THUMBNAIL_SIZE = 720;
 export const DEFAULT_HTML_THUMBNAIL_CONCURRENCY = 2;
+// macOS Quick Look's all-white HTML fallback is a 720px PNG below this size.
+// Treat it as unusable so it cannot appear as an empty gallery card.
+export const MIN_USABLE_HTML_THUMBNAIL_BYTES = 16 * 1024;
 export const DEFAULT_HTML_THUMBNAIL_FOLDER =
   "Artifacts/Vault Control Center Native Plugin/runtime/html-gallery/thumbnails";
 
@@ -121,6 +124,8 @@ const TEMPLATE_SEGMENTS = new Set([
 
 const POLICY_DASHBOARD_BOOTSTRAP = "artifacts/policy-dashboard/index.html";
 const YOUTUBE_GLASSES_RUNTIME = "artifacts/youtube meta app/runtime/index.html";
+const BLACKROCK_FUTURE_BUILDERS_PREFIX =
+  "10 misc/funding opportunities/blackrock future builders/";
 const HTML_METADATA_CACHES = new WeakMap<App, Map<string, CachedHtmlMetadata>>();
 
 /**
@@ -261,7 +266,8 @@ export function shouldExcludeHtmlPath(path: string): boolean {
   }
   if (
     lowerPath === POLICY_DASHBOARD_BOOTSTRAP ||
-    lowerPath === YOUTUBE_GLASSES_RUNTIME
+    lowerPath === YOUTUBE_GLASSES_RUNTIME ||
+    lowerPath.startsWith(BLACKROCK_FUTURE_BUILDERS_PREFIX)
   ) {
     return true;
   }
@@ -494,7 +500,9 @@ export async function generateHtmlThumbnails(
         `${runtime.baseName(absoluteSourcePath)}.png`
       );
       const bytes = await runtime.readFile(outputPath);
-      if (bytes.byteLength === 0) throw new Error("Quick Look returned an empty thumbnail.");
+      if (bytes.byteLength < MIN_USABLE_HTML_THUMBNAIL_BYTES) {
+        throw new Error("Quick Look returned a blank thumbnail.");
+      }
       await writeVaultBinary(app, item.thumbnailPath, bytes);
       generated += 1;
     } catch (error) {

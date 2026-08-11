@@ -215,6 +215,16 @@ describe("HTML gallery metadata and filtering", () => {
     expect(
       shouldExcludeHtmlPath("Artifacts/YouTube Meta App/runtime/index.html")
     ).toBe(true);
+    expect(
+      shouldExcludeHtmlPath(
+        "10 Misc/Funding Opportunities/BlackRock Future Builders/blackrock-future-builders-rfp.html"
+      )
+    ).toBe(true);
+    expect(
+      shouldExcludeHtmlPath(
+        "10 Misc/Funding Opportunities/BlackRock Future Builders/blackrock-future-builders-timeline-infographic.html"
+      )
+    ).toBe(true);
     expect(shouldExcludeHtmlPath("Artifacts/Live/Page.html")).toBe(false);
   });
 
@@ -273,6 +283,21 @@ describe("HTML gallery metadata and filtering", () => {
 });
 
 describe("Quick Look thumbnail generation", () => {
+  it("rejects Quick Look's known blank image output", async () => {
+    const item = galleryItem({ thumbnailPath: "Artifacts/VCC/Thumbs/blank.png" });
+    const runtime = fakeRuntime({ thumbnailBytes: 10_745 });
+    const app = fakeWritableApp([item.sourceFile]);
+
+    const result = await generateHtmlThumbnails(app, [item], {
+      isDesktopMac: true,
+      runtime,
+    });
+
+    expect(result).toMatchObject({ generated: 0, failed: 1 });
+    expect(result.errors[0]?.message).toContain("blank thumbnail");
+    expect(app.vault.createBinary).not.toHaveBeenCalled();
+  });
+
   it("is unavailable off desktop macOS without loading or executing a runtime", async () => {
     const runtime = fakeRuntime();
     const result = await generateHtmlThumbnails(
@@ -503,7 +528,9 @@ function galleryItem(overrides: Partial<HtmlGalleryItem> = {}): HtmlGalleryItem 
   };
 }
 
-function fakeRuntime(options: { failSource?: string } = {}): HtmlThumbnailRuntime {
+function fakeRuntime(
+  options: { failSource?: string; thumbnailBytes?: number } = {}
+): HtmlThumbnailRuntime {
   let temporaryIndex = 0;
   return {
     makeTempDirectory: vi.fn(async () => {
@@ -515,7 +542,7 @@ function fakeRuntime(options: { failSource?: string } = {}): HtmlThumbnailRuntim
         throw new Error("quick look failed");
       }
     }),
-    readFile: vi.fn(async () => new Uint8Array([1, 2, 3, 4])),
+    readFile: vi.fn(async () => new Uint8Array(options.thumbnailBytes ?? 16 * 1024)),
     removeDirectory: vi.fn(async () => undefined),
     joinPath: (...parts: string[]) => parts.join("/").replace(/\/{2,}/g, "/"),
     baseName: (path: string) => path.split("/").pop() ?? path,

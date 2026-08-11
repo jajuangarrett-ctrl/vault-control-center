@@ -2370,6 +2370,24 @@ a.fjg-vcc-row {
   text-align: center;
 }
 
+.fjg-vcc-html-thumbnail-placeholder span {
+  max-width: 24ch;
+  color: var(--vcc-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.fjg-vcc-html-thumbnail-placeholder small {
+  color: var(--vcc-text-muted);
+  font-size: 10px;
+}
+
+.fjg-vcc-html-thumbnail-placeholder[hidden] {
+  display: none;
+}
+
 .fjg-vcc-html-thumbnail-placeholder .fjg-vcc-icon {
   color: var(--vcc-gold);
   font-size: 34px;
@@ -2378,18 +2396,26 @@ a.fjg-vcc-row {
 .fjg-vcc-html-card-copy {
   display: flex;
   flex: 1 1 auto;
+  align-items: stretch;
   flex-direction: column;
   min-width: 0;
   gap: 6px;
   padding: 13px 14px 14px;
+  text-align: left;
 }
 
 .fjg-vcc-html-card-title {
+  display: block;
+  width: 100%;
   color: var(--vcc-text);
   font-size: 14px;
   font-weight: 750;
   line-height: 1.3;
+  overflow: visible;
   overflow-wrap: anywhere;
+  text-align: left;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .fjg-vcc-html-card-description {

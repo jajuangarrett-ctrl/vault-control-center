@@ -25,6 +25,7 @@ import {
 } from "./program-navigation";
 import {
   filterHtmlGalleryItems,
+  MIN_USABLE_HTML_THUMBNAIL_BYTES,
   type HtmlGallerySnapshot,
 } from "./html-gallery";
 import type {
@@ -208,7 +209,9 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
       },
     });
     const thumbnail = card.createDiv({ cls: "fjg-vcc-html-thumbnail" });
-    if (item.thumbnailFile) {
+    const hasUsableThumbnail =
+      item.thumbnailFile && item.thumbnailFile.stat.size >= MIN_USABLE_HTML_THUMBNAIL_BYTES;
+    if (hasUsableThumbnail) {
       const placeholder = thumbnail.createDiv({
         cls: "fjg-vcc-html-thumbnail-placeholder",
         attr: { hidden: "" },
@@ -231,7 +234,8 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
         cls: "fjg-vcc-html-thumbnail-placeholder",
       });
       createIcon(placeholder, "panels-top-left");
-      placeholder.createSpan({ text: "Select Update previews to create a thumbnail" });
+      placeholder.createSpan({ text: item.title });
+      placeholder.createEl("small", { text: "Local preview needs refresh" });
     }
     const cardCopy = card.createDiv({ cls: "fjg-vcc-html-card-copy" });
     cardCopy.createSpan({ cls: "fjg-vcc-html-card-title", text: item.title });
