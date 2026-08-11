@@ -80,6 +80,7 @@ export default class VaultControlCenterPlugin extends Plugin {
       : {};
     const savedSchemaVersion = finiteInteger(saved.schemaVersion, 0);
     const taskboardSecretId = stringSetting(saved.taskboardSecretId, "");
+    const remoteAutomationSecretId = stringSetting(saved.remoteAutomationSecretId, "");
     this.settings = {
       schemaVersion: DEFAULT_SETTINGS.schemaVersion,
       theme: saved.theme === "light" ? "light" : "dark",
@@ -117,6 +118,15 @@ export default class VaultControlCenterPlugin extends Plugin {
           : booleanSetting(saved.enableRemoteTaskboard, DEFAULT_SETTINGS.enableRemoteTaskboard),
       taskboardUrl: stringSetting(saved.taskboardUrl, DEFAULT_SETTINGS.taskboardUrl),
       taskboardSecretId,
+      remoteAutomationEnabled: booleanSetting(
+        saved.remoteAutomationEnabled,
+        DEFAULT_SETTINGS.remoteAutomationEnabled
+      ),
+      remoteAutomationUrl: stringSetting(
+        saved.remoteAutomationUrl,
+        DEFAULT_SETTINGS.remoteAutomationUrl
+      ),
+      remoteAutomationSecretId,
       clipboardTemplates: {
         meetingFollowUp: stringSetting(
           clipboardTemplates.meetingFollowUp,

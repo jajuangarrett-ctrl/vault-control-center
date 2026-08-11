@@ -213,6 +213,8 @@ export interface AutomationPlatformOptions {
 export type AutomationLaunchdAvailability = "loaded" | "not-loaded" | "not-checked";
 export type AutomationItemAvailability =
   | "ready"
+  | "remote-ready"
+  | "remote-unavailable"
   | "remote"
   | "not-loaded"
   | "status-only"
@@ -245,6 +247,7 @@ export interface AutomationItemSnapshot extends AutomationDefinition {
   healthMessage: string;
   availability: AutomationItemAvailability;
   canRun: boolean;
+  runTarget: "local" | "remote" | null;
   runState: "ready" | "running" | "unavailable";
   runMessage: string;
 }
@@ -491,6 +494,7 @@ function buildItemSnapshot(
     healthMessage: health.message,
     availability,
     canRun,
+    runTarget: canRun ? "local" : null,
     runState: inFlight ? "running" : canRun ? "ready" : "unavailable",
     runMessage: inFlight
       ? "Start request in progress."
@@ -770,6 +774,10 @@ function availabilityMessage(availability: AutomationItemAvailability): string {
   switch (availability) {
     case "ready":
       return "Ready to run on this Mac.";
+    case "remote-ready":
+      return "Ready to run on the always-on Mac.";
+    case "remote-unavailable":
+      return "The remote executor is unavailable or this job is not ready.";
     case "remote":
       return "Run now is available only on the executor Mac.";
     case "not-loaded":

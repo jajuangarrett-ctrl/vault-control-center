@@ -40,6 +40,9 @@ export interface DashboardSettings {
   enableRemoteTaskboard: boolean;
   taskboardUrl: string;
   taskboardSecretId: string;
+  remoteAutomationEnabled: boolean;
+  remoteAutomationUrl: string;
+  remoteAutomationSecretId: string;
   clipboardTemplates: Record<ClipboardTemplateId, string>;
 }
 
@@ -64,7 +67,7 @@ export const ROUTE_DEFINITIONS: readonly RouteDefinition[] = [
 ] as const;
 
 export const DEFAULT_SETTINGS: DashboardSettings = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   theme: "dark",
   applyShellTheme: true,
   areasFolder: "03 Areas",
@@ -86,6 +89,9 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   enableRemoteTaskboard: false,
   taskboardUrl: "",
   taskboardSecretId: "",
+  remoteAutomationEnabled: false,
+  remoteAutomationUrl: "",
+  remoteAutomationSecretId: "",
   clipboardTemplates: {
     meetingFollowUp:
       "Subject: Follow-up — [meeting]\n\nHi [name],\n\nThank you for meeting today. Here are the decisions and next steps:\n\n- Decision:\n- Owner:\n- Due date:\n\nFranklin",

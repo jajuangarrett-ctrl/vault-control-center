@@ -37,6 +37,13 @@ import {
   type AutomationSnapshot,
 } from "./automations";
 import {
+  applyRemoteAutomationAvailability,
+  emptyRemoteAutomationSnapshot,
+  fetchRemoteAutomationSnapshot,
+  submitRemoteAutomation,
+  type RemoteAutomationSnapshot,
+} from "./remote-automation";
+import {
   buildSystemMemorySnapshot,
   type SystemMemorySnapshot,
 } from "./system-memory";
@@ -174,7 +181,9 @@ export class VaultControlCenterView extends ItemView {
     reason: "unsupported-platform",
     message: "RAM status has not been checked yet.",
   };
+  private remoteAutomation: RemoteAutomationSnapshot = emptyRemoteAutomationSnapshot();
   private readonly automationStartingIds = new Set<string>();
+  private readonly automationRequestMessages = new Map<string, string>();
   private operationsRefreshing = false;
   private operationsRefreshPromise: Promise<void> | null = null;
   private operationsRefreshQueued = false;
@@ -704,6 +713,7 @@ export class VaultControlCenterView extends ItemView {
       automations: this.automations,
       memory: this.memory,
       automationStartingIds: this.automationStartingIds,
+      automationRequestMessages: this.automationRequestMessages,
       operationsRefreshing: this.operationsRefreshing,
       settings: this.plugin.settings,
       state: this.renderState,
@@ -922,6 +932,10 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private async refreshMemoryOnly(): Promise<void> {
+    if (!this.automations.isExecutor) {
+      await this.refreshOperations(false);
+      return;
+    }
     if (
       this.operationsRefreshing ||
       this.operationsSnapshotRequests > 0 ||
@@ -953,13 +967,30 @@ export class VaultControlCenterView extends ItemView {
   ): Promise<{ automations: AutomationSnapshot; memory: SystemMemorySnapshot }> {
     this.operationsSnapshotRequests += 1;
     try {
-      const automations = await buildAutomationSnapshot(this.app, {
+      let automations = await buildAutomationSnapshot(this.app, {
         isDesktopMac,
       });
-      const memory = await buildSystemMemorySnapshot({
-        isDesktopMac,
-        isExecutorEligible: automations.isExecutor,
-      });
+      let memory: SystemMemorySnapshot;
+      if (automations.isExecutor) {
+        this.remoteAutomation = emptyRemoteAutomationSnapshot(
+          "disabled",
+          "Local executor controls are active on this Mac."
+        );
+        memory = await buildSystemMemorySnapshot({
+          isDesktopMac,
+          isExecutorEligible: true,
+        });
+      } else {
+        this.remoteAutomation = await fetchRemoteAutomationSnapshot(
+          this.app,
+          this.plugin.settings
+        );
+        automations = applyRemoteAutomationAvailability(
+          automations,
+          this.remoteAutomation
+        );
+        memory = this.remoteAutomation.memory;
+      }
       return { automations, memory };
     } finally {
       this.operationsSnapshotRequests -= 1;
@@ -971,9 +1002,14 @@ export class VaultControlCenterView extends ItemView {
     this.automationStartingIds.add(id);
     if (this.route === "automations") this.renderContent();
     try {
-      const result = await runAutomation(id, { snapshot: this.automations });
+      const item = this.automations.items.find((entry) => entry.id === id);
+      const result = item?.runTarget === "remote"
+        ? await submitRemoteAutomation(this.app, this.plugin.settings, id)
+        : await runAutomation(id, { snapshot: this.automations });
+      this.automationRequestMessages.set(id, result.message);
       new Notice(result.message, result.status === "error" ? 8_000 : 6_000);
     } catch {
+      this.automationRequestMessages.set(id, "The automation request failed.");
       new Notice("The automation could not be started.", 8_000);
     } finally {
       this.automationStartingIds.delete(id);

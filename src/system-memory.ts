@@ -45,14 +45,14 @@ export interface SystemMemoryUsage {
 export interface SystemMemoryReadySnapshot extends SystemMemoryUsage {
   status: "ready";
   checkedAt: string;
-  source: "memory-pressure" | "node-os";
+  source: "memory-pressure" | "node-os" | "remote-executor";
   message: string;
 }
 
 export interface SystemMemoryUnavailableSnapshot {
   status: "unavailable";
   checkedAt: string;
-  reason: "unsupported-platform" | "ineligible-host";
+  reason: "unsupported-platform" | "ineligible-host" | "remote-unavailable";
   message: string;
 }
 

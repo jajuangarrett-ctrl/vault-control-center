@@ -136,6 +136,37 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
         this.plugin.scheduleRefresh();
       });
+
+    new Setting(containerEl).setName("Remote automation executor").setHeading();
+    containerEl.createEl("p", {
+      cls: "setting-item-description",
+      text: "Use the dedicated authenticated broker to run approved routine jobs on the always-on Mac. Only the Obsidian Secret Storage identifier is saved here.",
+    });
+    new Setting(containerEl)
+      .setName("Enable remote automation controls")
+      .setDesc("When unavailable or incomplete, remote Run now controls remain disabled.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.remoteAutomationEnabled).onChange(async (value) => {
+          this.plugin.settings.remoteAutomationEnabled = value;
+          await this.plugin.saveSettings();
+          await this.plugin.refreshDashboardViews(false);
+        })
+      );
+    this.addPathSetting(
+      "Automation broker URL",
+      "Dedicated HTTPS Netlify site URL, without an API path.",
+      "remoteAutomationUrl"
+    );
+    const automationSecret = new Setting(containerEl)
+      .setName("Automation broker credential")
+      .setDesc("Select a client credential managed by Obsidian Secret Storage. Its value is never copied into plugin data or logs.");
+    new SecretComponent(this.app, automationSecret.controlEl)
+      .setValue(this.plugin.settings.remoteAutomationSecretId)
+      .onChange(async (value) => {
+        this.plugin.settings.remoteAutomationSecretId = value.trim();
+        await this.plugin.saveSettings();
+        await this.plugin.refreshDashboardViews(false);
+      });
   }
 
   private addPathSetting(
@@ -148,6 +179,7 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
       | "contactListPath"
       | "tasksFilePath"
       | "taskboardUrl"
+      | "remoteAutomationUrl"
       | "htmlThumbnailFolder"
   ): void {
     new Setting(this.containerEl)

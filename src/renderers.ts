@@ -64,6 +64,7 @@ export interface DashboardRenderContext {
   automations: AutomationSnapshot;
   memory: SystemMemorySnapshot;
   automationStartingIds: ReadonlySet<string>;
+  automationRequestMessages: ReadonlyMap<string, string>;
   operationsRefreshing: boolean;
   settings: DashboardSettings;
   state: DashboardRenderState;
@@ -385,6 +386,13 @@ function renderAutomationCard(
     text: starting ? "Starting with launchd…" : item.healthMessage,
     attr: { "data-tone": statusTone },
   });
+  const requestMessage = context.automationRequestMessages.get(item.id);
+  if (requestMessage) {
+    card.createDiv({
+      cls: "fjg-vcc-automation-request-result",
+      text: requestMessage,
+    });
+  }
   const actions = footer.createDiv({ cls: "fjg-vcc-form-actions" });
   if (item.resolvedStatusPath) {
     createButton(actions, {
