@@ -5,7 +5,9 @@
 - Added an isolated authenticated Netlify queue for fixed-ID automation requests; request bodies reject commands, paths, arguments, environment variables, scripts, prompts, and unknown fields.
 - Added short expirations, UUID replay protection, conditional atomic claims, per-job in-flight locks, bounded rate limits, sanitized request states, and a daily queue-retention function.
 - Added a current-user macOS runner that reads its executor credential from Keychain, verifies the harmless executor sentinel and exact target label for every claim, refuses already-running jobs, and uses a fixed no-shell `launchctl kickstart` vector without `-k`.
+- Prevented manual starts within two minutes of each fixed scheduled run and retained a local processed-request journal so network retries cannot duplicate a launch.
 - Added remote executor health, ready-job availability, queued/rejected feedback, and sanitized always-on-Mac RAM status to the Automations route, while retaining the existing local-executor path unchanged.
+- Restored the desktop Node bridge through runtime-only CommonJS loading, so live launchd checks, macOS memory pressure, and Quick Look remain available without breaking mobile plugin loading.
 - Added Obsidian Secret Storage integration for the broker client credential. Only the selected secret identifier and non-secret HTTPS broker URL are stored in plugin settings.
 - Kept status-only, service, high-impact, disabled, missing, unverified, and external entries non-runnable, and kept Services and Repository Sync absent from the dashboard.
 - Added broker, runner, authentication-failure, unavailable-broker, executor-sentinel, target-load, replay, expiry, and no-shell regression coverage.

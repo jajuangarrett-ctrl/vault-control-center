@@ -23,7 +23,7 @@ The broker requires separate Netlify environment secrets for clients and the exe
 /bin/launchctl kickstart gui/<current-user-uid>/<fixed-label>
 ```
 
-The runner never uses `-k`, sudo, a shell, or network-supplied subprocess arguments. Its credential is stored in macOS Keychain. Its private journal, rotated logs, and non-secret configuration are stored outside the synchronized vault with owner-only permissions.
+The runner never uses `-k`, sudo, a shell, or network-supplied subprocess arguments. It also withholds manual starts within two minutes of each fixed scheduled run. Its credential is stored in macOS Keychain. Its private journal, rotated logs, and non-secret configuration are stored outside the synchronized vault with owner-only permissions.
 
 ## Netlify project
 
