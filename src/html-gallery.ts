@@ -210,10 +210,11 @@ export async function buildHtmlGallerySnapshot(
         }
       }
 
-      const thumbnailFile = asTFile(
+      const thumbnailCandidate = asTFile(
         safeGetAbstractFile(app, thumbnailPath),
         "png"
       );
+      const thumbnailFile = await usableHtmlThumbnailFile(app, thumbnailCandidate);
       const folderPath = parentPath(path);
       itemSlots[index] = {
         path,
@@ -500,8 +501,17 @@ export async function generateHtmlThumbnails(
         `${runtime.baseName(absoluteSourcePath)}.png`
       );
       const bytes = await runtime.readFile(outputPath);
-      if (bytes.byteLength < MIN_USABLE_HTML_THUMBNAIL_BYTES) {
-        throw new Error("Quick Look returned a blank thumbnail.");
+      const blankQuickLookPreview =
+        bytes.byteLength < MIN_USABLE_HTML_THUMBNAIL_BYTES ||
+        (await isVisuallyEmptyHtmlThumbnail(bytes));
+      if (blankQuickLookPreview) {
+        const generatedFallback = await createBrandedHtmlThumbnail(item.title);
+        if (!generatedFallback) {
+          throw new Error("Quick Look returned a blank thumbnail.");
+        }
+        await writeVaultBinary(app, item.thumbnailPath, generatedFallback);
+        generated += 1;
+        return;
       }
       await writeVaultBinary(app, item.thumbnailPath, bytes);
       generated += 1;
@@ -631,6 +641,115 @@ function asTFile(file: TAbstractFile | null, expectedExtension = ""): TFile | nu
     return null;
   }
   return candidate as TFile;
+}
+
+async function usableHtmlThumbnailFile(app: App, file: TFile | null): Promise<TFile | null> {
+  if (!file || finiteNumber(file.stat?.size) < MIN_USABLE_HTML_THUMBNAIL_BYTES) {
+    return null;
+  }
+  try {
+    const bytes = new Uint8Array(await app.vault.readBinary(file));
+    return (await isVisuallyEmptyHtmlThumbnail(bytes)) ? null : file;
+  } catch {
+    // Leave an existing thumbnail visible when the device cannot inspect it.
+    return file;
+  }
+}
+
+/**
+ * Detects Quick Look's visually empty HTML output instead of trusting PNG size.
+ * Downsampling keeps this bounded while catching uniform near-white/near-pastel
+ * canvases such as the GLBR and Administrator Collaborative previews.
+ */
+async function isVisuallyEmptyHtmlThumbnail(bytes: Uint8Array): Promise<boolean> {
+  if (typeof createImageBitmap !== "function" || typeof document === "undefined") {
+    return false;
+  }
+  let image: ImageBitmap | null = null;
+  try {
+    const data = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength
+    ) as ArrayBuffer;
+    image = await createImageBitmap(new Blob([data], { type: "image/png" }));
+    const canvas = document.createElement("canvas");
+    canvas.width = 32;
+    canvas.height = 32;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return false;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let opaque = 0;
+    let nearWhite = 0;
+    let lowest = 255;
+    let highest = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index + 3] < 32) continue;
+      opaque += 1;
+      const brightness =
+        pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
+      lowest = Math.min(lowest, brightness);
+      highest = Math.max(highest, brightness);
+      if (brightness >= 220) nearWhite += 1;
+    }
+    return opaque > 0 && nearWhite / opaque >= 0.985 && highest - lowest < 42;
+  } catch {
+    return false;
+  } finally {
+    image?.close();
+  }
+}
+
+/** Creates an offline, deterministic visual preview when Quick Look renders a page blank. */
+async function createBrandedHtmlThumbnail(title: string): Promise<Uint8Array | null> {
+  if (typeof document === "undefined") return null;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 720;
+    canvas.height = 450;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, "#081b33");
+    gradient.addColorStop(0.58, "#123d70");
+    gradient.addColorStop(1, "#0f274a");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "rgba(255, 197, 40, 0.16)";
+    context.beginPath();
+    context.arc(630, 72, 150, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "rgba(255, 255, 255, 0.08)";
+    context.fillRect(44, 300, 632, 2);
+    context.fillStyle = "#ffc528";
+    context.fillRect(44, 66, 74, 8);
+    context.fillStyle = "#f8f4e8";
+    context.font = "700 15px system-ui, -apple-system, sans-serif";
+    context.fillText("FJG VAULT · HTML ARTIFACT", 44, 112);
+    context.fillStyle = "#ffffff";
+    context.font = "700 38px system-ui, -apple-system, sans-serif";
+    const words = String(title || "HTML artifact").split(/\s+/);
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (context.measureText(next).width > 590 && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = next;
+      }
+    }
+    if (line) lines.push(line);
+    lines.slice(0, 3).forEach((entry, index) => context.fillText(entry, 44, 175 + index * 52));
+    context.fillStyle = "#c8d8ee";
+    context.font = "500 18px system-ui, -apple-system, sans-serif";
+    context.fillText("Local visual preview", 44, 350);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+  } catch {
+    return null;
+  }
 }
 
 function fileSystemAdapterBasePath(app: App): string | null {

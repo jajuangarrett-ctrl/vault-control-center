@@ -73,7 +73,7 @@ describe("HTML gallery discovery", () => {
       good.path,
       "Artifacts/VCC/Thumbnails"
     );
-    const thumbnail = file(thumbnailPath, 250, "png");
+    const thumbnail = file(thumbnailPath, 250, "png", 20 * 1024);
     const app = fakeApp([good, bad, thumbnail], {
       [good.path]: "<title>Good &amp; Ready</title><meta content='A useful dashboard' name='description'>",
     }, new Set([bad.path]));
@@ -479,7 +479,7 @@ describe("Quick Look thumbnail generation", () => {
   });
 });
 
-function file(path: string, mtime: number, extension?: string): TFile {
+function file(path: string, mtime: number, extension?: string, size = 1024): TFile {
   const name = path.split("/").pop() ?? path;
   const derivedExtension = extension ?? name.split(".").pop() ?? "";
   return {
@@ -487,7 +487,7 @@ function file(path: string, mtime: number, extension?: string): TFile {
     name,
     basename: name.replace(/\.[^.]+$/, ""),
     extension: derivedExtension,
-    stat: { mtime, ctime: mtime, size: 1024 },
+    stat: { mtime, ctime: mtime, size },
   } as TFile;
 }
 
