@@ -13,7 +13,8 @@ Vault Control Center is a standalone native Obsidian community plugin. It presen
 - `src/data.ts` builds the in-memory vault index and applies privacy filters.
 - `src/program-navigation.ts` owns recursive folder views and safe route-wide Areas/Programs file search.
 - `src/html-gallery.ts` discovers safe finished HTML files, caches concurrency-bounded metadata parsing, derives stable thumbnail paths, and performs explicitly requested Quick Look generation.
-- `src/automations.ts` owns the fixed automation inventory, synchronized status parsing, launchd inspection, executor detection, and allowlisted routine starts.
+- `src/automations.ts` owns the fixed automation inventory, synchronized status parsing, local launchd inspection, executor detection, and allowlisted local routine starts.
+- `src/remote-automation.ts` owns the fail-closed broker client, Secret Storage lookup, remote executor health, sanitized RAM parsing, and fixed-ID request submission.
 - `src/system-memory.ts` reads RAM only after the desktop-macOS and executor-host guards pass.
 - `src/taskboard.ts` derives the Home task summary from local FJG Task Manager workspace notes; the older remote adapter remains inert compatibility code in v0.2.0.
 - `src/renderers.ts` renders all eleven routes with native DOM elements.
@@ -46,9 +47,9 @@ Vault content discovery stays inside the configured vault roots and applies the 
 
 On desktop macOS, **Update previews** invokes `/usr/bin/qlmanage` with `execFile`, an argument vector, `shell: false`, bounded time/buffer/concurrency settings, and one temporary directory per artifact. The explicit UI action regenerates the current gallery so changes in linked assets are reflected. Temporary output is removed after each attempt, and final PNGs are written through Obsidian's vault API with shared-folder and duplicate-file race recovery.
 
-The Automations route uses only the compiled `FJG_AUTOMATION_ALLOWLIST`. Vault status notes can report results but cannot introduce a command or change a launchd label. Local checks and starts use `/bin/launchctl` through `execFile` with `shell: false`. **Run now** accepts only a known routine entry, on a Mac proven to be the executor by at least one loaded allowlisted routine job, when that exact job is loaded. `kickstart` deliberately omits `-k`, duplicate starts are suppressed, and service, high-impact, disabled, external, missing, status-only, and unknown entries are rejected.
+The Automations route uses only the compiled `FJG_AUTOMATION_ALLOWLIST`. Vault status notes can report results but cannot introduce a command or change a launchd label. Local checks and starts use `/bin/launchctl` through `execFile` with `shell: false`. On a non-executor device, the optional dedicated broker accepts only the six compiled routine IDs and four bounded request fields. The broker uses separate client/executor authentication, short expirations, replay protection, conditional claims, rate limits, and one in-flight lock per job. Its current-user runner freshly verifies `com.fjg.vault-automation-executor`, the exact mapped target, and the target's non-running state before the same no-shell `kickstart` vector. `-k`, sudo, shells, paths, arguments, environment input, scripts, prompts, and executable content are never accepted. Service, high-impact, disabled, external, missing, status-only, unknown, expired, replayed, unloaded, and already-running requests are rejected.
 
-RAM status uses the same proven-executor gate. It prefers `/usr/bin/memory_pressure -Q` and falls back to local Node operating-system counters; it never substitutes the current device's RAM on a non-executor Mac, Windows/Linux desktop, or mobile device.
+RAM status uses the same proven-executor gate. It reads local counters on the executor Mac or a sanitized fresh authenticated heartbeat from the remote runner; it never substitutes the current device's RAM on a non-executor Mac, Windows/Linux desktop, or mobile device.
 
 The v0.2.0 FJG Task Manager integration reads only `08 Tasks/Workspaces/*/task.md`, excludes completed and archived workspaces from the open count, sorts **Do First** tasks by due date, and renders at most eight task rows. It performs no taskboard network request. Retained remote-taskboard settings and adapter code do not supply the Home panel in this version.
 
@@ -71,7 +72,9 @@ The fixed inventory and manual policies are:
 - **Disabled:** Plugin repository auto-pull and iOS repository auto-pull.
 - **External:** Gmail capture and Netlify retention cleanup.
 
-Only the routine vault processors with verified labels can expose **Run now**, and only when their jobs are loaded on the confirmed executor Mac. External cloud jobs remain visible but non-runnable; continuous services, repository-committing jobs, disabled legacy sync, and missing services are omitted from the visible dashboard. RAM refreshes every 30 seconds while this route is open and can also be refreshed with the route status action.
+Only the routine vault processors with verified labels can expose **Run now**, either locally on the confirmed executor or remotely when a fresh broker heartbeat reports the fixed job ID ready. External cloud jobs remain visible but non-runnable; continuous services, repository-committing jobs, disabled legacy sync, and missing services are omitted from the visible dashboard. RAM refreshes every 30 seconds while this route is open and can also be refreshed with the route status action.
+
+The dedicated broker lives under `netlify/functions/`, and the current-user runner and LaunchAgent templates live under `scripts/` and `runner/`. See `docs/REMOTE_AUTOMATION.md` for installation, credential, validation, and pairing procedures.
 
 ## FJG Task Manager
 

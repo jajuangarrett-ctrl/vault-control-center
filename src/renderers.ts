@@ -32,6 +32,7 @@ import type {
   AutomationItemSnapshot,
   AutomationSnapshot,
 } from "./automations";
+import { VISIBLE_AUTOMATION_GROUPS } from "./automations";
 import type { SystemMemorySnapshot } from "./system-memory";
 import type { TaskboardSnapshot } from "./taskboard";
 import {
@@ -270,10 +271,12 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
 
   renderMemoryCard(parent, context);
 
-  const groups: Array<{ id: AutomationGroup; label: string }> = [
-    { id: "routine-vault", label: "Scheduled vault processors" },
-    { id: "external-cloud", label: "External and cloud automations" },
-  ];
+  const groupLabels: Record<(typeof VISIBLE_AUTOMATION_GROUPS)[number], string> = {
+    "routine-vault": "Scheduled vault processors",
+    "external-cloud": "External and cloud automations",
+  };
+  const groups: Array<{ id: AutomationGroup; label: string }> =
+    VISIBLE_AUTOMATION_GROUPS.map((id) => ({ id, label: groupLabels[id] }));
   for (const group of groups) {
     const visible = context.automations.items.filter(
       (item) =>

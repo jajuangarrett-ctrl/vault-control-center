@@ -2,6 +2,7 @@ import type { App, TFile } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import {
   FJG_AUTOMATION_ALLOWLIST,
+  VISIBLE_AUTOMATION_GROUPS,
   buildAutomationSnapshot,
   isAutomationRunning,
   parseAutomationStatusMarkdown,
@@ -38,6 +39,11 @@ describe("FJG automation allowlist", () => {
       FJG_AUTOMATION_ALLOWLIST.filter((entry) => entry.manualPolicy === "routine")
         .every((entry) => Boolean(entry.launchdLabel))
     ).toBe(true);
+  });
+
+  it("keeps Services and Repository Sync out of the visible dashboard groups", () => {
+    expect(VISIBLE_AUTOMATION_GROUPS).toEqual(["routine-vault", "external-cloud"]);
+    expect(VISIBLE_AUTOMATION_GROUPS).not.toContain("services-sync");
   });
 });
 

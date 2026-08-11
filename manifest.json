@@ -1,9 +1,9 @@
 {
   "id": "vault-control-center",
   "name": "Vault Control Center",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minAppVersion": "1.12.7",
-  "description": "A native dashboard for vault files, HTML artifacts, task workspaces, AI queues, and local automation status.",
+  "description": "A native dashboard for vault files, task workspaces, AI queues, and securely allowlisted local or remote automations.",
   "author": "Franklin Garrett",
   "authorUrl": "https://github.com/jajuangarrett-ctrl",
   "isDesktopOnly": false
