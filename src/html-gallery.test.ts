@@ -212,6 +212,9 @@ describe("HTML gallery metadata and filtering", () => {
       "Fallback Page"
     );
     expect(shouldExcludeHtmlPath("Artifacts/Tests/Fixture.html")).toBe(true);
+    expect(
+      shouldExcludeHtmlPath("Artifacts/YouTube Meta App/runtime/index.html")
+    ).toBe(true);
     expect(shouldExcludeHtmlPath("Artifacts/Live/Page.html")).toBe(false);
   });
 

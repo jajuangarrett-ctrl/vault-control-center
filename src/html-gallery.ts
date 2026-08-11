@@ -120,6 +120,7 @@ const TEMPLATE_SEGMENTS = new Set([
 ]);
 
 const POLICY_DASHBOARD_BOOTSTRAP = "artifacts/policy-dashboard/index.html";
+const YOUTUBE_GLASSES_RUNTIME = "artifacts/youtube meta app/runtime/index.html";
 const HTML_METADATA_CACHES = new WeakMap<App, Map<string, CachedHtmlMetadata>>();
 
 /**
@@ -258,7 +259,12 @@ export function shouldExcludeHtmlPath(path: string): boolean {
   if (!normalized || isExcludedPath(normalized) || isSensitivePath(normalized)) {
     return true;
   }
-  if (lowerPath === POLICY_DASHBOARD_BOOTSTRAP) return true;
+  if (
+    lowerPath === POLICY_DASHBOARD_BOOTSTRAP ||
+    lowerPath === YOUTUBE_GLASSES_RUNTIME
+  ) {
+    return true;
+  }
 
   const segments = normalized.split("/").filter(Boolean);
   const segmentKeys = segments.map(segmentKey);
