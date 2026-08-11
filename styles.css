@@ -2584,6 +2584,15 @@ a.fjg-vcc-row {
 .fjg-vcc-automation-status[data-tone="attention"]::before { background: var(--vcc-gold); }
 .fjg-vcc-automation-status[data-tone="critical"]::before { background: var(--vcc-critical); }
 
+.fjg-vcc-automation-request-result {
+  padding: 8px 10px;
+  border-radius: var(--vcc-radius-sm);
+  background: rgb(var(--vcc-blue-rgb) / 0.08);
+  color: var(--vcc-text-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .fjg-vcc-automation-host-note {
   display: flex;
   align-items: flex-start;

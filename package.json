@@ -17,6 +17,9 @@
   ],
   "author": "Franklin Garrett",
   "license": "MIT",
+  "dependencies": {
+    "@netlify/blobs": "^10.7.9"
+  },
   "devDependencies": {
     "@types/node": "^20.12.7",
     "builtin-modules": "3.3.0",
