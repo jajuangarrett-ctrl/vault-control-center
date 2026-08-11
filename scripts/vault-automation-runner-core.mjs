@@ -114,13 +114,30 @@ function validateClaim(value, now) {
 async function readMemory(options) {
   const osProvider = options.osProvider ?? await import("node:os");
   const totalBytes = osProvider.totalmem();
-  const freeBytes = osProvider.freemem();
-  if (!Number.isFinite(totalBytes) || totalBytes <= 0 || !Number.isFinite(freeBytes)) return null;
-  const freePercent = roundPercent(Math.min(100, Math.max(0, (freeBytes / totalBytes) * 100)));
+  if (!Number.isFinite(totalBytes) || totalBytes <= 0) return null;
+  let freePercent = null;
+  try {
+    const execFile = options.execFile ?? safeExecFile;
+    const result = await execFile(
+      "/usr/bin/memory_pressure",
+      ["-Q"],
+      { encoding: "utf8", maxBuffer: 64 * 1024, shell: false, timeout: 4_000 }
+    );
+    const match = String(result.stdout ?? "").match(
+      /System-wide\s+memory\s+free\s+percentage\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*%/i
+    );
+    const parsed = Number(match?.[1]);
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) freePercent = roundPercent(parsed);
+  } catch {}
+  if (freePercent === null) {
+    const freeBytes = osProvider.freemem();
+    if (!Number.isFinite(freeBytes) || freeBytes < 0 || freeBytes > totalBytes) return null;
+    freePercent = roundPercent(Math.min(100, Math.max(0, (freeBytes / totalBytes) * 100)));
+  }
   const usedPercent = roundPercent(100 - freePercent);
   return {
     totalBytes: Math.round(totalBytes),
-    usedBytes: Math.max(0, Math.round(totalBytes - freeBytes)),
+    usedBytes: Math.max(0, Math.round(totalBytes * (usedPercent / 100))),
     freePercent,
     usedPercent,
   };

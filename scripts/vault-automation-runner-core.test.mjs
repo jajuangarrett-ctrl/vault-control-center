@@ -89,6 +89,31 @@ describe("vault automation runner security boundary", () => {
     expect(JSON.stringify(heartbeat)).not.toContain("franklingarrett");
   });
 
+  it("prefers the fixed no-shell macOS memory-pressure summary", async () => {
+    const execFile = launchdExec(
+      new Set([EXECUTOR_SENTINEL_LABEL, AUTOMATION_LABELS.clippings]),
+      new Set(),
+      34
+    );
+    const heartbeat = await buildExecutorHeartbeat({
+      now: NOW,
+      uid: 501,
+      execFile,
+      osProvider: { totalmem: () => 1_000, freemem: () => 1 },
+    });
+    expect(heartbeat.memory).toEqual({
+      totalBytes: 1_000,
+      usedBytes: 660,
+      freePercent: 34,
+      usedPercent: 66,
+    });
+    expect(execFile).toHaveBeenCalledWith(
+      "/usr/bin/memory_pressure",
+      ["-Q"],
+      expect.objectContaining({ shell: false, timeout: 4_000 })
+    );
+  });
+
   it("blocks manual starts during fixed scheduled-run windows", () => {
     expect(isNearScheduledRun("clippings", new Date(2026, 7, 10, 8, 1))).toBe(true);
     expect(isNearScheduledRun("clippings", new Date(2026, 7, 10, 8, 5))).toBe(false);
@@ -105,9 +130,13 @@ function validClaim() {
   };
 }
 
-function launchdExec(loaded, running = new Set()) {
+function launchdExec(loaded, running = new Set(), memoryFreePercent = null) {
   return vi.fn(async (_executable, args, options) => {
     expect(options.shell).toBe(false);
+    if (_executable === "/usr/bin/memory_pressure") {
+      if (memoryFreePercent === null) throw new Error("not available");
+      return { stdout: `System-wide memory free percentage: ${memoryFreePercent}%\n`, stderr: "" };
+    }
     if (args[0] === "kickstart") return { stdout: "", stderr: "" };
     const label = String(args[1]).split("/").at(-1);
     if (!loaded.has(label)) throw new Error("not loaded");
