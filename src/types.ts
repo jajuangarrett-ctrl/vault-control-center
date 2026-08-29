@@ -75,7 +75,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   contactListPath: "People/Contacts.md",
   peopleFolder: "People/Agenda",
   tasksFilePath: "Tasks/Tasks.md",
-  htmlRoots: ["Artifacts", "02 Programs", "03 Areas", "10 Misc", "Wiki"],
+  htmlRoots: ["Artifacts", "04 Artifacts", "02 Programs", "03 Areas", "10 Misc", "Wiki"],
   htmlThumbnailFolder:
     "Artifacts/Vault Control Center Native Plugin/runtime/html-gallery/thumbnails",
   aiFolders: {
