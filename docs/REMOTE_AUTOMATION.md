@@ -4,7 +4,7 @@
 
 Vault Control Center remote automation is a dedicated fixed-ID system. It is not shared with Agent Mission Control and cannot accept prompts, commands, paths, arguments, environment variables, scripts, or executable content.
 
-The only remote mappings are:
+The only remote processor mappings are:
 
 | Automation ID | Current-user launchd label |
 | --- | --- |
@@ -16,6 +16,8 @@ The only remote mappings are:
 | `weekly-learning-review` | `com.franklingarrett.codex-weekly-learning-review` |
 
 Mira email filing remains status-only because it has no verified launchd label. Services, repository sync, disabled, missing, high-impact, unverified, and external jobs are never remote-runnable and remain absent from the visible Services and Repository Sync section.
+
+The dashboard also has one separate fixed application action, `reload-obsidian`. It is not a processor and does not appear as a **Run now** job. When the runner reports support, it invokes only the bundled Obsidian CLI's fixed `app:reload` command in the executor's current-user session. It accepts no paths, arguments, scripts, or user-supplied code and does not attest that Obsidian Sync has completed.
 
 The broker requires separate Netlify environment secrets for clients and the executor. Requests use short expirations and UUID replay keys. Netlify Blobs conditional writes provide atomic create, claim, and per-job in-flight locks. The runner checks the harmless `com.fjg.vault-automation-executor` sentinel and exact target label for every claim, rejects a running target, and executes only:
 
@@ -49,6 +51,8 @@ The executor token must already exist in the login Keychain under service `com.f
 launchctl print gui/$(id -u)/com.fjg.vault-automation-executor
 launchctl print gui/$(id -u)/com.fjg.vault-automation-runner
 ```
+
+To enable the separate remote Obsidian reload action after a plugin release, run the installer again on the always-on Mac. It refreshes the private runner copy and its current-user LaunchAgent; it does not create, change, or run any processor job.
 
 ## Main-Mac pairing
 

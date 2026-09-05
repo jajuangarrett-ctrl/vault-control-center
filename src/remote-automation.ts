@@ -20,6 +20,7 @@ export interface RemoteAutomationSnapshot {
   reachable: boolean;
   observedAt: string | null;
   runnableJobIds: string[];
+  obsidianReloadAvailable: boolean;
   message: string;
   memory: SystemMemorySnapshot;
 }
@@ -47,6 +48,7 @@ export function emptyRemoteAutomationSnapshot(
     reachable: false,
     observedAt: null,
     runnableJobIds: [],
+    obsidianReloadAvailable: false,
     message,
     memory: unavailableMemory(message),
   };
@@ -167,6 +169,39 @@ export async function submitRemoteAutomation(
   }
 }
 
+export async function submitRemoteObsidianReload(
+  app: App,
+  settings: DashboardSettings,
+  request: RemoteRequest = defaultRequest,
+  now = new Date()
+): Promise<AutomationRunResult> {
+  const connection = resolveConnection(app, settings);
+  if (!connection.ready) return { id: "reload-obsidian", status: "rejected", message: connection.message };
+  const requestId = crypto.randomUUID();
+  const payload = {
+    jobId: "reload-obsidian",
+    requestId,
+    requestedAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + 90_000).toISOString(),
+  };
+  try {
+    const response = await request({
+      url: `${connection.baseUrl}/api/vault-automation/requests`,
+      method: "POST",
+      headers: { Authorization: `Bearer ${connection.secret}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      throw: false,
+    });
+    if (response.status === 202 && isRequestState(response.json, requestId, "reload-obsidian")) {
+      return { id: "reload-obsidian", status: "queued", message: "Obsidian reload was securely queued on the always-on Mac." };
+    }
+    if (response.status === 401) return { id: "reload-obsidian", status: "rejected", message: "The automation broker credential was not accepted." };
+    return { id: "reload-obsidian", status: "rejected", message: "The Obsidian reload was rejected by the automation broker." };
+  } catch {
+    return { id: "reload-obsidian", status: "error", message: "The remote automation broker is unavailable." };
+  }
+}
+
 function resolveConnection(app: App, settings: DashboardSettings):
   | { ready: true; baseUrl: string; secret: string }
   | { ready: false; state: RemoteAutomationConnectionState; message: string } {
@@ -201,6 +236,7 @@ function parseHealth(value: unknown): RemoteAutomationSnapshot {
   const runnableJobIds = Array.isArray(executor?.runnableJobIds)
     ? executor.runnableJobIds.filter((id): id is string => typeof id === "string" && isRoutineId(id))
     : [];
+  const obsidianReloadAvailable = reachable && executor?.obsidianReloadAvailable === true;
   const checkedAt = validIso(payload.checkedAt) ?? new Date().toISOString();
   const observedAt = validIso(executor?.observedAt) ?? null;
   const memory = reachable ? parseRemoteMemory(payload.memory, observedAt ?? checkedAt) : null;
@@ -210,6 +246,7 @@ function parseHealth(value: unknown): RemoteAutomationSnapshot {
     reachable,
     observedAt,
     runnableJobIds: reachable ? [...new Set(runnableJobIds)] : [],
+    obsidianReloadAvailable,
     message: reachable
       ? "The always-on Mac is reachable."
       : "The broker is online, but the executor sentinel is unavailable.",

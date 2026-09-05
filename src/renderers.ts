@@ -67,6 +67,9 @@ export interface DashboardRenderContext {
   memory: SystemMemorySnapshot;
   automationStartingIds: ReadonlySet<string>;
   automationRequestMessages: ReadonlyMap<string, string>;
+  remoteObsidianReloadAvailable: boolean;
+  remoteObsidianReloading: boolean;
+  remoteObsidianReloadMessage: string;
   operationsRefreshing: boolean;
   settings: DashboardSettings;
   state: DashboardRenderState;
@@ -82,6 +85,7 @@ export interface DashboardRenderContext {
   refreshHtmlThumbnails: () => void;
   refreshOperations: () => void;
   runAutomation: (id: string) => void;
+  reloadRemoteObsidian: () => void;
   openBookmark: (bookmark: DashboardBookmark) => void;
   openExternal: (url: string) => void;
   capture: (commandId: string, label: string) => void;
@@ -272,6 +276,26 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
     context.automations.isExecutor ? "server-cog" : "monitor-dot"
   );
   hostNote.createSpan({ text: context.automations.message });
+
+  if (!context.automations.isExecutor) {
+    const remoteControl = parent.createDiv({ cls: "fjg-vcc-automation-host-note" });
+    createIcon(remoteControl, "rotate-cw");
+    const remoteCopy = remoteControl.createDiv();
+    remoteCopy.createSpan({ text: "Always-on Mac · Obsidian application" });
+    if (context.remoteObsidianReloadMessage) {
+      remoteCopy.createDiv({ cls: "fjg-vcc-automation-request-result", text: context.remoteObsidianReloadMessage });
+    }
+    createButton(remoteControl, {
+      label: context.remoteObsidianReloading ? "Reloading…" : "Reload Obsidian",
+      icon: context.remoteObsidianReloading ? "loader-circle" : "rotate-cw",
+      className: "fjg-vcc-button is-primary",
+      disabled: context.remoteObsidianReloading || !context.remoteObsidianReloadAvailable,
+      title: context.remoteObsidianReloadAvailable
+        ? "Reload Obsidian on the always-on Mac. This does not confirm Obsidian Sync completion."
+        : "The always-on Mac has not reported support for remote Obsidian reload.",
+      onClick: context.reloadRemoteObsidian,
+    });
+  }
 
   renderMemoryCard(parent, context);
 

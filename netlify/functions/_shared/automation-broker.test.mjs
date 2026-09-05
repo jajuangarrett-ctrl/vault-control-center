@@ -23,6 +23,18 @@ describe("dedicated automation broker", () => {
     expect((await broker.getRequestStatus(REQUEST_ID)).state).toBe("claimed");
   });
 
+  it("accepts the one fixed Obsidian reload request without adding a runnable processor", async () => {
+    const broker = createAutomationBroker(memoryStore(), { now: () => NOW });
+    const queued = await broker.submitRequest({ ...validRequest(), jobId: "reload-obsidian" });
+    const poll = await broker.pollExecutor({ ...validHeartbeat(), obsidianReloadAvailable: true });
+    expect(queued).toMatchObject({ jobId: "reload-obsidian", state: "queued" });
+    expect(poll.request).toMatchObject({ jobId: "reload-obsidian" });
+    expect((await broker.getHealth()).executor).toMatchObject({
+      runnableJobIds: ["clippings", "root-inbox"],
+      obsidianReloadAvailable: true,
+    });
+  });
+
   it("rejects unknown IDs, executable fields, expired requests, and replayed IDs", async () => {
     const broker = createAutomationBroker(memoryStore(), { now: () => NOW });
     await expect(broker.submitRequest({ ...validRequest(), jobId: "shell" }))
@@ -103,6 +115,7 @@ describe("dedicated automation broker", () => {
         observedAt: NOW.toISOString(),
         sentinelLoaded: true,
         runnableJobIds: ["clippings", "root-inbox"],
+        obsidianReloadAvailable: false,
       },
       memory: {
         totalBytes: 16_000,
@@ -146,6 +159,7 @@ function validHeartbeat() {
     observedAt: NOW.toISOString(),
     sentinelLoaded: true,
     runnableJobIds: ["clippings", "root-inbox"],
+    obsidianReloadAvailable: false,
     memory: { totalBytes: 16_000, usedBytes: 8_000, freePercent: 50, usedPercent: 50 },
   };
 }

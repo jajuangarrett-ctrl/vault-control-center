@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3 — 2026-09-05
+
+- Added a distinct, capability-gated **Reload Obsidian** control for the always-on Mac. It uses the bundled Obsidian CLI's fixed in-app reload command; it does not launch a vault processor or promise that Obsidian Sync has completed.
+- Kept the six routine processor IDs as the complete remote **Run now** allowlist. The reload control is visibly labeled as an always-on-Mac application action and remains disabled until the authenticated executor reports support.
+- Preserved the broker's fail-closed request schema, replay protection, claim locks, current-user runner boundary, and compatibility with earlier runner heartbeats while an executor update is pending.
+
 ## 0.3.0 — 2026-08-10
 
 - Added an isolated authenticated Netlify queue for fixed-ID automation requests; request bodies reject commands, paths, arguments, environment variables, scripts, prompts, and unknown fields.

@@ -7,6 +7,11 @@ export const APPROVED_AUTOMATION_IDS = Object.freeze([
   "weekly-learning-review",
 ]);
 
+// This is deliberately separate from the routine processor allowlist. It is a
+// single fixed application command, not a way to run arbitrary software.
+export const OBSIDIAN_RELOAD_ID = "reload-obsidian";
+const APPROVED_REQUEST_IDS = Object.freeze([...APPROVED_AUTOMATION_IDS, OBSIDIAN_RELOAD_ID]);
+
 export const REQUEST_STATES = Object.freeze([
   "queued",
   "claimed",
@@ -27,6 +32,9 @@ const REASON_CODES = new Set([
   "kickstart-failed",
   "runner-error",
   "malformed-claim",
+  "obsidian-reload-accepted",
+  "obsidian-cli-unavailable",
+  "obsidian-reload-failed",
 ]);
 const REQUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REQUEST_MAX_AGE_MS = 30_000;
@@ -131,7 +139,7 @@ async function pollExecutor(store, payload, now) {
 
   for (const entry of records) {
     const record = entry.data;
-    if (!APPROVED_AUTOMATION_IDS.includes(record.jobId)) continue;
+    if (!APPROVED_REQUEST_IDS.includes(record.jobId)) continue;
     if (TERMINAL_STATES.has(record.state)) continue;
     if (Date.parse(record.expiresAt) <= now().getTime()) {
       const expired = await store.setJSON(
@@ -212,6 +220,7 @@ async function getHealth(store, now) {
       observedAt: observedAt?.toISOString() ?? null,
       sentinelLoaded: reachable,
       runnableJobIds,
+      obsidianReloadAvailable: reachable && heartbeat?.obsidianReloadAvailable === true,
     },
     memory: reachable ? sanitizeMemory(heartbeat?.memory, observedAt?.toISOString() ?? now().toISOString()) : null,
   };
@@ -243,7 +252,7 @@ async function cleanup(store, now) {
 
 function validateAutomationRequest(payload, current) {
   exactObject(payload, ["jobId", "requestId", "requestedAt", "expiresAt"]);
-  if (!APPROVED_AUTOMATION_IDS.includes(payload.jobId)) {
+  if (!APPROVED_REQUEST_IDS.includes(payload.jobId)) {
     throw new BrokerError("unknown-job", 400, "Unknown automation ID.");
   }
   validateRequestId(payload.requestId);
@@ -266,7 +275,7 @@ function validateAutomationRequest(payload, current) {
 }
 
 function validateHeartbeat(payload, current) {
-  exactObject(payload, ["observedAt", "sentinelLoaded", "runnableJobIds", "memory"]);
+  exactObject(payload, ["observedAt", "sentinelLoaded", "runnableJobIds", "memory"], ["obsidianReloadAvailable"]);
   const observedAt = requiredDate(payload.observedAt, "observedAt");
   if (Math.abs(current.getTime() - observedAt.getTime()) > 60_000) {
     throw new BrokerError("invalid-heartbeat-time", 400, "The executor timestamp is outside the allowed window.");
@@ -278,6 +287,7 @@ function validateHeartbeat(payload, current) {
     observedAt: observedAt.toISOString(),
     sentinelLoaded: payload.sentinelLoaded,
     runnableJobIds: payload.sentinelLoaded ? approvedSubset(payload.runnableJobIds) : [],
+    obsidianReloadAvailable: payload.sentinelLoaded && payload.obsidianReloadAvailable === true,
     memory: payload.sentinelLoaded ? sanitizeMemory(payload.memory, observedAt.toISOString()) : null,
   };
 }
@@ -285,16 +295,19 @@ function validateHeartbeat(payload, current) {
 function validateRunnerEvent(payload, current) {
   exactObject(payload, ["requestId", "jobId", "state", "occurredAt", "reasonCode"]);
   validateRequestId(payload.requestId);
-  if (!APPROVED_AUTOMATION_IDS.includes(payload.jobId)) {
+  if (!APPROVED_REQUEST_IDS.includes(payload.jobId)) {
     throw new BrokerError("unknown-job", 400, "Unknown automation ID.");
   }
   if (!EVENT_STATES.has(payload.state) || !REASON_CODES.has(payload.reasonCode)) {
     throw new BrokerError("invalid-event", 400, "The runner event is malformed.");
   }
-  if (payload.state === "started" && payload.reasonCode !== "launchctl-accepted") {
+  const expectedStartedReason = payload.jobId === OBSIDIAN_RELOAD_ID
+    ? "obsidian-reload-accepted"
+    : "launchctl-accepted";
+  if (payload.state === "started" && payload.reasonCode !== expectedStartedReason) {
     throw new BrokerError("invalid-event", 400, "The runner event is malformed.");
   }
-  if (payload.state !== "started" && payload.reasonCode === "launchctl-accepted") {
+  if (payload.state !== "started" && ["launchctl-accepted", "obsidian-reload-accepted"].includes(payload.reasonCode)) {
     throw new BrokerError("invalid-event", 400, "The runner event is malformed.");
   }
   const occurredAt = requiredDate(payload.occurredAt, "occurredAt");
@@ -379,13 +392,14 @@ function approvedSubset(value) {
   return [...new Set(value.filter((id) => APPROVED_AUTOMATION_IDS.includes(id)))];
 }
 
-function exactObject(value, keys) {
+function exactObject(value, keys, optionalKeys = []) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new BrokerError("malformed-request", 400, "The request body is malformed.");
   }
   const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
-  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+  const required = [...keys].sort();
+  const allowed = new Set([...required, ...optionalKeys]);
+  if (actual.length < required.length || required.some((key) => !actual.includes(key)) || actual.some((key) => !allowed.has(key))) {
     throw new BrokerError("malformed-request", 400, "The request contains unsupported fields.");
   }
 }

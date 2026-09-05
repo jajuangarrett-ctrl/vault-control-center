@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AUTOMATION_LABELS,
   EXECUTOR_SENTINEL_LABEL,
+  OBSIDIAN_CLI,
   buildExecutorHeartbeat,
   isNearScheduledRun,
   processAutomationClaim,
@@ -53,6 +54,21 @@ describe("vault automation runner security boundary", () => {
     expect(kickstart?.[1]).not.toContain("-k");
   });
 
+  it("reloads Obsidian only through the fixed bundled CLI vector", async () => {
+    const execFile = launchdExec(new Set([EXECUTOR_SENTINEL_LABEL]), new Set(), null, true);
+    const result = await processAutomationClaim({ ...validClaim(), jobId: "reload-obsidian" }, {
+      now: NOW,
+      uid: 501,
+      execFile,
+    });
+    expect(result).toMatchObject({ state: "started", reasonCode: "obsidian-reload-accepted" });
+    expect(execFile).toHaveBeenCalledWith(
+      OBSIDIAN_CLI,
+      ["eval", 'code=app.commands.executeCommandById("app:reload")'],
+      expect.objectContaining({ shell: false, timeout: 10_000 })
+    );
+  });
+
   it("rejects unknown, extra-field, and expired claims before launchd execution", async () => {
     const execFile = vi.fn();
     await expect(
@@ -84,6 +100,7 @@ describe("vault automation runner security boundary", () => {
       observedAt: NOW.toISOString(),
       sentinelLoaded: true,
       runnableJobIds: ["clippings", "root-inbox"],
+      obsidianReloadAvailable: false,
       memory: { totalBytes: 1_000, usedBytes: 600, freePercent: 40, usedPercent: 60 },
     });
     expect(JSON.stringify(heartbeat)).not.toContain("franklingarrett");
@@ -130,13 +147,18 @@ function validClaim() {
   };
 }
 
-function launchdExec(loaded, running = new Set(), memoryFreePercent = null) {
+function launchdExec(loaded, running = new Set(), memoryFreePercent = null, obsidianCliAvailable = false) {
   return vi.fn(async (_executable, args, options) => {
     expect(options.shell).toBe(false);
     if (_executable === "/usr/bin/memory_pressure") {
       if (memoryFreePercent === null) throw new Error("not available");
       return { stdout: `System-wide memory free percentage: ${memoryFreePercent}%\n`, stderr: "" };
     }
+    if (_executable === "/usr/bin/test") {
+      if (!obsidianCliAvailable) throw new Error("not available");
+      return { stdout: "", stderr: "" };
+    }
+    if (_executable === OBSIDIAN_CLI) return { stdout: "", stderr: "" };
     if (args[0] === "kickstart") return { stdout: "", stderr: "" };
     const label = String(args[1]).split("/").at(-1);
     if (!loaded.has(label)) throw new Error("not loaded");

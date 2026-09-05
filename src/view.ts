@@ -41,6 +41,7 @@ import {
   emptyRemoteAutomationSnapshot,
   fetchRemoteAutomationSnapshot,
   submitRemoteAutomation,
+  submitRemoteObsidianReload,
   type RemoteAutomationSnapshot,
 } from "./remote-automation";
 import {
@@ -184,6 +185,8 @@ export class VaultControlCenterView extends ItemView {
   private remoteAutomation: RemoteAutomationSnapshot = emptyRemoteAutomationSnapshot();
   private readonly automationStartingIds = new Set<string>();
   private readonly automationRequestMessages = new Map<string, string>();
+  private remoteObsidianReloading = false;
+  private remoteObsidianReloadMessage = "";
   private operationsRefreshing = false;
   private operationsRefreshPromise: Promise<void> | null = null;
   private operationsRefreshQueued = false;
@@ -714,6 +717,9 @@ export class VaultControlCenterView extends ItemView {
       memory: this.memory,
       automationStartingIds: this.automationStartingIds,
       automationRequestMessages: this.automationRequestMessages,
+      remoteObsidianReloadAvailable: this.remoteAutomation.reachable && this.remoteAutomation.obsidianReloadAvailable,
+      remoteObsidianReloading: this.remoteObsidianReloading,
+      remoteObsidianReloadMessage: this.remoteObsidianReloadMessage,
       operationsRefreshing: this.operationsRefreshing,
       settings: this.plugin.settings,
       state: this.renderState,
@@ -737,6 +743,7 @@ export class VaultControlCenterView extends ItemView {
       refreshHtmlThumbnails: () => void this.refreshHtmlThumbnails(),
       refreshOperations: () => void this.refreshOperations(true),
       runAutomation: (id) => void this.runAutomationNow(id),
+      reloadRemoteObsidian: () => void this.reloadRemoteObsidian(),
       openBookmark: (bookmark) => void this.openBookmark(bookmark),
       openExternal: (url) => this.openExternal(url),
       capture: (commandId, label) => this.plugin.executeCapture(commandId, label),
@@ -1013,6 +1020,20 @@ export class VaultControlCenterView extends ItemView {
       new Notice("The automation could not be started.", 8_000);
     } finally {
       this.automationStartingIds.delete(id);
+      await this.refreshOperations(false);
+    }
+  }
+
+  private async reloadRemoteObsidian(): Promise<void> {
+    if (this.remoteObsidianReloading || !this.remoteAutomation.reachable || !this.remoteAutomation.obsidianReloadAvailable) return;
+    this.remoteObsidianReloading = true;
+    if (this.route === "automations") this.renderContent();
+    try {
+      const result = await submitRemoteObsidianReload(this.app, this.plugin.settings);
+      this.remoteObsidianReloadMessage = result.message;
+      new Notice(result.message, result.status === "error" ? 8_000 : 6_000);
+    } finally {
+      this.remoteObsidianReloading = false;
       await this.refreshOperations(false);
     }
   }

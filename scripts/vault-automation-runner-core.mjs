@@ -2,6 +2,9 @@ import { execFile as nodeExecFile } from "node:child_process";
 import { promisify } from "node:util";
 
 export const EXECUTOR_SENTINEL_LABEL = "com.fjg.vault-automation-executor";
+export const OBSIDIAN_RELOAD_ID = "reload-obsidian";
+export const OBSIDIAN_CLI = "/Applications/Obsidian.app/Contents/MacOS/obsidian-cli";
+const OBSIDIAN_RELOAD_CODE = 'app.commands.executeCommandById("app:reload")';
 export const AUTOMATION_LABELS = Object.freeze({
   clippings: "com.franklingarrett.clippings-inbox-sort",
   "root-inbox": "com.franklingarrett.root-inbox-sort",
@@ -30,6 +33,7 @@ export async function buildExecutorHeartbeat(options = {}) {
     observedAt: now.toISOString(),
     sentinelLoaded: sentinel.loaded,
     runnableJobIds,
+    obsidianReloadAvailable: sentinel.loaded && await isObsidianReloadAvailable(execFile),
     memory: sentinel.loaded ? await readMemory(options) : null,
   };
 }
@@ -48,6 +52,18 @@ export async function processAutomationClaim(claim, options = {}) {
   const sentinel = await inspectLaunchdLabel(execFile, uid, EXECUTOR_SENTINEL_LABEL);
   if (!sentinel.loaded) {
     return { ...base, state: "rejected", reasonCode: "sentinel-not-loaded" };
+  }
+
+  if (request.jobId === OBSIDIAN_RELOAD_ID) {
+    if (!await isObsidianReloadAvailable(execFile)) {
+      return { ...base, state: "rejected", reasonCode: "obsidian-cli-unavailable" };
+    }
+    try {
+      await execFile(OBSIDIAN_CLI, ["eval", `code=${OBSIDIAN_RELOAD_CODE}`], commandOptions(10_000));
+      return { ...base, state: "started", reasonCode: "obsidian-reload-accepted" };
+    } catch {
+      return { ...base, state: "failed", reasonCode: "obsidian-reload-failed" };
+    }
   }
 
   const label = AUTOMATION_LABELS[request.jobId];
@@ -98,7 +114,7 @@ function validateClaim(value, now) {
   if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
     throw new Error("Malformed claim");
   }
-  if (!Object.hasOwn(AUTOMATION_LABELS, value.jobId)) throw new Error("Unknown job");
+  if (!Object.hasOwn(AUTOMATION_LABELS, value.jobId) && value.jobId !== OBSIDIAN_RELOAD_ID) throw new Error("Unknown job");
   if (typeof value.requestId !== "string" || !REQUEST_ID_PATTERN.test(value.requestId)) throw new Error("Invalid request ID");
   const requestedAt = parseIso(value.requestedAt);
   const expiresAt = parseIso(value.expiresAt);
@@ -109,6 +125,15 @@ function validateClaim(value, now) {
     requestedAt: requestedAt.toISOString(),
     expiresAt: expiresAt.toISOString(),
   };
+}
+
+async function isObsidianReloadAvailable(execFile) {
+  try {
+    await execFile("/usr/bin/test", ["-x", OBSIDIAN_CLI], commandOptions(4_000));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function readMemory(options) {

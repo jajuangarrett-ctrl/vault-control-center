@@ -8,6 +8,7 @@ import {
   applyRemoteAutomationAvailability,
   fetchRemoteAutomationSnapshot,
   submitRemoteAutomation,
+  submitRemoteObsidianReload,
 } from "./remote-automation";
 import { DEFAULT_SETTINGS } from "./types";
 import type { AutomationSnapshot } from "./automations";
@@ -87,6 +88,13 @@ describe("remote automation client", () => {
     expect(rejectedRequest).not.toHaveBeenCalled();
   });
 
+  it("submits only the fixed remote Obsidian reload action", async () => {
+    const request = vi.fn(async (options) => ({ status: 202, json: { ...JSON.parse(options.body ?? "{}"), state: "queued" } }));
+    await expect(submitRemoteObsidianReload(fakeApp(), enabledSettings(), request, NOW))
+      .resolves.toMatchObject({ id: "reload-obsidian", status: "queued" });
+    expect(JSON.parse(request.mock.calls[0][0].body ?? "{}")).toMatchObject({ jobId: "reload-obsidian" });
+  });
+
   it("enables remote controls only for routine IDs reported ready", () => {
     const merged = applyRemoteAutomationAvailability(nonExecutorSnapshot(), {
       state: "ready",
@@ -94,6 +102,7 @@ describe("remote automation client", () => {
       reachable: true,
       observedAt: NOW.toISOString(),
       runnableJobIds: ["clippings"],
+      obsidianReloadAvailable: false,
       message: "ready",
       memory: { status: "unavailable", checkedAt: NOW.toISOString(), reason: "remote-unavailable", message: "n/a" },
     });
