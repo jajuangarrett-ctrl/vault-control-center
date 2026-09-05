@@ -221,6 +221,7 @@ async function getHealth(store, now) {
       sentinelLoaded: reachable,
       runnableJobIds,
       obsidianReloadAvailable: reachable && heartbeat?.obsidianReloadAvailable === true,
+      obsidianReloadCapabilityReported: reachable && heartbeat?.obsidianReloadCapabilityReported === true,
     },
     memory: reachable ? sanitizeMemory(heartbeat?.memory, observedAt?.toISOString() ?? now().toISOString()) : null,
   };
@@ -287,6 +288,7 @@ function validateHeartbeat(payload, current) {
     observedAt: observedAt.toISOString(),
     sentinelLoaded: payload.sentinelLoaded,
     runnableJobIds: payload.sentinelLoaded ? approvedSubset(payload.runnableJobIds) : [],
+    obsidianReloadCapabilityReported: Object.hasOwn(payload, "obsidianReloadAvailable"),
     obsidianReloadAvailable: payload.sentinelLoaded && payload.obsidianReloadAvailable === true,
     memory: payload.sentinelLoaded ? sanitizeMemory(payload.memory, observedAt.toISOString()) : null,
   };

@@ -68,6 +68,7 @@ export interface DashboardRenderContext {
   automationStartingIds: ReadonlySet<string>;
   automationRequestMessages: ReadonlyMap<string, string>;
   remoteObsidianReloadAvailable: boolean;
+  remoteObsidianReloadCapabilityReported: boolean;
   remoteObsidianReloading: boolean;
   remoteObsidianReloadMessage: string;
   operationsRefreshing: boolean;
@@ -292,7 +293,9 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
       disabled: context.remoteObsidianReloading || !context.remoteObsidianReloadAvailable,
       title: context.remoteObsidianReloadAvailable
         ? "Reload Obsidian on the always-on Mac. This does not confirm Obsidian Sync completion."
-        : "The always-on Mac has not reported support for remote Obsidian reload.",
+        : context.remoteObsidianReloadCapabilityReported
+          ? "The always-on Mac has Obsidian reload support installed, but its bundled Obsidian CLI is unavailable."
+          : "The always-on Mac has not yet reported the updated remote Obsidian reload runner.",
       onClick: context.reloadRemoteObsidian,
     });
   }

@@ -21,6 +21,7 @@ export interface RemoteAutomationSnapshot {
   observedAt: string | null;
   runnableJobIds: string[];
   obsidianReloadAvailable: boolean;
+  obsidianReloadCapabilityReported: boolean;
   message: string;
   memory: SystemMemorySnapshot;
 }
@@ -49,6 +50,7 @@ export function emptyRemoteAutomationSnapshot(
     observedAt: null,
     runnableJobIds: [],
     obsidianReloadAvailable: false,
+    obsidianReloadCapabilityReported: false,
     message,
     memory: unavailableMemory(message),
   };
@@ -237,6 +239,7 @@ function parseHealth(value: unknown): RemoteAutomationSnapshot {
     ? executor.runnableJobIds.filter((id): id is string => typeof id === "string" && isRoutineId(id))
     : [];
   const obsidianReloadAvailable = reachable && executor?.obsidianReloadAvailable === true;
+  const obsidianReloadCapabilityReported = reachable && executor?.obsidianReloadCapabilityReported === true;
   const checkedAt = validIso(payload.checkedAt) ?? new Date().toISOString();
   const observedAt = validIso(executor?.observedAt) ?? null;
   const memory = reachable ? parseRemoteMemory(payload.memory, observedAt ?? checkedAt) : null;
@@ -247,6 +250,7 @@ function parseHealth(value: unknown): RemoteAutomationSnapshot {
     observedAt,
     runnableJobIds: reachable ? [...new Set(runnableJobIds)] : [],
     obsidianReloadAvailable,
+    obsidianReloadCapabilityReported,
     message: reachable
       ? "The always-on Mac is reachable."
       : "The broker is online, but the executor sentinel is unavailable.",

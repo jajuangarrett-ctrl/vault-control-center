@@ -718,6 +718,7 @@ export class VaultControlCenterView extends ItemView {
       automationStartingIds: this.automationStartingIds,
       automationRequestMessages: this.automationRequestMessages,
       remoteObsidianReloadAvailable: this.remoteAutomation.reachable && this.remoteAutomation.obsidianReloadAvailable,
+      remoteObsidianReloadCapabilityReported: this.remoteAutomation.reachable && this.remoteAutomation.obsidianReloadCapabilityReported,
       remoteObsidianReloading: this.remoteObsidianReloading,
       remoteObsidianReloadMessage: this.remoteObsidianReloadMessage,
       operationsRefreshing: this.operationsRefreshing,

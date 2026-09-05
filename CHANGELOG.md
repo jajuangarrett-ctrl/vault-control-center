@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4 — 2026-09-05
+
+- Added a backward-compatible runner-capability marker so the remote reload control can distinguish an unrefreshed always-on runner from an installed runner whose bundled Obsidian CLI is unavailable.
+
 ## 0.3.3 — 2026-09-05
 
 - Added a distinct, capability-gated **Reload Obsidian** control for the always-on Mac. It uses the bundled Obsidian CLI's fixed in-app reload command; it does not launch a vault processor or promise that Obsidian Sync has completed.

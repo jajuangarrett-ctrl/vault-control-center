@@ -28,12 +28,15 @@ describe("remote automation client", () => {
           observedAt: NOW.toISOString(),
           sentinelLoaded: true,
           runnableJobIds: ["clippings", "shell"],
+          obsidianReloadCapabilityReported: true,
+          obsidianReloadAvailable: true,
         },
         memory: { totalBytes: 1_000, usedBytes: 750, freePercent: 25, usedPercent: 75 },
       },
     });
     const result = await fetchRemoteAutomationSnapshot(fakeApp(), enabledSettings(), request);
     expect(result).toMatchObject({ state: "ready", reachable: true, runnableJobIds: ["clippings"] });
+    expect(result).toMatchObject({ obsidianReloadCapabilityReported: true, obsidianReloadAvailable: true });
     expect(result.memory).toMatchObject({ status: "ready", source: "remote-executor", usedPercent: 75 });
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
       url: "https://broker.example/api/vault-automation/health",
@@ -103,6 +106,7 @@ describe("remote automation client", () => {
       observedAt: NOW.toISOString(),
       runnableJobIds: ["clippings"],
       obsidianReloadAvailable: false,
+      obsidianReloadCapabilityReported: false,
       message: "ready",
       memory: { status: "unavailable", checkedAt: NOW.toISOString(), reason: "remote-unavailable", message: "n/a" },
     });

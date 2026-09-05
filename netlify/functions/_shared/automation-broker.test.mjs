@@ -32,6 +32,7 @@ describe("dedicated automation broker", () => {
     expect((await broker.getHealth()).executor).toMatchObject({
       runnableJobIds: ["clippings", "root-inbox"],
       obsidianReloadAvailable: true,
+      obsidianReloadCapabilityReported: true,
     });
   });
 
@@ -116,6 +117,7 @@ describe("dedicated automation broker", () => {
         sentinelLoaded: true,
         runnableJobIds: ["clippings", "root-inbox"],
         obsidianReloadAvailable: false,
+        obsidianReloadCapabilityReported: true,
       },
       memory: {
         totalBytes: 16_000,
@@ -124,6 +126,17 @@ describe("dedicated automation broker", () => {
         usedPercent: 50,
         checkedAt: NOW.toISOString(),
       },
+    });
+  });
+
+  it("distinguishes an earlier runner heartbeat from an installed but unavailable CLI", async () => {
+    const broker = createAutomationBroker(memoryStore(), { now: () => NOW });
+    const legacyHeartbeat = validHeartbeat();
+    delete legacyHeartbeat.obsidianReloadAvailable;
+    await broker.pollExecutor(legacyHeartbeat);
+    expect((await broker.getHealth()).executor).toMatchObject({
+      obsidianReloadCapabilityReported: false,
+      obsidianReloadAvailable: false,
     });
   });
 
