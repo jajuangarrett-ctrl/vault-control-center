@@ -17,7 +17,7 @@ The only remote processor mappings are:
 
 Mira email filing remains status-only because it has no verified launchd label. Services, repository sync, disabled, missing, high-impact, unverified, and external jobs are never remote-runnable and remain absent from the visible Services and Repository Sync section.
 
-The dashboard also has one separate fixed application action, `reload-obsidian`. It is not a processor and does not appear as a **Run now** job. When the runner reports support, it invokes only the bundled Obsidian CLI's fixed `app:reload` command in the executor's current-user session. It accepts no paths, arguments, scripts, or user-supplied code and does not attest that Obsidian Sync has completed.
+The dashboard also has one separate fixed application action, `reload-obsidian`. It is not a processor and does not appear as a **Run now** job. When the runner reports support, it invokes only the bundled Obsidian CLI's fixed `app:reload` command in the executor's current-user session. Its capability check uses direct executable access, accepts no paths, arguments, scripts, or user-supplied code, and does not attest that Obsidian Sync has completed.
 
 The broker requires separate Netlify environment secrets for clients and the executor. Requests use short expirations and UUID replay keys. Netlify Blobs conditional writes provide atomic create, claim, and per-job in-flight locks. The runner checks the harmless `com.fjg.vault-automation-executor` sentinel and exact target label for every claim, rejects a running target, and executes only:
 

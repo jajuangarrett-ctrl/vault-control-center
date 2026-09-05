@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5 — 2026-09-05
+
+- Fixed the always-on runner's Obsidian CLI capability probe on macOS. It now uses Node's direct executable-access API rather than the nonexistent `/usr/bin/test` executable, allowing an installed bundled CLI to enable the remote reload control.
+
 ## 0.3.4 — 2026-09-05
 
 - Added a backward-compatible runner-capability marker so the remote reload control can distinguish an unrefreshed always-on runner from an installed runner whose bundled Obsidian CLI is unavailable.

@@ -1,4 +1,6 @@
 import { execFile as nodeExecFile } from "node:child_process";
+import { constants } from "node:fs";
+import { access } from "node:fs/promises";
 import { promisify } from "node:util";
 
 export const EXECUTOR_SENTINEL_LABEL = "com.fjg.vault-automation-executor";
@@ -33,7 +35,7 @@ export async function buildExecutorHeartbeat(options = {}) {
     observedAt: now.toISOString(),
     sentinelLoaded: sentinel.loaded,
     runnableJobIds,
-    obsidianReloadAvailable: sentinel.loaded && await isObsidianReloadAvailable(execFile),
+    obsidianReloadAvailable: sentinel.loaded && await isObsidianReloadAvailable(options),
     memory: sentinel.loaded ? await readMemory(options) : null,
   };
 }
@@ -55,7 +57,7 @@ export async function processAutomationClaim(claim, options = {}) {
   }
 
   if (request.jobId === OBSIDIAN_RELOAD_ID) {
-    if (!await isObsidianReloadAvailable(execFile)) {
+    if (!await isObsidianReloadAvailable(options)) {
       return { ...base, state: "rejected", reasonCode: "obsidian-cli-unavailable" };
     }
     try {
@@ -127,9 +129,9 @@ function validateClaim(value, now) {
   };
 }
 
-async function isObsidianReloadAvailable(execFile) {
+async function isObsidianReloadAvailable(options = {}) {
   try {
-    await execFile("/usr/bin/test", ["-x", OBSIDIAN_CLI], commandOptions(4_000));
+    await (options.access ?? access)(OBSIDIAN_CLI, constants.X_OK);
     return true;
   } catch {
     return false;

@@ -60,6 +60,7 @@ describe("vault automation runner security boundary", () => {
       now: NOW,
       uid: 501,
       execFile,
+      access: vi.fn().mockResolvedValue(undefined),
     });
     expect(result).toMatchObject({ state: "started", reasonCode: "obsidian-reload-accepted" });
     expect(execFile).toHaveBeenCalledWith(
@@ -94,6 +95,7 @@ describe("vault automation runner security boundary", () => {
       now: NOW,
       uid: 501,
       execFile,
+      access: vi.fn().mockRejectedValue(new Error("not available")),
       osProvider: { totalmem: () => 1_000, freemem: () => 400 },
     });
     expect(heartbeat).toEqual({
