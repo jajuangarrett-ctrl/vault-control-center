@@ -304,6 +304,7 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
 
   const groupLabels: Record<(typeof VISIBLE_AUTOMATION_GROUPS)[number], string> = {
     "routine-vault": "Scheduled vault processors",
+    "services-sync": "Continuous and local support services",
     "external-cloud": "External and cloud automations",
   };
   const groups: Array<{ id: AutomationGroup; label: string }> =

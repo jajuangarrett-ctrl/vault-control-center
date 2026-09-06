@@ -1,7 +1,7 @@
 {
   "id": "vault-control-center",
   "name": "Vault Control Center",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "minAppVersion": "1.12.7",
   "description": "A native dashboard for vault files, task workspaces, AI queues, and securely allowlisted local or remote automations.",
   "author": "Franklin Garrett",

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.6 — 2026-09-05
+
+- Expanded the reviewed remote processor mappings to all ten once-daily vault workflows and corrected their displayed schedule.
+- Added the full configured-automation inventory to the Automations tab, including meaningful visible states for persistent, disabled, and Codex-scheduler-only entries.
+
 ## 0.3.5 — 2026-09-05
 
 - Fixed the always-on runner's Obsidian CLI capability probe on macOS. It now uses Node's direct executable-access API rather than the nonexistent `/usr/bin/test` executable, allowing an installed bundled CLI to enable the remote reload control.

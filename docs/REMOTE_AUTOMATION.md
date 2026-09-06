@@ -9,13 +9,17 @@ The only remote processor mappings are:
 | Automation ID | Current-user launchd label |
 | --- | --- |
 | `clippings` | `com.franklingarrett.clippings-inbox-sort` |
+| `vault-folder-processing` | `com.franklingarrett.vault-folder-process` |
 | `root-inbox` | `com.franklingarrett.root-inbox-sort` |
+| `mira-email-filing` | `com.franklingarrett.mira-email-sort` |
 | `iflytek-notes` | `com.franklingarrett.iflytek-notes-process` |
 | `youtube-notes` | `com.franklingarrett.youtube-transcript-note` |
 | `fjg-capture-transcripts` | `com.franklingarrett.fjg-capture-transcripts-process` |
 | `weekly-learning-review` | `com.franklingarrett.codex-weekly-learning-review` |
+| `formatted-notes-filing` | `com.franklingarrett.formatted-notes-file` |
+| `thought-capture-organizing` | `com.franklingarrett.thought-capture-organize` |
 
-Mira email filing remains status-only because it has no verified launchd label. Services, repository sync, disabled, missing, high-impact, unverified, and external jobs are never remote-runnable and remain absent from the visible Services and Repository Sync section.
+These ten processor mappings are verified against the authoritative installed definitions. Their normal schedules remain once daily at 6:10 PM Pacific; the remote control simply asks launchd to run one selected idle job outside its two-minute scheduled window. Continuous services, repository-sync jobs, the disabled Mission Control runner, and the Codex-managed Vocci automation remain visible with an explicit state and reason, rather than receiving an unsafe synthetic command.
 
 The dashboard also has one separate fixed application action, `reload-obsidian`. It is not a processor and does not appear as a **Run now** job. When the runner reports support, it invokes only the bundled Obsidian CLI's fixed `app:reload` command in the executor's current-user session. Its capability check uses direct executable access, accepts no paths, arguments, scripts, or user-supplied code, and does not attest that Obsidian Sync has completed.
 

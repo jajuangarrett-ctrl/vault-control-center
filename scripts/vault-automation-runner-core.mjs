@@ -8,12 +8,16 @@ export const OBSIDIAN_RELOAD_ID = "reload-obsidian";
 export const OBSIDIAN_CLI = "/Applications/Obsidian.app/Contents/MacOS/obsidian-cli";
 const OBSIDIAN_RELOAD_CODE = 'app.commands.executeCommandById("app:reload")';
 export const AUTOMATION_LABELS = Object.freeze({
+  "vault-folder-processing": "com.franklingarrett.vault-folder-process",
   clippings: "com.franklingarrett.clippings-inbox-sort",
   "root-inbox": "com.franklingarrett.root-inbox-sort",
+  "mira-email-filing": "com.franklingarrett.mira-email-sort",
   "iflytek-notes": "com.franklingarrett.iflytek-notes-process",
   "youtube-notes": "com.franklingarrett.youtube-transcript-note",
   "fjg-capture-transcripts": "com.franklingarrett.fjg-capture-transcripts-process",
   "weekly-learning-review": "com.franklingarrett.codex-weekly-learning-review",
+  "formatted-notes-filing": "com.franklingarrett.formatted-notes-file",
+  "thought-capture-organizing": "com.franklingarrett.thought-capture-organize",
 });
 
 const REQUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -188,16 +192,9 @@ function roundPercent(value) {
 }
 
 export function isNearScheduledRun(jobId, now, windowMinutes = 2) {
+  if (!Object.hasOwn(AUTOMATION_LABELS, jobId)) return false;
   const minuteOfDay = now.getHours() * 60 + now.getMinutes();
-  const schedules = {
-    clippings: [8 * 60, 12 * 60, 18 * 60],
-    "root-inbox": [8 * 60 + 10, 12 * 60 + 10, 18 * 60 + 10],
-    "iflytek-notes": [8 * 60 + 30, 12 * 60 + 30, 18 * 60 + 30],
-    "youtube-notes": [8 * 60 + 40, 12 * 60 + 40, 18 * 60 + 40],
-    "fjg-capture-transcripts": [8 * 60 + 50, 12 * 60 + 50, 18 * 60 + 50],
-    "weekly-learning-review": now.getDay() === 5 ? [16 * 60] : [],
-  };
-  return (schedules[jobId] ?? []).some((scheduledMinute) =>
+  return [18 * 60 + 10].some((scheduledMinute) =>
     Math.abs(minuteOfDay - scheduledMinute) <= windowMinutes
   );
 }

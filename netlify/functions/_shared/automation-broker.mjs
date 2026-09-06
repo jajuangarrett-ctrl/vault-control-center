@@ -1,10 +1,14 @@
 export const APPROVED_AUTOMATION_IDS = Object.freeze([
+  "vault-folder-processing",
   "clippings",
   "root-inbox",
+  "mira-email-filing",
   "iflytek-notes",
   "youtube-notes",
   "fjg-capture-transcripts",
   "weekly-learning-review",
+  "formatted-notes-filing",
+  "thought-capture-organizing",
 ]);
 
 // This is deliberately separate from the routine processor allowlist. It is a

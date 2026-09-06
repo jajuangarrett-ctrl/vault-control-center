@@ -134,9 +134,9 @@ describe("vault automation runner security boundary", () => {
   });
 
   it("blocks manual starts during fixed scheduled-run windows", () => {
-    expect(isNearScheduledRun("clippings", new Date(2026, 7, 10, 8, 1))).toBe(true);
-    expect(isNearScheduledRun("clippings", new Date(2026, 7, 10, 8, 5))).toBe(false);
-    expect(isNearScheduledRun("weekly-learning-review", new Date(2026, 7, 14, 16, 0))).toBe(true);
+    expect(isNearScheduledRun("clippings", new Date(2026, 7, 10, 18, 11))).toBe(true);
+    expect(isNearScheduledRun("clippings", new Date(2026, 7, 10, 18, 15))).toBe(false);
+    expect(isNearScheduledRun("weekly-learning-review", new Date(2026, 7, 14, 18, 10))).toBe(true);
   });
 });
 

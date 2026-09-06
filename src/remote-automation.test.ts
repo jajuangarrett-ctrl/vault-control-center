@@ -86,7 +86,7 @@ describe("remote automation client", () => {
 
     const rejectedRequest = vi.fn();
     await expect(
-      submitRemoteAutomation(fakeApp(), enabledSettings(), "mira-email-filing", rejectedRequest, NOW)
+      submitRemoteAutomation(fakeApp(), enabledSettings(), "vocci-notes-processing", rejectedRequest, NOW)
     ).resolves.toMatchObject({ status: "rejected" });
     expect(rejectedRequest).not.toHaveBeenCalled();
   });

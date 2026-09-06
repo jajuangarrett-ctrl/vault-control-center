@@ -1,6 +1,6 @@
 {
   "name": "vault-control-center",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Native Obsidian dashboard for operating a structured vault.",
   "main": "main.js",
   "scripts": {

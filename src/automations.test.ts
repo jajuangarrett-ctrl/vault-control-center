@@ -16,6 +16,7 @@ const NOW = new Date("2026-08-10T20:00:00.000Z");
 describe("FJG automation allowlist", () => {
   it("contains the known routine, service/sync, and cloud entries", () => {
     expect(FJG_AUTOMATION_ALLOWLIST.map((entry) => entry.id)).toEqual([
+      "vault-folder-processing",
       "clippings",
       "root-inbox",
       "mira-email-filing",
@@ -23,17 +24,21 @@ describe("FJG automation allowlist", () => {
       "youtube-notes",
       "fjg-capture-transcripts",
       "weekly-learning-review",
+      "formatted-notes-filing",
+      "thought-capture-organizing",
+      "vocci-notes-processing",
       "agent-mission-control",
       "auto-commit-codex-repos",
       "auto-pull-plugin-repos",
       "auto-pull-ios-repos",
       "mira-local-sync",
       "outlook-exporter",
-      "gmail-capture",
-      "netlify-retention-cleanup",
+      "franklin-ai-gateway",
+      "vault-automation-runner",
+      "vault-automation-executor",
     ]);
     expect(new Set(FJG_AUTOMATION_ALLOWLIST.map((entry) => entry.group))).toEqual(
-      new Set(["routine-vault", "services-sync", "external-cloud"])
+      new Set(["routine-vault", "services-sync"])
     );
     expect(
       FJG_AUTOMATION_ALLOWLIST.filter((entry) => entry.manualPolicy === "routine")
@@ -41,9 +46,8 @@ describe("FJG automation allowlist", () => {
     ).toBe(true);
   });
 
-  it("keeps Services and Repository Sync out of the visible dashboard groups", () => {
-    expect(VISIBLE_AUTOMATION_GROUPS).toEqual(["routine-vault", "external-cloud"]);
-    expect(VISIBLE_AUTOMATION_GROUPS).not.toContain("services-sync");
+  it("shows every inventoried automation group", () => {
+    expect(VISIBLE_AUTOMATION_GROUPS).toEqual(["routine-vault", "services-sync", "external-cloud"]);
   });
 });
 
@@ -128,7 +132,7 @@ describe("buildAutomationSnapshot", () => {
     expect(snapshot.isExecutor).toBe(false);
     expect(snapshot.executorState).toBe("non-executor");
     expect(snapshot.items.find((entry) => entry.id === "agent-mission-control"))
-      .toMatchObject({ loaded: true, availability: "service", canRun: false });
+      .toMatchObject({ loaded: true, availability: "disabled", canRun: false });
     expect(snapshot.items.find((entry) => entry.id === "auto-commit-codex-repos"))
       .toMatchObject({ loaded: true, availability: "high-impact", canRun: false });
   });
@@ -153,7 +157,7 @@ describe("buildAutomationSnapshot", () => {
           state: "not running",
           lastExitCode: 0,
         },
-        "com.fjg.agent-mission-control.runner": {
+        "com.fjg.vault-automation-runner": {
           state: "running",
           lastExitCode: 0,
         },
@@ -168,7 +172,7 @@ describe("buildAutomationSnapshot", () => {
           state: "not running",
           lastExitCode: 0,
         },
-        "com.fjg.agent-mission-control.runner": {
+        "com.fjg.vault-automation-runner": {
           state: "not running",
           lastExitCode: 0,
         },
@@ -176,7 +180,7 @@ describe("buildAutomationSnapshot", () => {
       now: NOW,
     });
 
-    expect(missing.items.find((entry) => entry.id === "agent-mission-control"))
+    expect(missing.items.find((entry) => entry.id === "vault-automation-runner"))
       .toMatchObject({
         loaded: false,
         healthTone: "critical",
@@ -184,7 +188,7 @@ describe("buildAutomationSnapshot", () => {
         canRun: false,
         availability: "service",
       });
-    expect(running.items.find((entry) => entry.id === "agent-mission-control"))
+    expect(running.items.find((entry) => entry.id === "vault-automation-runner"))
       .toMatchObject({
         loaded: true,
         running: true,
@@ -194,7 +198,7 @@ describe("buildAutomationSnapshot", () => {
         availability: "service",
       });
     expect(
-      loadedButIdle.items.find((entry) => entry.id === "agent-mission-control")
+      loadedButIdle.items.find((entry) => entry.id === "vault-automation-runner")
     ).toMatchObject({
       loaded: true,
       running: false,
@@ -214,7 +218,7 @@ describe("buildAutomationSnapshot", () => {
           state: "not running",
           lastExitCode: 0,
         },
-        "com.franklin.auto-pull-plugin-repos": {
+        "com.fjg.agent-mission-control.runner": {
           state: "not running",
           lastExitCode: 0,
         },
@@ -230,7 +234,7 @@ describe("buildAutomationSnapshot", () => {
       now: NOW,
     });
 
-    expect(snapshot.items.find((entry) => entry.id === "auto-pull-plugin-repos"))
+    expect(snapshot.items.find((entry) => entry.id === "agent-mission-control"))
       .toMatchObject({
         loaded: true,
         availability: "disabled",
