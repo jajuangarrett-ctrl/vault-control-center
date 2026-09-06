@@ -3,8 +3,6 @@ import type { App, TFile } from "obsidian";
 export type AutomationGroup = "routine-vault" | "services-sync" | "external-cloud";
 export const VISIBLE_AUTOMATION_GROUPS = [
   "routine-vault",
-  "services-sync",
-  "external-cloud",
 ] as const satisfies readonly AutomationGroup[];
 export type AutomationManualPolicy =
   | "routine"

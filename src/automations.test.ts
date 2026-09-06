@@ -46,8 +46,8 @@ describe("FJG automation allowlist", () => {
     ).toBe(true);
   });
 
-  it("shows every inventoried automation group", () => {
-    expect(VISIBLE_AUTOMATION_GROUPS).toEqual(["routine-vault", "services-sync", "external-cloud"]);
+  it("shows only workflows with implemented manual controls", () => {
+    expect(VISIBLE_AUTOMATION_GROUPS).toEqual(["routine-vault"]);
   });
 });
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.7 — 2026-09-05
+
+- Focused the Automations tab on the ten workflows with implemented manual controls; continuous, disabled, and scheduler-only entries remain documented in the automation inventory rather than cluttering the action list.
+
 ## 0.3.6 — 2026-09-05
 
 - Expanded the reviewed remote processor mappings to all ten once-daily vault workflows and corrected their displayed schedule.
