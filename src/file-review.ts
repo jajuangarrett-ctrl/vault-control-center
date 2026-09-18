@@ -104,13 +104,16 @@ export class FileReviewStore {
             if (validRecord(r)) {
               const local = this.records.get(r.id);
               const stored = { ...r, recordedPath: reviewPath(r.recordedPath)!, currentPath: r.currentPath ? reviewPath(r.currentPath)! : undefined };
-              this.records.set(r.id, local && (local.locationUpdatedAt ?? 0) > (stored.locationUpdatedAt ?? 0) ? local : stored);
+              this.records.set(r.id, local && (local.locationUpdatedAt ?? 0) >= (stored.locationUpdatedAt ?? 0) ? local : stored);
             }
           }
           this.loaded = true;
         } catch { persistenceError = "Saved review history is unreadable; new history will not overwrite it."; }
       } else this.loaded = true;
     }
+    // The journal preserves corrections/history, but never grants display membership.
+    // Rebuild membership from the nine current dashboard tables on every refresh.
+    const activeRecords = new Map<string, ReviewRecord>();
     await Promise.all(REVIEW_SOURCES.map(async source => {
       const file = this.app.vault.getAbstractFileByPath(source.path);
       const status = { label: labelFor(source.id), path: source.path, message: "History source unavailable on this device." };
@@ -121,13 +124,22 @@ export class FileReviewStore {
         const records = parseReviewTable(md, source, this.app.vault.getName());
         for (const record of records) {
           const old = this.records.get(record.id);
-          this.records.set(record.id, { ...record, currentPath: old?.currentPath, unavailable: old?.unavailable, locationUpdatedAt: old?.locationUpdatedAt });
+          const sameOutput = old?.recordedPath === record.recordedPath || old?.currentPath === record.recordedPath;
+          const current = sameOutput && old?.locationUpdatedAt ? {
+            ...record, currentPath: old?.currentPath, unavailable: old?.unavailable,
+            locationUpdatedAt: old?.locationUpdatedAt,
+          } : record;
+          activeRecords.set(record.id, current);
+          // Preserve a prior correction if a producer reused this event ID for a
+          // different output. It must not relocate the newly listed file.
+          if (!old?.locationUpdatedAt || sameOutput) this.records.set(record.id, current);
         }
-        status.message = `${records.length} recorded outputs in synchronized history.`;
+        status.message = `${records.length} current processed-output entries · ${source.section} → ${source.column}.`;
         if (!records.length && !md.includes(`## ${source.section}`)) status.message = "History format not recognized; no files inferred.";
       } catch { status.message = "History source could not be read."; }
     }));
-    const records = [...this.records.values()].sort((a, b) => b.processed.localeCompare(a.processed));
+    for (const id of this.bindings.keys()) if (!activeRecords.has(id)) this.bindings.delete(id);
+    const records = [...activeRecords.values()].sort((a, b) => b.processed.localeCompare(a.processed));
     const events = records.filter(record => reviewPath(resolveReviewPath(record, records))).map(record => {
       const path = resolveReviewPath(record, records);
       const found = this.app.vault.getAbstractFileByPath(path);
@@ -150,7 +162,7 @@ export class FileReviewStore {
     if (this.loaded) {
       try { await this.persist(); } catch { persistenceError = "Review history could not be saved. Current results are still available."; }
     }
-    this.snapshot = { rows, coverage: coverage.sort((a,b) => a.label.localeCompare(b.label)), message: persistenceError || "Only recorded outputs are listed. New dashboard results are retained here; older producer history may be incomplete." };
+    this.snapshot = { rows, coverage: coverage.sort((a,b) => a.label.localeCompare(b.label)), message: persistenceError || "Only processed outputs currently listed in the nine dashboard tables are included. Saved history never adds rows; verified move corrections only update listed files’ locations." };
     return this.snapshot;
   }
   renamed(file: TFile, _oldPath: string): void {

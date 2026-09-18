@@ -1,6 +1,8 @@
 import type { App, TFile } from "obsidian";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FileReviewStore, REVIEW_RECORDS_PATH, REVIEW_SOURCES, moveReviewedFile, parseReviewTable, resolveReviewPath, reviewPath, type ReviewRecord } from "./file-review";
+
+afterEach(() => vi.restoreAllMocks());
 
 const source = REVIEW_SOURCES.find(x => x.id === "formatted-notes-filing")!;
 const table = (path = "03 Areas/Teaching /Note", original = "Note.md") => `## Filing History\n| Original note | Processed | Filed note | Destination |\n|---|---|---|---|\n| ${original} | 2026-09-18 12:25:00 PDT | [[${path}\\|Note]] | ignored |\n## Pending Queue\n| Should not import | 2026-09-18 | [[Other.md]] | ignored |`;
@@ -71,6 +73,7 @@ describe("selected file moves", () => {
 
 describe("review persistence and duplicate provenance", () => {
   it("deduplicates shared outputs, retains new results, follows observed renames, and flags unavailable paths", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1000); // Consecutive corrections may share a millisecond.
     const docs = new Map<string,string>([[source.path,table()]]);
     const files = new Map<string,any>();
     const makeFile=(path:string) => ({path,name:path.split("/").pop(),extension:path.split(".").pop(),stat:{ctime:1,mtime:1,size:1}} as TFile);
@@ -103,5 +106,83 @@ describe("review persistence and duplicate provenance", () => {
     docs.set(REVIEW_RECORDS_PATH, "{broken");
     expect((await reloaded.refresh()).message).toMatch(/unreadable/);
     expect(docs.get(REVIEW_RECORDS_PATH)).toBe("{broken");
+  });
+});
+
+describe("current dashboard membership", () => {
+  function setupScopeFixture() {
+    const docs = new Map<string, string>([[source.path, table()]]);
+    const files = new Map<string, TFile>();
+    const makeFile = (path: string) => ({ path, name: path.split("/").pop(), extension: "md", stat: { ctime: 1, mtime: 1, size: 1 } } as TFile);
+    const add = (path: string, content?: string) => {
+      const file = makeFile(path); files.set(path, file);
+      if (content !== undefined) docs.set(path, content);
+      return file;
+    };
+    add(source.path);
+    const note = add("03 Areas/Teaching /Note.md");
+    const app = { vault: {
+      getName: () => "FJG Vault", getAbstractFileByPath: (p: string) => files.get(p),
+      cachedRead: async (f: TFile) => docs.get(f.path), read: async (f: TFile) => docs.get(f.path),
+      createFolder: async () => {}, create: async (p: string, content: string) => add(p, content),
+      modify: async (f: TFile, content: string) => { docs.set(f.path, content); },
+    } } as unknown as App;
+    return { docs, files, note, add, app, store: new FileReviewStore(app) };
+  }
+
+  it("excludes cache-only entries and their filing edges while retaining historical data", async () => {
+    const f = setupScopeFixture();
+    const cached = { ...parseReviewTable(table("Unrelated/Old.md", "Old.md"), source)[0],
+      processed: "2026-09-19 12:00", fromPath: f.note.path };
+    f.add(cached.recordedPath);
+    f.add(REVIEW_RECORDS_PATH, JSON.stringify({ version: 1, records: [cached] }));
+    const snapshot = await f.store.refresh();
+    expect(snapshot.rows).toHaveLength(1);
+    expect(snapshot.rows[0].currentPath).toBe(f.note.path);
+    expect(snapshot.rows[0].file).toBe(f.note);
+    expect(JSON.parse(f.docs.get(REVIEW_RECORDS_PATH)!).records.some((r: ReviewRecord) => r.id === cached.id)).toBe(true);
+  });
+
+  it("removes display membership on empty, missing, unreadable, or unrecognized sources without deleting history", async () => {
+    const f = setupScopeFixture();
+    expect((await f.store.refresh()).rows).toHaveLength(1);
+    for (const content of ["## Filing History\nNo filed notes.", table().replace("## Filing History", "## Pending Queue"), "Unreadable format"]) {
+      f.docs.set(source.path, content);
+      expect((await f.store.refresh()).rows).toHaveLength(0);
+      expect(JSON.parse(f.docs.get(REVIEW_RECORDS_PATH)!).records).toHaveLength(1);
+    }
+    f.files.delete(source.path);
+    expect((await new FileReviewStore(f.app).refresh()).rows).toHaveLength(0);
+    expect(JSON.parse(f.docs.get(REVIEW_RECORDS_PATH)!).records).toHaveLength(1);
+    f.add(source.path); f.docs.delete(source.path);
+    const unreadable = await f.store.refresh();
+    expect(unreadable.rows).toHaveLength(0);
+    expect(unreadable.coverage.find(c => c.path === source.path)?.message).toMatch(/could not be read/);
+  });
+
+  it("preserves a valid correction only for the same currently listed output", async () => {
+    const f = setupScopeFixture();
+    await f.store.refresh();
+    const originalPath = f.note.path;
+    f.files.delete(originalPath); f.note.path = "Corrected/Note.md"; f.files.set(f.note.path, f.note);
+    f.store.renamed(f.note, originalPath);
+    await f.store.refresh();
+    f.docs.set(source.path, "## Filing History\nNo current rows.");
+    expect((await f.store.refresh()).rows).toHaveLength(0);
+    f.docs.set(source.path, table());
+    expect((await new FileReviewStore(f.app).refresh()).rows[0].currentPath).toBe("Corrected/Note.md");
+    // A producer reusing the event key must not transfer that correction to another output.
+    f.docs.set(source.path, table("Different/Note.md"));
+    f.add("Different/Note.md");
+    const changed = await f.store.refresh();
+    expect(changed.rows[0].currentPath).toBe("Different/Note.md");
+    expect(JSON.parse(f.docs.get(REVIEW_RECORDS_PATH)!).records[0].currentPath).toBe("Corrected/Note.md");
+  });
+
+  it("uses only each authorized output column, excluding input links, archived originals, metadata and unrelated sections", () => {
+    for (const definition of REVIEW_SOURCES) {
+      const markdown = `## ${definition.section}\n| Original file | Processed | ${definition.column} | Archived original | Report |\n|---|---|---|---|---|\n| [[Input.md]] | 2026-09-18 12:00 | [[Output.md]] | [[Archive.md]] | [[Helper.md]] |\n## Pending Queue\n| Original file | Processed | ${definition.column} |\n|---|---|---|\n| Waiting.md | 2026-09-18 | [[Pending.md]] |`;
+      expect(parseReviewTable(markdown, definition).map(r => r.recordedPath)).toEqual(["Output.md"]);
+    }
   });
 });

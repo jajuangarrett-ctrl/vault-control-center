@@ -34,7 +34,7 @@ import type {
   AutomationSnapshot,
 } from "./automations";
 import { VISIBLE_AUTOMATION_GROUPS } from "./automations";
-import type { FileReviewSnapshot, ReviewRow } from "./file-review";
+import { REVIEW_SOURCES, type FileReviewSnapshot, type ReviewRow } from "./file-review";
 import type { SystemMemorySnapshot } from "./system-memory";
 import type { TaskboardSnapshot } from "./taskboard";
 import {
@@ -347,11 +347,11 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
 function renderFileReview(parent: HTMLElement, context: DashboardRenderContext): void {
   const snapshot = context.fileReview;
   const panel = createPanel(parent, `File review · ${snapshot.rows.length} files`, { className: "fjg-vcc-file-review" });
-  panel.body.createEl("p", { cls: "fjg-vcc-review-intro", text: "Review where your notes were filed. Move opens a searchable vault-folder picker; choosing a folder moves only that file." });
+  panel.body.createEl("p", { cls: "fjg-vcc-review-intro", text: "Processed output files from your nine processing dashboards. Choose Move to select a destination folder for one file." });
   const controls = panel.body.createDiv({ cls: "fjg-vcc-review-controls" });
   const search = controls.createEl("input", { type: "search", placeholder: "Search filenames, paths, or workflows", attr: { "aria-label": "Search file review" } });
   const filter = controls.createEl("select", { attr: { "aria-label": "Filter file review by workflow" } });
-  filter.createEl("option", { value: "", text: "All workflows" });
+  filter.createEl("option", { value: "", text: "All 9 processing dashboards" });
   for (const source of snapshot.coverage) filter.createEl("option", { value: source.label, text: source.label });
   search.value = context.reviewFilters.query;
   filter.value = context.reviewFilters.workflow;
@@ -363,7 +363,7 @@ function renderFileReview(parent: HTMLElement, context: DashboardRenderContext):
     list.empty();
     const rows = snapshot.rows.filter(row => (!filter.value || row.label.includes(filter.value)) &&
       matchesQuery([context.state.query, search.value].filter(Boolean).join(" "), row.currentPath ?? "", row.label, row.original, ...row.history.map(r => r.original)));
-    count.setText(`${rows.length} matching files`);
+    count.setText(`${rows.length} files from current dashboard tables`);
     if (!rows.length) createEmptyState(list, "No recorded files match", "Clear the filters or refresh status to read new processing results.", "files");
     for (const row of rows) {
       const entry = list.createDiv({ cls: "fjg-vcc-review-row" });
@@ -377,7 +377,10 @@ function renderFileReview(parent: HTMLElement, context: DashboardRenderContext):
       detail.createEl("summary", { text: `Processing history · ${row.history.length}` });
       for (const event of row.history) {
         const provenance = detail.createDiv();
-        provenance.createDiv({ text: `${event.processed} · ${event.original}` });
+        const source = REVIEW_SOURCES.find(s => s.id === event.workflow);
+        provenance.createDiv({ text: `${source?.section} → ${source?.column} · ${event.processed}` });
+        provenance.createDiv({ text: `Dashboard output: ${event.recordedPath}` });
+        provenance.createDiv({ text: `Original input: ${event.original}` });
         createButton(provenance, { label: `Open ${snapshot.coverage.find(c => c.path === event.sourcePath)?.label ?? "processing"} history`, className: "fjg-vcc-button", onClick: () => context.openFile(event.sourcePath) });
       }
       createButton(entry, { label: "Move", icon: "folder-input", className: "fjg-vcc-button is-primary", disabled: !row.file,

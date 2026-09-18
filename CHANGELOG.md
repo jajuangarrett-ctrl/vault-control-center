@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.10 — 2026-09-18
+
+- Make the nine current processing-dashboard output tables the sole File review membership source. Saved records no longer keep removed rows visible or contribute old filing-chain destinations.
+- Preserve saved history and valid move corrections without deleting notes or prior records. A correction applies only to its matching currently listed output.
+- Show the exact dashboard section, output column and recorded output path in each file's processing details, separately from its original input.
+- Scope audit found every existing live event was already represented in the nine dashboards; the defect was future/cache-retained membership, now covered by regressions for removed/missing/malformed sources and cache-only chains.
+- Focused validation: 179 tests, build and live source-to-row reconciliation; no real-note moves or processor execution.
+
+
 ## 0.3.9 — 2026-09-18
 
 - Add Automations → File review for the nine synchronized processing dashboards, including Vocci and Mira independently of Run now availability.
