@@ -231,3 +231,11 @@ export async function moveReviewedFile(app: App, selected: MoveSelection, folder
     return `Moved to ${destination}`;
   } finally { moving.delete(file); }
 }
+
+/** Resolve the displayed current path without trimming meaningful folder spaces. */
+export function getLiveReviewFile(app: App, row: ReviewRow): TFile | null {
+  const path = row.currentPath ?? row.recordedPath;
+  const file = row.file;
+  return file && file.path === path && reviewPath(path) === path &&
+    app.vault.getAbstractFileByPath(path) === file ? file : null;
+}

@@ -35,6 +35,7 @@ import type {
 } from "./automations";
 import { VISIBLE_AUTOMATION_GROUPS } from "./automations";
 import { REVIEW_SOURCES, type FileReviewSnapshot, type ReviewRow } from "./file-review";
+import { renderReviewPath } from "./file-review-path";
 import type { SystemMemorySnapshot } from "./system-memory";
 import type { TaskboardSnapshot } from "./taskboard";
 import {
@@ -68,6 +69,7 @@ export interface DashboardRenderContext {
   fileReview: FileReviewSnapshot;
   reviewFilters: { query: string; workflow: string };
   moveReviewFile: (row: ReviewRow) => void;
+  openReviewFile: (row: ReviewRow) => void;
   memory: SystemMemorySnapshot;
   automationStartingIds: ReadonlySet<string>;
   automationRequestMessages: ReadonlyMap<string, string>;
@@ -370,7 +372,7 @@ function renderFileReview(parent: HTMLElement, context: DashboardRenderContext):
       const main = entry.createDiv({ cls: "fjg-vcc-review-main" });
       const path = row.currentPath ?? row.recordedPath;
       createButton(main, { label: path.split("/").pop() ?? path, className: "fjg-vcc-review-filename", disabled: !row.file, onClick: () => context.openFile(path) });
-      main.createDiv({ cls: "fjg-vcc-review-path", text: path });
+      renderReviewPath(main, row, context.openReviewFile);
       main.createDiv({ cls: "fjg-vcc-review-context", text: `${row.label} · ${row.processed}` });
       if (!row.file) main.createDiv({ cls: "fjg-vcc-review-missing", text: row.state });
       const detail = main.createEl("details", { cls: "fjg-vcc-review-provenance" });

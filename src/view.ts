@@ -764,6 +764,7 @@ export class VaultControlCenterView extends ItemView {
       automations: this.automations,
       fileReview: this.plugin.fileReview.snapshot,
       reviewFilters: this.reviewFilters,
+      openReviewFile: (row) => void this.plugin.openReviewFileInTab(row),
       moveReviewFile: (row) => {
         if (row.file) {
           new FileReviewFolderModal(this.app, row, this.plugin.fileReview, () => this.renderContent()).open();

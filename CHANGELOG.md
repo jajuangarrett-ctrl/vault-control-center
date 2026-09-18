@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.11 — 2026-09-18
+
+- Make the current document path in each File review row an underlined, focusable link that opens the exact file in Obsidian's reusable document tab, separately from the filename preview action.
+- Support click and Enter activation, Unicode and meaningful folder spaces, and non-Markdown files through the native file API. Missing/relocated/replaced targets do not open a guessed file.
+- Preserve dashboard-only membership, move corrections, Copy path, and existing Move protections.
+- Validation: 183 tests and production build; live disposable Markdown/SVG path activation, keyboard focus/Enter, stale-link rejection and refreshed moved-path checks.
+
+
 ## 0.3.10 — 2026-09-18
 
 - Make the nine current processing-dashboard output tables the sole File review membership source. Saved records no longer keep removed rows visible or contribute old filing-chain destinations.

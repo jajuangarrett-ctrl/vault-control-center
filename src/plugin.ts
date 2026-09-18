@@ -9,7 +9,7 @@ import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
 import { VaultControlCenterView } from "./view";
 
-import { FileReviewStore, REVIEW_RECORDS_PATH } from "./file-review";
+import { FileReviewStore, REVIEW_RECORDS_PATH, getLiveReviewFile, type ReviewRow } from "./file-review";
 
 type CommandHost = {
   commands?: {
@@ -221,6 +221,20 @@ export default class VaultControlCenterPlugin extends Plugin {
       if (!ran) new Notice(`${label} is not enabled.`);
     } catch {
       new Notice(`${label} could not be opened.`);
+    }
+  }
+
+  async openReviewFileInTab(row: ReviewRow): Promise<void> {
+    const file = getLiveReviewFile(this.app, row);
+    if (!file) {
+      new Notice("That file moved or is no longer available. Refresh File review.");
+      await this.fileReview.refresh();
+      return;
+    }
+    try {
+      await this.reusableFileLeaf().openFile(file);
+    } catch {
+      new Notice("That file could not be opened in an Obsidian tab.");
     }
   }
 
