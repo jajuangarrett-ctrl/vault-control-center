@@ -140,3 +140,5 @@ The interface follows a reference-driven workflow: one stable information archit
 ## License
 
 MIT © Franklin Garrett
+
+Automation output review: see [File review](docs/FILE_REVIEW.md) for the nine recorded-history sources, safe per-file moves, and retention limits.

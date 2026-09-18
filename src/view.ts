@@ -48,6 +48,7 @@ import {
   buildSystemMemorySnapshot,
   type SystemMemorySnapshot,
 } from "./system-memory";
+import { FileReviewFolderModal } from "./file-review-modal";
 import { createButton, createIcon } from "./dom";
 import type VaultControlCenterPlugin from "./plugin";
 import { resolveProgramFolderPath } from "./program-navigation";
@@ -166,6 +167,7 @@ export class VaultControlCenterView extends ItemView {
     items: [],
   };
   private htmlThumbnailsGenerating = false;
+  private reviewFilters = { query: "", workflow: "" };
   private automations: AutomationSnapshot = {
     status: "ready",
     checkedAt: "",
@@ -454,6 +456,7 @@ export class VaultControlCenterView extends ItemView {
         ),
         operationsPromise,
       ]);
+      await this.plugin.fileReview.refresh();
       this.data = data;
       this.taskboard = taskboard;
       if (htmlGeneration === this.htmlSnapshotGeneration) {
@@ -759,6 +762,13 @@ export class VaultControlCenterView extends ItemView {
       htmlGallery: this.htmlGallery,
       htmlThumbnailsGenerating: this.htmlThumbnailsGenerating,
       automations: this.automations,
+      fileReview: this.plugin.fileReview.snapshot,
+      reviewFilters: this.reviewFilters,
+      moveReviewFile: (row) => {
+        if (row.file) {
+          new FileReviewFolderModal(this.app, row, this.plugin.fileReview, () => this.renderContent()).open();
+        }
+      },
       memory: this.memory,
       automationStartingIds: this.automationStartingIds,
       automationRequestMessages: this.automationRequestMessages,
@@ -971,6 +981,7 @@ export class VaultControlCenterView extends ItemView {
       const automationGeneration = ++this.automationSnapshotGeneration;
       const memoryGeneration = ++this.memorySnapshotGeneration;
       const operations = await this.buildOperationsState(isDesktopMac);
+      await this.plugin.fileReview.refresh();
       if (automationGeneration === this.automationSnapshotGeneration) {
         this.automations = operations.automations;
         this.automationSnapshotAppliedGeneration = automationGeneration;
@@ -1141,6 +1152,8 @@ export class VaultControlCenterView extends ItemView {
     if (!this.rootEl || !this.rootEl.isConnected) return;
     if (this.app.workspace.getActiveViewOfType(VaultControlCenterView) !== this) return;
     const target = event.target as HTMLElement | null;
+    // Native modals (including Move) own their keyboard input outside this view.
+    if (!target || !this.rootEl.contains(target)) return;
     const isEditing = target?.matches("input, textarea, select, [contenteditable='true']") ?? false;
     if (
       event.key === "Escape" &&

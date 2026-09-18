@@ -17,6 +17,7 @@ vi.mock("obsidian", () => {
 
   return {
     Component: class {},
+    FuzzySuggestModal: class {},
     ItemView: MockItemView,
     MarkdownRenderer: { render: vi.fn() },
     MarkdownView: class extends MockItemView {},
@@ -304,7 +305,7 @@ function makeView(knownFolderPaths: ReadonlySet<string> = new Set()): VaultContr
         },
       },
     } as never,
-    { settings: {} } as never
+    { settings: {}, fileReview: { snapshot: { rows: [], coverage: [], message: "" } } } as never
   );
 }
 
@@ -366,3 +367,16 @@ function folderPaths(data: DashboardData): ReadonlySet<string> {
   }
   return paths;
 }
+
+describe("dashboard keyboard boundaries", () => {
+  it("does not intercept slash keys sent outside the dashboard, including native modals", () => {
+    const view = makeView() as any;
+    view.rootEl = { isConnected: true, contains: () => false };
+    view.app = { workspace: { getActiveViewOfType: () => view } };
+    view.searchInputEl = { focus: vi.fn() };
+    const event = { key: "/", target: { matches: () => false }, preventDefault: vi.fn() };
+    view.handleKeyboard(event);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(view.searchInputEl.focus).not.toHaveBeenCalled();
+  });
+});

@@ -9,6 +9,8 @@ import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
 import { VaultControlCenterView } from "./view";
 
+import { FileReviewStore, REVIEW_RECORDS_PATH } from "./file-review";
+
 type CommandHost = {
   commands?: {
     executeCommandById?: (id: string) => boolean;
@@ -24,12 +26,14 @@ type AppWithViewRegistry = {
 export type InteractiveHtmlOpenResult = ReusableFileLeafOpenResult | "fallback";
 
 export default class VaultControlCenterPlugin extends Plugin {
+  fileReview!: FileReviewStore;
   settings: DashboardSettings = structuredClone(DEFAULT_SETTINGS);
   private refreshTimer: number | null = null;
   private reusableFileLeafController: ReusableFileLeafController | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.fileReview = new FileReviewStore(this.app);
     this.applyTheme();
 
     this.registerView(
@@ -65,12 +69,20 @@ export default class VaultControlCenterPlugin extends Plugin {
     this.addSettingTab(new VaultControlCenterSettingTab(this.app, this));
 
     this.app.workspace.onLayoutReady(() => {
-      const schedule = () => this.scheduleRefresh();
+      const schedule = (file?: { path: string }) => {
+        if (file?.path !== REVIEW_RECORDS_PATH) this.scheduleRefresh();
+      };
       this.registerEvent(this.app.vault.on("create", schedule));
       this.registerEvent(this.app.vault.on("modify", schedule));
-      this.registerEvent(this.app.vault.on("delete", schedule));
-      this.registerEvent(this.app.vault.on("rename", schedule));
-      this.registerEvent(this.app.workspace.on("file-open", schedule));
+      this.registerEvent(this.app.vault.on("delete", file => {
+        if (file instanceof TFile) this.fileReview.deleted(file);
+        schedule(file);
+      }));
+      this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+        if (file instanceof TFile) this.fileReview.renamed(file, oldPath);
+        schedule(file);
+      }));
+      this.registerEvent(this.app.workspace.on("file-open", () => schedule()));
     });
   }
 

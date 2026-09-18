@@ -79,6 +79,12 @@ Only the routine vault processors with verified labels can expose **Run now**, e
 
 The dedicated broker lives under `netlify/functions/`, and the current-user runner and LaunchAgent templates live under `scripts/` and `runner/`. See `docs/REMOTE_AUTOMATION.md` for installation, credential, validation, and pairing procedures.
 
+## Automation file review
+
+Version 0.3.9 adds **Automations → File review** above the existing workflow controls. It combines recorded outputs from the nine processing dashboards (Vault Folder, Clippings, Root Inbox, Mira, iFLYTEK, YouTube, FJG Capture, Vocci, and Formatted Notes Filing), showing each resolved file once with its vault-relative path and expandable processing provenance. Search or filter the list, preview a file, then choose **Move** and an existing folder in the native searchable picker. Escape cancels; collisions and stale or missing files cannot overwrite another file. Obsidian manages link updates, and existing metadata-maintenance plugins continue to operate normally.
+
+Observed outputs and corrected locations are retained as portable runtime data in `Artifacts/Vault Control Center Native Plugin/File Review Records.json`. Previously truncated history cannot be recovered, and unresolved paths stay disabled without filename guessing. No automation execution settings are changed. See the source repository's `docs/FILE_REVIEW.md` for source mappings, retention behavior, and focused validation.
+
 ## FJG Task Manager
 
 The Home signal and task panel derive their counts from the local folder-based task workspaces. `totalCount` includes every matching workspace task file; `openCount` excludes `completed` and `archived`; the visible list contains only `do-first` work. A task row previews that workspace's `task.md`, while **Task Manager** executes `fjg-task-manager:open-dashboard` and reports when the companion plugin is not enabled.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.9 — 2026-09-18
+
+- Add Automations → File review for the nine synchronized processing dashboards, including Vocci and Mira independently of Run now availability.
+- Show one row per resolved output file with vault-relative path, workflow/run provenance, filename search, workflow filtering, preview, and native searchable destination picker.
+- Use Obsidian FileManager moves with cancellation, collision, concurrent-move, stale-selection, replacement, missing-folder, and missing-file protection; preserve native link-update behavior.
+- Retain observed processing evidence and move locations in a compact synchronized vault JSON record; explicitly report missing/unrecognized history and never guess from recent edits or same-name files.
+- Keep native modal keyboard input outside the dashboard slash shortcut. Preserve the v0.3.8 Copy path command and controls.
+- Focused validation: 175 tests, production build, clean npm audit; live disposable-fixture cancel, collision, successful move/link update, stale selection, and missing-file checks. No real processor was started and no existing user note was moved.
+
+
 ## 0.3.8 — 2026-09-18
 
 - Added a visible **Copy path** action to the Areas and Programs folder browser. It always copies the currently browsed folder as a vault-relative path suitable for Obsidian Clipper, never an absolute system path.
