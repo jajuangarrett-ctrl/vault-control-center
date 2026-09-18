@@ -1718,7 +1718,8 @@ a.fjg-vcc-row {
 }
 
 .fjg-vcc-folder-up,
-.fjg-vcc-folder-crumb {
+.fjg-vcc-folder-crumb,
+.fjg-vcc-folder-copy-path {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1733,13 +1734,15 @@ a.fjg-vcc-row {
   font-weight: 600;
 }
 
-.fjg-vcc-folder-up {
+.fjg-vcc-folder-up,
+.fjg-vcc-folder-copy-path {
   flex: 0 0 auto;
   border: 1px solid var(--vcc-border);
 }
 
 .fjg-vcc-folder-up:hover,
-.fjg-vcc-folder-crumb:hover {
+.fjg-vcc-folder-crumb:hover,
+.fjg-vcc-folder-copy-path:hover {
   background: rgb(var(--vcc-blue-rgb) / 0.09);
   color: var(--vcc-text);
 }
@@ -3695,7 +3698,7 @@ a.fjg-vcc-row {
     min-height: 44px;
   }
 
-  .fjg-vcc :is(.fjg-vcc-folder-up, .fjg-vcc-folder-crumb, .fjg-vcc-folder-chip) {
+  .fjg-vcc :is(.fjg-vcc-folder-up, .fjg-vcc-folder-crumb, .fjg-vcc-folder-copy-path, .fjg-vcc-folder-chip) {
     min-height: 44px;
   }
 }

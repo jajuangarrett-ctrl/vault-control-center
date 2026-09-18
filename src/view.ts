@@ -706,6 +706,51 @@ export class VaultControlCenterView extends ItemView {
     );
   }
 
+  currentFolderPath(): string {
+    const rootPath = normalizeVaultPath(
+      this.route === "areas"
+        ? this.renderState.selectedAreaPath
+        : this.route === "programs"
+          ? this.renderState.selectedProgramPath
+          : ""
+    );
+    const folderPath = normalizeVaultPath(
+      this.route === "areas"
+        ? this.renderState.selectedAreaFolderPath
+        : this.route === "programs"
+          ? this.renderState.selectedProgramFolderPath
+          : ""
+    );
+    if (
+      !rootPath ||
+      !folderPath ||
+      !pathIsWithin(folderPath, rootPath) ||
+      isExcludedPath(folderPath) ||
+      isSensitivePath(folderPath)
+    ) {
+      return "";
+    }
+    const folder = this.app.vault.getAbstractFileByPath(normalizePath(folderPath));
+    return folder instanceof TFolder ? folderPath : "";
+  }
+
+  canCopyCurrentFolderPath(): boolean {
+    return Boolean(this.currentFolderPath());
+  }
+
+  async copyCurrentFolderPath(path = this.currentFolderPath()): Promise<boolean> {
+    const normalizedPath = normalizeVaultPath(path);
+    const currentPath = this.currentFolderPath();
+    if (!normalizedPath || !currentPath || normalizedPath !== currentPath) {
+      new Notice("Choose a folder in Areas or Programs before copying its path.");
+      return false;
+    }
+    return copyText(
+      normalizedPath,
+      `Copied folder path: ${normalizedPath}`
+    );
+  }
+
   private renderContext(): DashboardRenderContext {
     if (!this.data) throw new Error("Dashboard data is not ready.");
     return {
@@ -790,6 +835,7 @@ export class VaultControlCenterView extends ItemView {
         this.renderContent();
         this.focusFolderHeading();
       },
+      copyFolderPath: (path) => void this.copyCurrentFolderPath(path),
       selectAiQueue: (key) => {
         this.renderState.selectedAiQueue = key;
         this.renderContent();

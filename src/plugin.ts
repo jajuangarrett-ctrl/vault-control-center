@@ -51,6 +51,16 @@ export default class VaultControlCenterPlugin extends Plugin {
       name: "Refresh dashboard data",
       callback: () => void this.refreshDashboardViews(true),
     });
+    this.addCommand({
+      id: "copy-current-folder-path",
+      name: "Copy current dashboard folder path",
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(VaultControlCenterView);
+        if (!view?.canCopyCurrentFolderPath()) return false;
+        if (!checking) void view.copyCurrentFolderPath();
+        return true;
+      },
+    });
 
     this.addSettingTab(new VaultControlCenterSettingTab(this.app, this));
 

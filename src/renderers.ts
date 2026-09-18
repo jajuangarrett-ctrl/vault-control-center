@@ -94,6 +94,7 @@ export interface DashboardRenderContext {
   selectAreaFolder: (path: string) => void;
   selectProgram: (path: string) => void;
   selectProgramFolder: (path: string) => void;
+  copyFolderPath: (path: string) => void;
   selectAiQueue: (key: AiFolderKey) => void;
   setRecentFilter: (filter: RecentFilter) => void;
   setBookmarkFilter: (filter: BookmarkFilter) => void;
@@ -843,6 +844,14 @@ function renderFolderCollection(
       });
     }
   }
+  createButton(toolbar, {
+    label: "Copy path",
+    icon: "copy",
+    className: "fjg-vcc-folder-copy-path",
+    ariaLabel: `Copy vault-relative path for ${folderView.name}`,
+    title: "Copy the current vault-relative folder path (⌘⇧C)",
+    onClick: () => context.copyFolderPath(folderView.path),
+  });
 
   browser.createEl("h3", {
     cls: "fjg-vcc-folder-heading",
@@ -1355,12 +1364,17 @@ function queueIcon(key: AiFolderKey): string {
   }[key];
 }
 
-export async function copyText(text: string): Promise<void> {
+export async function copyText(
+  text: string,
+  successMessage = "Copied to clipboard."
+): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
-    new Notice("Copied to clipboard.");
+    new Notice(successMessage);
+    return true;
   } catch {
     new Notice("Clipboard access was not available.");
+    return false;
   }
 }
 

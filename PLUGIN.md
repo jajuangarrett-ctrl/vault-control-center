@@ -25,8 +25,11 @@ Vault Control Center is a standalone native Obsidian community plugin. It presen
 
 - **Vault Control Center: Open dashboard**
 - **Vault Control Center: Refresh dashboard data**
+- **Vault Control Center: Copy current dashboard folder path** (available while an Areas or Programs folder is active)
 
 The ribbon icon opens or reveals the existing dashboard leaf.
+
+The Areas and Programs folder toolbar also exposes **Copy path** directly. It copies the active folder as an Obsidian vault-relative path and updates with child-folder, **Up**, and breadcrumb navigation; it never copies an absolute machine path.
 
 Home capture actions delegate to these optional command IDs:
 
@@ -47,7 +50,7 @@ Vault content discovery stays inside the configured vault roots and applies the 
 
 On desktop macOS, **Update previews** invokes `/usr/bin/qlmanage` with `execFile`, an argument vector, `shell: false`, bounded time/buffer/concurrency settings, and one temporary directory per artifact. The explicit UI action regenerates the current gallery so changes in linked assets are reflected. Temporary output is removed after each attempt, and final PNGs are written through Obsidian's vault API with shared-folder and duplicate-file race recovery.
 
-The Automations route uses only the compiled `FJG_AUTOMATION_ALLOWLIST`. Vault status notes can report results but cannot introduce a command or change a launchd label. Local checks and starts use `/bin/launchctl` through `execFile` with `shell: false`. On a non-executor device, the optional dedicated broker accepts only the six compiled routine IDs plus one distinct fixed `reload-obsidian` application action, each with four bounded request fields. The reload action is not a processor or **Run now** job and invokes only Obsidian's bundled CLI with its fixed in-app `app:reload` command after the executor reports capability. The broker uses separate client/executor authentication, short expirations, replay protection, conditional claims, rate limits, and one in-flight lock per job. Its current-user runner freshly verifies `com.fjg.vault-automation-executor`, the exact mapped target, and the target's non-running state before the same no-shell `kickstart` vector. `-k`, sudo, shells, paths, arguments, environment input, scripts, prompts, and executable content are never accepted. Service, high-impact, disabled, external, missing, status-only, unknown, expired, replayed, unloaded, and already-running requests are rejected.
+The Automations route uses only the compiled `FJG_AUTOMATION_ALLOWLIST`. Vault status notes can report results but cannot introduce a command or change a launchd label. Local checks and starts use `/bin/launchctl` through `execFile` with `shell: false`. On a non-executor device, the optional dedicated broker accepts only the ten compiled routine IDs plus one distinct fixed `reload-obsidian` application action, each with four bounded request fields. The reload action is not a processor or **Run now** job and invokes only Obsidian's bundled CLI with its fixed in-app `app:reload` command after the executor reports capability. The broker uses separate client/executor authentication, short expirations, replay protection, conditional claims, rate limits, and one in-flight lock per job. Its current-user runner freshly verifies `com.fjg.vault-automation-executor`, the exact mapped target, and the target's non-running state before the same no-shell `kickstart` vector. `-k`, sudo, shells, paths, arguments, environment input, scripts, prompts, and executable content are never accepted. Service, high-impact, disabled, external, missing, status-only, unknown, expired, replayed, unloaded, and already-running requests are rejected.
 
 RAM status uses the same proven-executor gate. It reads local counters on the executor Mac or a sanitized fresh authenticated heartbeat from the remote runner; it never substitutes the current device's RAM on a non-executor Mac, Windows/Linux desktop, or mobile device.
 

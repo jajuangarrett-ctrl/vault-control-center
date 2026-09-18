@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.8 — 2026-09-18
+
+- Added a visible **Copy path** action to the Areas and Programs folder browser. It always copies the currently browsed folder as a vault-relative path suitable for Obsidian Clipper, never an absolute system path.
+- Kept the copied value synchronized with child-folder drill-down, **Up**, and breadcrumb navigation, and added an availability-gated command for assigning a keyboard shortcut.
+- Added regression coverage for Programs and Areas navigation, exact clipboard values, and rejection of absolute or non-folder paths.
+- Updated affected test and transitive dependencies to clear the current package-audit advisories.
+
 ## 0.3.7 — 2026-09-05
 
 - Focused the Automations tab on the ten workflows with implemented manual controls; continuous, disabled, and scheduler-only entries remain documented in the automation inventory rather than cluttering the action list.
