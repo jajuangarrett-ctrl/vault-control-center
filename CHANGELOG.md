@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.13 — 2026-09-18
+
+- Add reversible Dismiss from review for unresolved files and a separate Show dismissed view with Restore to review, search, workflow filters, processing history and day sections.
+- Persist visibility independently of file location/fingerprint updates; hide every selected merged history while keeping future events and different output revisions discoverable.
+- Exclude dismissed entries from active counts and fingerprint/recovery work. Preserve all source dashboards and actual files.
+- Validation: 205 tests, production build and focused live disposable-record checks.
+
 ## 0.3.12 — 2026-09-18
 
 - Recover unobserved moves using a saved SHA-256 baseline and a unique exact content match, with bounded incremental hashing and sensitive/archived exclusions. Ambiguity and missing baselines remain explicit.

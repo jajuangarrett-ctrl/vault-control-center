@@ -18,13 +18,14 @@ export const REVIEW_SOURCES: readonly ReviewSource[] = [
 ];
 export interface ReviewRecord {
   id: string; workflow: string; processed: string; original: string; recordedPath: string;
+  dismissed?: boolean; dismissalUpdatedAt?: number;
   identity?: ReviewIdentity; identityUpdatedAt?: number; locationEvidence?: string;
   sourcePath: string; fromPath?: string; currentPath?: string; unavailable?: boolean; locationUpdatedAt?: number;
 }
 export interface ReviewRow extends ReviewRecord { label: string; file: TFile | null; state: string; history: ReviewRecord[] }
 export interface ReviewCoverage { label: string; path?: string; message: string }
-export interface FileReviewSnapshot { rows: ReviewRow[]; coverage: ReviewCoverage[]; message: string }
-export const emptyFileReview = (): FileReviewSnapshot => ({ rows: [], coverage: [], message: "Loading recorded outputs…" });
+export interface FileReviewSnapshot { rows: ReviewRow[]; dismissedRows: ReviewRow[]; coverage: ReviewCoverage[]; message: string }
+export const emptyFileReview = (): FileReviewSnapshot => ({ rows: [], dismissedRows: [], coverage: [], message: "Loading recorded outputs…" });
 const recordKey = (r: ReviewRecord) => JSON.stringify([r.id, r.recordedPath]);
 const sameOutput = (a: ReviewRecord, b: ReviewRecord) => a.recordedPath === b.recordedPath || a.currentPath === b.recordedPath;
 const labelFor = (id: string) => FJG_AUTOMATION_ALLOWLIST.find(x => x.id === id)?.label ?? id;
@@ -114,7 +115,10 @@ export class FileReviewStore {
               const localTime = Math.max(local?.locationUpdatedAt ?? 0, local?.identityUpdatedAt ?? 0);
               const storedTime = Math.max(stored.locationUpdatedAt ?? 0, stored.identityUpdatedAt ?? 0);
               const selected = local && localTime >= storedTime ? local : stored;
-              this.records.set(recordKey(r), selected);
+              // Visibility is independent of location/baseline timestamps. A fresh identity
+              // read on one device must not undo a dismissal/restore from another.
+              const visibility = local && (local.dismissalUpdatedAt ?? 0) >= (stored.dismissalUpdatedAt ?? 0) ? local : stored;
+              this.records.set(recordKey(r), { ...selected, dismissed: visibility.dismissed, dismissalUpdatedAt: visibility.dismissalUpdatedAt });
               if (selected === stored && !stored.unavailable && (stored.locationUpdatedAt ?? 0) > (local?.locationUpdatedAt ?? 0)) {
                 this.unavailable.delete(recordKey(r)); this.bindings.delete(recordKey(r));
               }
@@ -136,11 +140,13 @@ export class FileReviewStore {
         const md = await this.app.vault.cachedRead(file);
         const records = parseReviewTable(md, source, this.app.vault.getName());
         for (const record of records) {
-          const old = this.records.get(recordKey(record)) ?? [...this.records.values()].find(r => r.id === record.id && r.currentPath === record.recordedPath);
+          const exact = this.records.get(recordKey(record));
+          const old = exact ?? [...this.records.values()].find(r => r.id === record.id && r.currentPath === record.recordedPath);
           const current = old && sameOutput(old, record) ? {
             ...record, currentPath: old.currentPath, unavailable: old.unavailable,
             locationUpdatedAt: old.locationUpdatedAt, locationEvidence: old.locationEvidence,
             identity: old.identity, identityUpdatedAt: old.identityUpdatedAt,
+            dismissed: exact?.dismissed, dismissalUpdatedAt: exact?.dismissalUpdatedAt,
           } : record;
           activeRecords.set(record.id, current);
           this.records.set(recordKey(record), current);
@@ -153,10 +159,16 @@ export class FileReviewStore {
     for (const key of this.bindings.keys()) if (!activeKeys.has(key)) this.bindings.delete(key);
     const records = [...activeRecords.values()].sort((a, b) => b.processed.localeCompare(a.processed));
     const events: ReviewRow[] = [];
+    const hiddenEvents: ReviewRow[] = [];
     for (const record of records) {
       let path = resolveReviewPath(record, records);
       if (!reviewPath(path)) continue;
       const key = recordKey(record);
+      if (record.dismissed) {
+        this.bindings.delete(key);
+        hiddenEvents.push({ ...record, currentPath: path, label: labelFor(record.workflow), file: null, history: [record], state: "Dismissed from review — files and source history are unchanged." });
+        continue; // No file binding, fingerprint reads or recovery scans for dismissed entries.
+      }
       let found = this.app.vault.getAbstractFileByPath(path);
       const prior = this.bindings.get(key);
       // Folder renames can update child TFile paths without individual rename events.
@@ -191,20 +203,24 @@ export class FileReviewStore {
       if (file) this.bindings.set(key, file);
       events.push({ ...record, currentPath: path, label: labelFor(record.workflow), file, history: [record], state });
     }
-    const grouped = new Map<string, ReviewRow>();
-    for (const row of events) {
-      const key = row.currentPath ?? row.recordedPath;
-      const existing = grouped.get(key);
-      if (existing) {
-        existing.history.push(...row.history);
-        existing.label = [...new Set(existing.history.map(r => labelFor(r.workflow)))].join(" · ");
-      } else grouped.set(key, row);
-    }
-    const rows = [...grouped.values()];
+    const group = (items: ReviewRow[]): ReviewRow[] => {
+      const grouped = new Map<string, ReviewRow>();
+      for (const row of items) {
+        const key = row.currentPath ?? row.recordedPath;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.history.push(...row.history);
+          existing.label = [...new Set(existing.history.map(r => labelFor(r.workflow)))].join(" · ");
+        } else grouped.set(key, row);
+      }
+      return [...grouped.values()];
+    };
+    const rows = group(events);
+    const dismissedRows = group(hiddenEvents);
     if (this.loaded) {
       try { await this.persist(); } catch { persistenceError = "Review history could not be saved. Current results are still available."; }
     }
-    this.snapshot = { rows, coverage: coverage.sort((a,b) => a.label.localeCompare(b.label)), message: persistenceError || "Only processed outputs currently listed in the nine dashboard tables are included. Saved history never adds rows; verified move corrections only update listed files’ locations." };
+    this.snapshot = { rows, dismissedRows, coverage: coverage.sort((a,b) => a.label.localeCompare(b.label)), message: persistenceError || "Only processed outputs currently listed in the nine dashboard tables are included. Saved history never adds rows; verified move corrections only update listed files’ locations." };
     return this.snapshot;
   }
   renamed(file: TFile, _oldPath: string): void {
@@ -269,6 +285,33 @@ export class FileReviewStore {
     this.queue = work.catch(() => undefined);
     return work;
   }
+  /** Reversible visibility change for the exact displayed event/output revisions only. */
+  setDismissed(row: ReviewRow, dismissed: boolean): Promise<void> {
+    const keys = row.history.map(recordKey);
+    const path = row.currentPath ?? row.recordedPath;
+    const work = this.queue.then(async () => {
+      const snapshot = await this.load();
+      if (!this.loaded) throw new Error("Saved review history is unreadable. Repair it before changing review visibility.");
+      const sourceRows = dismissed ? snapshot.rows : snapshot.dismissedRows;
+      const current = sourceRows.find(candidate => (candidate.currentPath ?? candidate.recordedPath) === path && keys.every(key => candidate.history.some(event => recordKey(event) === key)));
+      if (!current) throw new Error("This processing entry changed. Refresh File review and try again.");
+      if (dismissed && current.file) throw new Error("This file is available again. Refresh File review to open it.");
+      const records = current.history.filter(event => keys.includes(recordKey(event)));
+      const prior = records.map(record => ({ dismissed: record.dismissed, dismissalUpdatedAt: record.dismissalUpdatedAt }));
+      for (const record of records) {
+        record.dismissed = dismissed;
+        record.dismissalUpdatedAt = Math.max(Date.now(), (record.dismissalUpdatedAt ?? 0) + 1);
+      }
+      try { await this.persist(); }
+      catch (error) {
+        records.forEach((record, i) => Object.assign(record, prior[i]));
+        throw new Error("The review visibility change could not be saved. Nothing was dismissed or restored.");
+      }
+      await this.load();
+    });
+    this.queue = work.catch(() => undefined);
+    return work;
+  }
   private async persist(): Promise<void> {
     const content = JSON.stringify({ version: 1, records: [...this.records.values()] }, null, 2) + "\n";
     const file = this.app.vault.getAbstractFileByPath(REVIEW_RECORDS_PATH);
@@ -285,6 +328,8 @@ function validRecord(r: any): r is ReviewRecord {
   return r && [r.id,r.workflow,r.processed,r.original,r.sourcePath,r.recordedPath].every(x => typeof x === "string") &&
     REVIEW_SOURCES.some(x => x.id === r.workflow && x.path === r.sourcePath) &&
     Boolean(reviewPath(r.recordedPath)) && Boolean(reviewPath(r.sourcePath)) &&
+    (r.dismissed === undefined || typeof r.dismissed === "boolean") &&
+    (r.dismissalUpdatedAt === undefined || (typeof r.dismissalUpdatedAt === "number" && Number.isFinite(r.dismissalUpdatedAt))) &&
     (r.identity === undefined || validIdentity(r.identity)) &&
     (r.identityUpdatedAt === undefined || (typeof r.identityUpdatedAt === "number" && Number.isFinite(r.identityUpdatedAt))) &&
     (r.locationEvidence === undefined || typeof r.locationEvidence === "string") &&

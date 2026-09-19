@@ -305,7 +305,7 @@ function makeView(knownFolderPaths: ReadonlySet<string> = new Set()): VaultContr
         },
       },
     } as never,
-    { settings: {}, fileReview: { snapshot: { rows: [], coverage: [], message: "" } } } as never
+    { settings: {}, fileReview: { snapshot: { rows: [], dismissedRows: [], coverage: [], message: "" } } } as never
   );
 }
 

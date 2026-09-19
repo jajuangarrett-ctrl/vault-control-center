@@ -1,6 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import { FileReviewStore, REVIEW_RECORDS_PATH, REVIEW_SOURCES, getLiveReviewFile, moveReviewedFile } from "./file-review";
+import { groupReviewDays } from "./file-review-days";
 import { IDENTITY_LIMITS, ReviewIdentityIndex, fileStamp } from "./file-review-identity";
 
 const source = REVIEW_SOURCES.find(x => x.id === "formatted-notes-filing")!;
@@ -124,5 +125,108 @@ describe("verified recovery and explicit location", () => {
     index.begin(); expect((await index.find(baseline)).file).toBe(f.note);
     f.readBinary.mockClear(); index.begin(); expect((await index.find(baseline)).file).toBe(f.note);
     expect(f.readBinary).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("reversible review dismissal", () => {
+  it("dismisses merged workflow histories through refresh/reload, retains source content and restores all entries", async () => {
+    const f = setup(); f.files.delete(f.note.path);
+    const capture = REVIEW_SOURCES.find(s => s.id === "vocci-notes-processing")!;
+    f.add(capture.path, "## Processing History\n| Vocci session | Processed | Verbatim Vocci note |\n|---|---|---|\n| Session | 2026-09-17 | [[AI Team/Formatted_Notes/Input.md]] |");
+    const sourceBefore = f.contents.get(source.path), captureBefore = f.contents.get(capture.path);
+    const row = (await f.store.refresh()).rows[0];
+    expect(row.history).toHaveLength(2);
+    await f.store.setDismissed(row, true);
+    expect(f.store.snapshot.rows).toHaveLength(0);
+    expect(f.store.snapshot.dismissedRows[0].history).toHaveLength(2);
+    const reloaded = new FileReviewStore(f.app);
+    const snapshot = await reloaded.refresh();
+    expect(snapshot.rows).toHaveLength(0); expect(snapshot.dismissedRows).toHaveLength(1);
+    expect(f.contents.get(source.path)).toBe(sourceBefore); expect(f.contents.get(capture.path)).toBe(captureBefore);
+    expect(f.modify.mock.calls.every(([file]) => file.path === REVIEW_RECORDS_PATH)).toBe(true);
+    await reloaded.setDismissed(snapshot.dismissedRows[0], false);
+    const restored = await new FileReviewStore(f.app).refresh();
+    expect(restored.rows[0].history).toHaveLength(2); expect(restored.dismissedRows).toHaveLength(0);
+    expect(restored.rows[0].file).toBeNull();
+  });
+  it("does not transfer dismissal to a reused event's different output, a corrected path revision, or a new processing event", async () => {
+    const f = setup(); f.files.delete(f.note.path);
+    await f.store.setDismissed((await f.store.refresh()).rows[0], true);
+    f.contents.set(source.path, table("Different/Output.md"));
+    let snapshot = await f.store.refresh();
+    expect(snapshot.rows).toHaveLength(1); expect(snapshot.dismissedRows).toHaveLength(0);
+    // A newer event at the same old file is visible, while the dismissed older event stays hidden.
+    f.contents.set(source.path, table(f.note.path, `| New input.md | 2026-09-19 09:00 PDT | [[${f.note.path}]] |`));
+    snapshot = await f.store.refresh();
+    expect(snapshot.rows).toHaveLength(1); expect(snapshot.rows[0].history).toHaveLength(1);
+    expect(snapshot.rows[0].processed).toContain("2026-09-19"); expect(snapshot.dismissedRows).toHaveLength(1);
+    f.contents.set(source.path, "## Filing History");
+    snapshot = await f.store.refresh();
+    expect(snapshot.rows).toHaveLength(0); expect(snapshot.dismissedRows).toHaveLength(0);
+    expect(JSON.parse(f.contents.get(REVIEW_RECORDS_PATH)!).records.some((r: any) => r.dismissed)).toBe(true);
+    f.contents.set(source.path, table(f.note.path));
+    snapshot = await new FileReviewStore(f.app).refresh();
+    expect(snapshot.rows).toHaveLength(0); expect(snapshot.dismissedRows).toHaveLength(1);
+  });
+  it("does not inherit dismissal through a location correction alias", async () => {
+    const f = setup(); await f.store.refresh();
+    const oldPath = f.note.path; f.move(f.note, "Corrected/Note.md"); f.store.renamed(f.note, oldPath);
+    await f.store.refresh(); f.files.delete(f.note.path);
+    await f.store.setDismissed((await f.store.refresh()).rows[0], true);
+    f.contents.set(source.path, table(f.note.path));
+    expect((await f.store.refresh()).rows).toHaveLength(1);
+    expect(f.store.snapshot.dismissedRows).toHaveLength(0);
+  });
+  it("skips fingerprinting and recovery for dismissed entries even after reload and file reappearance", async () => {
+    const f = setup(); await f.store.refresh(); f.files.delete(f.note.path);
+    await f.store.setDismissed((await f.store.refresh()).rows[0], true);
+    f.add("Reappeared/Note.md", "verified bytes α"); f.readBinary.mockClear();
+    const find = vi.spyOn(ReviewIdentityIndex.prototype, "find");
+    try {
+      const store = new FileReviewStore(f.app); await store.refresh(); await store.refresh();
+      expect(f.readBinary).not.toHaveBeenCalled(); expect(find).not.toHaveBeenCalled();
+      await store.setDismissed(store.snapshot.dismissedRows[0], false);
+      expect(store.snapshot.rows[0].currentPath).toBe("Reappeared/Note.md");
+    } finally { find.mockRestore(); }
+  });
+  it("keeps dismissal sync separate from newer local identity/location updates and accepts a newer Restore", async () => {
+    const f = setup(); await f.store.refresh(); f.files.delete(f.note.path);
+    const saved = JSON.parse(f.contents.get(REVIEW_RECORDS_PATH)!);
+    saved.records[0].dismissed = true; saved.records[0].dismissalUpdatedAt = 100;
+    saved.records[0].identityUpdatedAt = 1;
+    f.contents.set(REVIEW_RECORDS_PATH, JSON.stringify(saved));
+    expect((await f.store.refresh()).rows).toHaveLength(0);
+    const restored = JSON.parse(f.contents.get(REVIEW_RECORDS_PATH)!);
+    restored.records[0].dismissed = false; restored.records[0].dismissalUpdatedAt = 101;
+    f.contents.set(REVIEW_RECORDS_PATH, JSON.stringify(restored));
+    expect((await f.store.refresh()).rows).toHaveLength(1);
+    expect(f.store.snapshot.rows[0].identity).toBeDefined();
+  });
+  it("rejects stale or recovered active entries, and rolls back an unsaved dismissal", async () => {
+    const f = setup(); f.files.delete(f.note.path);
+    const row = (await f.store.refresh()).rows[0];
+    f.contents.set(source.path, table("Different/Output.md"));
+    await expect(f.store.setDismissed(row, true)).rejects.toThrow(/changed/);
+    f.contents.set(source.path, table(f.note.path)); f.files.set(f.note.path, f.note);
+    await expect(f.store.setDismissed(row, true)).rejects.toThrow(/available again/);
+    f.files.delete(f.note.path); await f.store.refresh();
+    const before = f.contents.get(REVIEW_RECORDS_PATH);
+    f.modify.mockRejectedValueOnce(new Error("disk full"));
+    await expect(f.store.setDismissed(f.store.snapshot.rows[0], true)).rejects.toThrow(/could not be saved/);
+    expect(f.contents.get(REVIEW_RECORDS_PATH)).toBe(before);
+    expect((await f.store.refresh()).rows).toHaveLength(1);
+    expect(f.store.snapshot.dismissedRows).toHaveLength(0);
+  });
+  it("excludes dismissed entries from active day/filter counts and restores them to their original day", async () => {
+    const f = setup(); f.files.delete(f.note.path);
+    f.contents.set(source.path, table(f.note.path, "| Other.md | 2026-09-17 | [[Other/Output.md]] |"));
+    const row = (await f.store.refresh()).rows.find(r => r.original === "Input.md")!;
+    await f.store.setDismissed(row, true);
+    expect(groupReviewDays(f.store.snapshot.rows).map(g => [g.key,g.rows.length])).toEqual([["2026-09-17",1]]);
+    expect(f.store.snapshot.rows.filter(r => r.original === "Input.md")).toHaveLength(0);
+    expect(groupReviewDays(f.store.snapshot.dismissedRows).map(g => [g.key,g.rows.length])).toEqual([["2026-09-18",1]]);
+    await f.store.setDismissed(f.store.snapshot.dismissedRows[0], false);
+    expect(groupReviewDays(f.store.snapshot.rows).map(g => [g.key,g.rows.length])).toEqual([["2026-09-18",1],["2026-09-17",1]]);
   });
 });

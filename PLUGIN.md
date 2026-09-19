@@ -128,3 +128,7 @@ BRAT-compatible releases must include these runtime files at the repository root
 File review now groups each current file under its latest recorded processing day, newest first, with keyboard-accessible expandable day headers and filtered counts. Disclosure choices survive ordinary refreshes. Earlier processing events remain in the file's history.
 
 Refresh reconnects unobserved moves only from a saved SHA-256 fingerprint and a unique exact content match among eligible vault files. **Locate file** handles missing baselines, changed content, duplicates and files above the 16 MiB fingerprint cap: select the intended current file to remember its location without moving or rewriting it. The same nine current dashboard output tables still control membership. Hashing is bounded and cached; no document content is stored in the synchronized review journal. See the repository's `docs/FILE_REVIEW.md` for criteria, limits and validation.
+
+### Dismissed File review entries (v0.3.13)
+
+Unresolved entries now offer **Dismiss from review** beside Locate file. Dismiss hides all processing histories in that row from the active list and its counts, without changing files or processing dashboards. **Show dismissed** opens a separate searchable view with **Restore to review**. Dismissals survive refresh/reload through the synchronized review journal and do not trigger repeated content recovery. New processing events and different recorded output revisions remain discoverable; older dismissed history stays hidden. Update other devices to v0.3.13 or newer through BRAT.

@@ -168,7 +168,7 @@ export class VaultControlCenterView extends ItemView {
   };
   private htmlThumbnailsGenerating = false;
   private reviewDayExpansion = new Map<string, boolean>();
-  private reviewFilters = { query: "", workflow: "" };
+  private reviewFilters = { query: "", workflow: "", dismissed: false };
   private automations: AutomationSnapshot = {
     status: "ready",
     checkedAt: "",
@@ -766,6 +766,12 @@ export class VaultControlCenterView extends ItemView {
       fileReview: this.plugin.fileReview.snapshot,
       reviewFilters: this.reviewFilters,
       reviewDayExpansion: this.reviewDayExpansion,
+      setReviewDismissed: (row, dismissed) => {
+        void this.plugin.fileReview.setDismissed(row, dismissed).then(() => {
+          new Notice(dismissed ? "Dismissed from review. Use Show dismissed to restore it." : "Restored to review.");
+        }).catch(error => new Notice(error instanceof Error ? error.message : "The review entry could not be updated.", 8000))
+          .finally(() => this.renderContent());
+      },
       locateReviewFile: (row) => new FileReviewLocateModal(this.app, row, this.plugin.fileReview, () => this.renderContent()).open(),
       openReviewFile: (row) => void this.plugin.openReviewFileInTab(row),
       moveReviewFile: (row) => {
