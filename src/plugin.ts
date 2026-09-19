@@ -116,6 +116,10 @@ export default class VaultControlCenterPlugin extends Plugin {
       peopleFolder: stringSetting(saved.peopleFolder, DEFAULT_SETTINGS.peopleFolder),
       tasksFilePath: stringSetting(saved.tasksFilePath, DEFAULT_SETTINGS.tasksFilePath),
       htmlRoots: stringArraySetting(saved.htmlRoots, DEFAULT_SETTINGS.htmlRoots),
+      htmlHomePages: stringArraySettingAllowEmpty(
+        saved.htmlHomePages,
+        DEFAULT_SETTINGS.htmlHomePages
+      ),
       htmlThumbnailFolder: stringSetting(
         saved.htmlThumbnailFolder,
         DEFAULT_SETTINGS.htmlThumbnailFolder
@@ -168,7 +172,10 @@ export default class VaultControlCenterPlugin extends Plugin {
       },
     };
 
-    if (savedSchemaVersion < DEFAULT_SETTINGS.schemaVersion) {
+    if (
+      savedSchemaVersion < DEFAULT_SETTINGS.schemaVersion ||
+      !Array.isArray(saved.htmlHomePages)
+    ) {
       await this.saveData(this.settings);
     }
   }
@@ -334,4 +341,15 @@ function stringArraySetting(value: unknown, fallback: string[]): string[] {
     .map((entry) => entry.trim())
     .filter(Boolean);
   return strings.length ? strings : [...fallback];
+}
+
+function stringArraySettingAllowEmpty(
+  value: unknown,
+  fallback: readonly string[]
+): string[] {
+  if (!Array.isArray(value)) return [...fallback];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }

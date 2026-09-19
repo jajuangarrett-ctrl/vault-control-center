@@ -183,11 +183,11 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
   const toolbar = parent.createDiv({ cls: "fjg-vcc-html-toolbar" });
   const copy = toolbar.createDiv({ cls: "fjg-vcc-html-toolbar-copy" });
   copy.createEl("h2", {
-    text: `${items.length} HTML artifact${items.length === 1 ? "" : "s"}`,
+    text: `${items.length} active home page${items.length === 1 ? "" : "s"}`,
   });
   copy.createEl("p", {
     text:
-      "Clickable previews for finished HTML dashboards and tools across the configured vault folders.",
+      "Clickable previews for the active HTML dashboard and tool home pages selected in plugin settings.",
   });
   createButton(toolbar, {
     label: context.htmlThumbnailsGenerating
@@ -202,10 +202,10 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
   if (!items.length) {
     createEmptyState(
       parent,
-      context.state.query ? "No HTML artifacts match" : "No HTML artifacts found",
+      context.state.query ? "No active home pages match" : "No active home pages found",
       context.state.query
         ? "Try another search or clear the current query."
-        : "Check the HTML gallery roots in plugin settings, then refresh.",
+        : "Check the HTML home pages and gallery roots in plugin settings, then refresh.",
       "panels-top-left"
     );
     return;
@@ -213,7 +213,7 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
 
   const grid = parent.createDiv({
     cls: "fjg-vcc-html-grid",
-    attr: { "aria-label": "HTML artifact gallery" },
+    attr: { "aria-label": "Active HTML home page gallery" },
   });
   for (const item of items) {
     const card = grid.createEl("button", {
@@ -257,7 +257,7 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
     cardCopy.createSpan({ cls: "fjg-vcc-html-card-title", text: item.title });
     cardCopy.createEl("p", {
       cls: "fjg-vcc-html-card-description",
-      text: item.description || "Interactive HTML artifact",
+      text: item.description || "Interactive HTML home page",
     });
     const meta = cardCopy.createDiv({ cls: "fjg-vcc-html-card-meta" });
     meta.createSpan({ text: `${item.category} · ${item.folder}` });

@@ -129,15 +129,21 @@ const BLACKROCK_FUTURE_BUILDERS_PREFIX =
 const HTML_METADATA_CACHES = new WeakMap<App, Map<string, CachedHtmlMetadata>>();
 
 /**
- * Builds a live, read-only catalog of safe HTML files. A bad file contributes a
- * fallback card and an error instead of preventing the rest of the catalog.
+ * Builds a live, read-only catalog of safe HTML files. When `homePages` is
+ * provided, only those exact vault-relative launch pages are eligible. This
+ * keeps redirects, packaged copies, route helpers, and obsolete HTML beside a
+ * live app out of the gallery without modifying or deleting any source file.
+ * A bad selected file contributes a fallback card and an error instead of
+ * preventing the rest of the catalog.
  */
 export async function buildHtmlGallerySnapshot(
   app: App,
   roots: string[],
-  thumbnailFolder: string
+  thumbnailFolder: string,
+  homePages?: readonly string[]
 ): Promise<HtmlGallerySnapshot> {
   const normalizedRoots = normalizeRoots(roots);
+  const normalizedHomePages = normalizeHomePages(homePages);
   const errors: HtmlGalleryError[] = [];
   const requestedThumbnailFolder = normalizeVaultPath(thumbnailFolder);
   const normalizedThumbnailFolder = isSafeHtmlThumbnailFolder(
@@ -165,7 +171,14 @@ export async function buildHtmlGallerySnapshot(
       const withinConfiguredRoot = normalizedRoots.some((root) =>
         pathIsWithin(path, root)
       );
-      if (!withinConfiguredRoot || shouldExcludeHtmlPath(path)) {
+      const isConfiguredHomePage =
+        normalizedHomePages === null ||
+        normalizedHomePages.has(path.toLocaleLowerCase());
+      if (
+        !withinConfiguredRoot ||
+        !isConfiguredHomePage ||
+        shouldExcludeHtmlPath(path)
+      ) {
         excludedCount += 1;
         continue;
       }
@@ -550,6 +563,23 @@ function isHtmlFile(file: TFile): boolean {
 
 function normalizeRoots(roots: readonly string[]): string[] {
   return [...new Set((roots ?? []).map(normalizeVaultPath).filter(Boolean))];
+}
+
+/**
+ * `undefined` preserves the discovery API used by older callers. An explicit
+ * empty array is intentionally different: it means that no home pages are
+ * configured and therefore no gallery card should be shown.
+ */
+function normalizeHomePages(
+  homePages: readonly string[] | undefined
+): Set<string> | null {
+  if (homePages === undefined) return null;
+  return new Set(
+    homePages
+      .map(normalizeVaultPath)
+      .filter(Boolean)
+      .map((path) => path.toLocaleLowerCase())
+  );
 }
 
 function bestMatchingRoot(path: string, roots: readonly string[]): string {

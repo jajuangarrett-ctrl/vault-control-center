@@ -453,7 +453,8 @@ export class VaultControlCenterView extends ItemView {
         buildHtmlGallerySnapshot(
           this.app,
           this.plugin.settings.htmlRoots,
-          this.plugin.settings.htmlThumbnailFolder
+          this.plugin.settings.htmlThumbnailFolder,
+          this.plugin.settings.htmlHomePages
         ),
         operationsPromise,
       ]);
@@ -933,7 +934,8 @@ export class VaultControlCenterView extends ItemView {
       const htmlGallery = await buildHtmlGallerySnapshot(
         this.app,
         this.plugin.settings.htmlRoots,
-        this.plugin.settings.htmlThumbnailFolder
+        this.plugin.settings.htmlThumbnailFolder,
+        this.plugin.settings.htmlHomePages
       );
       if (htmlGeneration === this.htmlSnapshotGeneration) {
         this.htmlGallery = htmlGallery;

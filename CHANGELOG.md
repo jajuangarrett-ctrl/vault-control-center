@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.14 — 2026-09-18
+
+- Replace broad HTML-file discovery with an editable list of 30 audited, canonical home pages inside the existing safe gallery roots.
+- Keep redirect shells, packaged copies, superseded dashboards, route helpers, mocks, references, and legacy HTML runtimes out of the gallery without moving or deleting any source files.
+- Preserve exact canonical launch paths, searchable cards, reusable native-tab opening, and preview generation only for the retained pages.
+- Validation: 208 tests, production build, canonical-path inventory reconciliation, and focused live Obsidian gallery checks.
+
 ## 0.3.13 — 2026-09-18
 
 - Add reversible Dismiss from review for unresolved files and a separate Show dismissed view with Restore to review, search, workflow filters, processing history and day sections.

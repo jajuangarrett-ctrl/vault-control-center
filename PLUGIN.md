@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Vault Control Center is a standalone native Obsidian community plugin. It presents eleven live operational views without embedding an HTML dashboard, invoking a local server, or persisting a snapshot of vault content. Finished HTML artifacts are cataloged as vault files; a registered desktop viewer opens them in a reusable native tab, with a safe source-preview fallback on unsupported devices.
+Vault Control Center is a standalone native Obsidian community plugin. It presents eleven live operational views without embedding an HTML dashboard, invoking a local server, or persisting a snapshot of vault content. Configured active HTML home pages are cataloged as vault files; a registered desktop viewer opens them in a reusable native tab, with a safe source-preview fallback on unsupported devices.
 
 ## Architecture
 
@@ -12,13 +12,13 @@ Vault Control Center is a standalone native Obsidian community plugin. It presen
 - `src/reusable-file-leaf.ts` keeps one unpinned native editor tab available for repeated **Open in tab** actions without replacing the dashboard.
 - `src/data.ts` builds the in-memory vault index and applies privacy filters.
 - `src/program-navigation.ts` owns recursive folder views and safe route-wide Areas/Programs file search.
-- `src/html-gallery.ts` discovers safe finished HTML files, caches concurrency-bounded metadata parsing, derives stable thumbnail paths, and performs explicitly requested Quick Look generation.
+- `src/html-gallery.ts` intersects exact configured HTML home pages with safe gallery roots, caches concurrency-bounded metadata parsing, derives stable thumbnail paths, and performs explicitly requested Quick Look generation.
 - `src/automations.ts` owns the fixed automation inventory, synchronized status parsing, local launchd inspection, executor detection, and allowlisted local routine starts.
 - `src/remote-automation.ts` owns the fail-closed broker client, Secret Storage lookup, remote executor health, sanitized RAM parsing, and fixed-ID request submission.
 - `src/system-memory.ts` reads RAM only after the desktop-macOS and executor-host guards pass.
 - `src/taskboard.ts` derives the Home task summary from local FJG Task Manager workspace notes; the older remote adapter remains inert compatibility code in v0.2.0.
 - `src/renderers.ts` renders all eleven routes with native DOM elements.
-- `src/settings.ts` exposes source paths, HTML runtime paths, theme controls, and retained compatibility settings.
+- `src/settings.ts` exposes source paths, exact HTML home pages, HTML runtime paths, theme controls, and retained compatibility settings.
 - `styles.css` contains scoped component, responsive, and optional shell-theme rules.
 
 ## Commands
@@ -46,7 +46,7 @@ The Home task panel delegates its primary action to `fjg-task-manager:open-dashb
 
 The plugin persists validated settings and the compact File review provenance/location/fingerprint journal described below. Derived file lists, queue records, people records, bookmark results, task-workspace results, automation state, and RAM readings remain in memory. A capped safe-path preview history and the folder-rail disclosure state may remain in Obsidian workspace state. Explicitly generated HTML thumbnails are the intentional derived-file exception and are stored in the configured vault-relative runtime folder.
 
-Vault content discovery stays inside the configured vault roots and applies the shared sensitive, hidden, and archived-path filters. HTML discovery adds mechanical exclusions for inbox/queue, development, build, test, template, and reusable-design-system paths. Metadata reads are capped, individual file errors fail open to a fallback card, and HTML source is never executed by the gallery.
+Vault content discovery stays inside the configured vault roots and applies the shared sensitive, hidden, and archived-path filters. HTML discovery additionally requires an exact `htmlHomePages` match inside `htmlRoots`, then applies mechanical exclusions for inbox/queue, development, build, test, template, and reusable-design-system paths. Metadata reads are capped, individual file errors fail open to a fallback card, and HTML source is never executed by the gallery.
 
 On desktop macOS, **Update previews** invokes `/usr/bin/qlmanage` with `execFile`, an argument vector, `shell: false`, bounded time/buffer/concurrency settings, and one temporary directory per artifact. The explicit UI action regenerates the current gallery so changes in linked assets are reflected. Temporary output is removed after each attempt, and final PNGs are written through Obsidian's vault API with shared-folder and duplicate-file race recovery.
 
@@ -58,7 +58,7 @@ The v0.2.0 FJG Task Manager integration reads only `08 Tasks/Workspaces/*/task.m
 
 ## HTML gallery
 
-The HTML route builds a live, searchable card catalog from the configured `htmlRoots`. Cards use capped, cached, concurrency-bounded `<title>` and description parsing, fall back safely when a file cannot be read, and sort newest first. Each source path maps to a stable 16-hex PNG name under `htmlThumbnailFolder`, allowing the portable thumbnails to sync independently of the development repository. Selecting a card uses the registered desktop HTML view through the same reusable native tab controller as **Open in tab**; unavailable or failed interactive opens fall back to the escaped in-dashboard source preview.
+The HTML route builds a live, searchable card catalog from the intersection of configured `htmlHomePages` and `htmlRoots`. The exact page list identifies active canonical launch pages while the roots remain the outer safety boundary. Settings schema 7 seeds existing installs with 30 audited canonical paths; a missing or non-array value migrates to those defaults, while an explicit empty array is preserved and displays no cards. Cards use capped, cached, concurrency-bounded `<title>` and description parsing, fall back safely when a selected file cannot be read, and sort newest first. Each source path maps to a stable 16-hex PNG name under `htmlThumbnailFolder`, allowing the portable thumbnails to sync independently of the development repository. Selecting a card uses the registered desktop HTML view through the same reusable native tab controller as **Open in tab**; unavailable or failed interactive opens fall back to the escaped in-dashboard source preview.
 
 Thumbnail generation is intentionally unavailable outside desktop Obsidian on macOS or when the vault does not use a local `FileSystemAdapter`. Browsing already-indexed artifacts and synchronized thumbnails remains available on other devices, where card selection opens the safe source preview rather than executing the HTML.
 

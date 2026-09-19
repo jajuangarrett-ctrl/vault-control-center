@@ -1,6 +1,6 @@
 # Vault Control Center
 
-Vault Control Center is a native Obsidian dashboard for operating a structured vault. It replaces a static HTML Viewer/local-server workflow with a live `ItemView`: files, folders, HTML artifacts, queues, bookmarks, people, task workspaces, capture actions, automations, and templates all work through Obsidian itself.
+Vault Control Center is a native Obsidian dashboard for operating a structured vault. It replaces a static HTML Viewer/local-server workflow with a live `ItemView`: files, folders, active HTML home pages, queues, bookmarks, people, task workspaces, capture actions, automations, and templates all work through Obsidian itself.
 
 ![Illustrative dark-mode design concept](docs/design/vault-control-center-dark-concept.png)
 
@@ -15,7 +15,7 @@ The dashboard keeps eleven views in one consistent throwback navy, gold, orange,
 | Home | Capture actions, live signals, current programs, recent files, people, and local FJG Task Manager status |
 | Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with a collapsible root rail, recursive drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
 | Programs | Program folders, activity groups, a collapsible root rail, recursive subfolder drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
-| HTML | A searchable card gallery of safe finished HTML artifacts under configurable vault roots, with optional Quick Look thumbnails |
+| HTML | A searchable card gallery of explicitly selected active HTML home pages inside configurable vault roots, with optional Quick Look thumbnails |
 | AI Team | Four configurable operational queues; Owner and Team inboxes use complete direct-file counts and lists |
 | Automations | Scheduled vault processors and external jobs, plus executor-Mac RAM status |
 | Recent | Searchable, vault-wide Obsidian file-open history with category filters |
@@ -28,7 +28,7 @@ Additional features:
 
 - Native ribbon icon and command-palette actions
 - A visible **Copy path** action in the Areas and Programs folder browser that follows drill-down, **Up**, and breadcrumb navigation and copies the current vault-relative folder path for Obsidian Clipper
-- Searchable HTML artifact cards with title, description, category, folder, modified time, and a reusable native-tab opening flow
+- Searchable active HTML home-page cards with title, description, category, folder, modified time, and a reusable native-tab opening flow
 - Explicit **Update previews** regeneration for HTML thumbnails through macOS Quick Look; generated PNGs use stable names in a configurable vault-relative runtime folder
 - Cross-device automation results from synchronized status notes, with local launchd controls on the confirmed executor or an optional isolated fixed-ID Netlify broker for the always-on Mac
 - RAM pressure and usage for the confirmed local or authenticated remote executor; unavailable devices fail closed instead of reporting their own RAM
@@ -70,19 +70,19 @@ Open **Settings → Community plugins → Vault Control Center** and configure t
 
 - Areas
 - Programs
-- HTML gallery roots and the vault-relative thumbnail folder
+- HTML gallery roots, exact active home-page paths, and the vault-relative thumbnail folder
 - People agendas and contacts
 - Tasks
 - Four operational queues
 - Recent-activity fallback roots
 
-The bundled defaults are generic examples. Missing sources are reported in the dashboard instead of causing the view to fail.
+The bundled HTML defaults select 30 audited canonical launch pages. Other missing sources are reported in the dashboard instead of causing the view to fail.
 
 Areas and Programs search does not change the selected root or nested folder. A matching file opens in the shared preview, Back returns to the same results, and **Clear search** restores the exact pre-search folder view. A route-wide empty state appears when nothing matches. Result paths wrap at desktop, split-pane, and phone widths.
 
 When the folder browser is visible, **Copy path** copies the exact current folder without the vault name, a leading slash, or a macOS `/Users/...` prefix. The same action is available from the command palette as **Vault Control Center: Copy current dashboard folder path** while an Areas or Programs folder is active, so it can also be assigned in **Settings → Hotkeys**.
 
-The HTML route scans only the configured vault roots. It excludes hidden, archived, sensitive, inbox/queue, source/build/test, and reusable-template paths before rendering cards. Metadata parsing is capped, unchanged results are cached, and reads use bounded concurrency. **Update previews** is an explicit action: on desktop macOS it asks Quick Look to regenerate the current gallery, stores the results in the configured vault-relative folder, and isolates individual failures so one bad artifact does not stop the rest. Clicking a card uses the registered desktop HTML viewer in the same reusable native tab when available; mobile, a missing viewer, or an opening failure falls back to the safe in-dashboard HTML source preview.
+The HTML route shows only exact paths listed under **HTML home pages** that also sit inside the configured **HTML gallery roots**. The path list chooses the canonical launch page for each active dashboard or tool; the roots remain the outer safety boundary. Leaving the home-page list blank intentionally shows no cards. Hidden, archived, sensitive, inbox/queue, source/build/test, and reusable-template paths remain excluded even when listed. Metadata parsing is capped, unchanged results are cached, and reads use bounded concurrency. **Update previews** is an explicit action: on desktop macOS it asks Quick Look to regenerate the current gallery, stores the results in the configured vault-relative folder, and isolates individual failures so one bad home page does not stop the rest. Clicking a card uses the registered desktop HTML viewer in the same reusable native tab when available; mobile, a missing viewer, or an opening failure falls back to the safe in-dashboard HTML source preview.
 
 The Automations route uses a fixed code allowlist; vault files and network clients cannot introduce commands or change launchd labels. The visible control center focuses on scheduled vault processors and external/cloud jobs; background services and repository-sync jobs are intentionally omitted. Synchronized status notes can be read on any device. Desktop Obsidian on macOS first checks the local labels. When that Mac is not the executor, an opt-in dedicated broker can expose only the ten routine IDs to the always-on Mac. The runner rechecks its harmless sentinel, the exact mapped target, and the target's running state for every claimed request before a no-shell `launchctl kickstart` without `-k`. Unknown, expired, replayed, concurrent, unloaded, status-only, service, high-impact, disabled, missing, and external requests fail closed. Remote RAM is accepted only from a fresh authenticated executor heartbeat.
 

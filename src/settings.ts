@@ -55,7 +55,7 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("HTML gallery").setHeading();
     new Setting(containerEl)
       .setName("HTML gallery roots")
-      .setDesc("One vault-relative folder per line. Safe finished HTML files under these roots appear as gallery cards.")
+      .setDesc("One vault-relative folder per line. These roots remain the safety boundary for every HTML home page.")
       .addTextArea((text) => {
         text.inputEl.rows = 5;
         text
@@ -63,6 +63,23 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.htmlRoots.join("\n"))
           .onChange(async (value) => {
             this.plugin.settings.htmlRoots = value
+              .split(/\r?\n/)
+              .map((part) => part.trim())
+              .filter(Boolean);
+            await this.plugin.saveSettings();
+            this.plugin.scheduleRefresh();
+          });
+      });
+    new Setting(containerEl)
+      .setName("HTML home pages")
+      .setDesc("One exact vault-relative HTML page per line. Only listed pages inside the gallery roots appear as cards; leave blank to show none.")
+      .addTextArea((text) => {
+        text.inputEl.rows = 10;
+        text
+          .setPlaceholder("Artifacts/Budget Dashboard/index.html\nWiki/48-laws-of-power-study-guide.html")
+          .setValue(this.plugin.settings.htmlHomePages.join("\n"))
+          .onChange(async (value) => {
+            this.plugin.settings.htmlHomePages = value
               .split(/\r?\n/)
               .map((part) => part.trim())
               .filter(Boolean);

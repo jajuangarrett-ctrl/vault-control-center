@@ -99,6 +99,115 @@ describe("HTML gallery discovery", () => {
     expect(snapshot.errors).toEqual([{ path: bad.path, message: "read failed" }]);
   });
 
+  it("shows only configured canonical home pages and never reads their support copies", async () => {
+    const agendaHome = file("Artifacts/Agenda Dashboard/agenda.html", 900);
+    const agendaRedirect = file("Artifacts/Agenda Dashboard/index.html", 1_000);
+    const icorHome = file(
+      "Artifacts/ICOR Agent Dashboard/AI Agent Dashboard.html",
+      800
+    );
+    const icorSuperseded = file("Artifacts/ICOR Agent Dashboard/index.html", 1_100);
+    const policiesHome = file(
+      "03 Areas/Policies/Policies and Procedures Dashboard.html",
+      700
+    );
+    const policiesRoute = file("03 Areas/Policies/settings.html", 1_200);
+    const unsafeArchive = file("Artifacts/Archive/Old Dashboard.html", 1_300);
+    const unrelated = file("Artifacts/New Prototype/index.html", 1_400);
+    const app = fakeApp(
+      [
+        agendaHome,
+        agendaRedirect,
+        icorHome,
+        icorSuperseded,
+        policiesHome,
+        policiesRoute,
+        unsafeArchive,
+        unrelated,
+      ],
+      {
+        [agendaHome.path]: "<title>Agenda Center</title>",
+        [icorHome.path]: "<title>AI Agent Dashboard</title>",
+        [policiesHome.path]: "<title>Policies and Procedures</title>",
+      }
+    );
+
+    const snapshot = await buildHtmlGallerySnapshot(
+      app,
+      ["Artifacts", "03 Areas"],
+      "Artifacts/VCC/Thumbnails",
+      [
+        agendaHome.path.toLocaleLowerCase(),
+        icorHome.path,
+        policiesHome.path,
+        policiesHome.path,
+        unsafeArchive.path,
+      ]
+    );
+
+    expect(snapshot.items.map((item) => item.path)).toEqual([
+      agendaHome.path,
+      icorHome.path,
+      policiesHome.path,
+    ]);
+    expect(snapshot.scannedCount).toBe(8);
+    expect(snapshot.excludedCount).toBe(5);
+    expect(app.vault.read).toHaveBeenCalledTimes(3);
+    const readPaths = vi.mocked(app.vault.read).mock.calls.map(([entry]) => entry.path);
+    expect(readPaths).toEqual(
+      expect.arrayContaining([agendaHome.path, icorHome.path, policiesHome.path])
+    );
+    for (const supportPath of [
+      agendaRedirect.path,
+      icorSuperseded.path,
+      policiesRoute.path,
+      unrelated.path,
+    ]) {
+      expect(readPaths).not.toContain(supportPath);
+    }
+  });
+
+  it("normalizes configured home-page paths and preserves intentional variants", async () => {
+    const standard = file("Artifacts/Workout/index.html", 200);
+    const companion = file("Artifacts/Workout/glasses/index.html", 100);
+    const app = fakeApp([standard, companion], {
+      [standard.path]: "<title>Workout Library</title>",
+      [companion.path]: "<title>Workout Library for Glasses</title>",
+    });
+
+    const snapshot = await buildHtmlGallerySnapshot(
+      app,
+      ["Artifacts"],
+      "Artifacts/VCC/Thumbnails",
+      ["/Artifacts\\Workout/./index.html", companion.path]
+    );
+
+    expect(snapshot.items.map((item) => item.path)).toEqual([
+      standard.path,
+      companion.path,
+    ]);
+  });
+
+  it("returns an empty clean snapshot when no active home pages are configured", async () => {
+    const app = fakeApp(
+      [file("Artifacts/Legacy/index.html", 100)],
+      { "Artifacts/Legacy/index.html": "<title>Legacy</title>" }
+    );
+
+    const snapshot = await buildHtmlGallerySnapshot(
+      app,
+      ["Artifacts"],
+      "Artifacts/VCC/Thumbnails",
+      []
+    );
+
+    expect(snapshot.items).toEqual([]);
+    expect(snapshot.scannedCount).toBe(1);
+    expect(snapshot.excludedCount).toBe(1);
+    expect(snapshot.errors).toEqual([]);
+    expect(app.vault.read).not.toHaveBeenCalled();
+  });
+
   it("returns a nonthrowing snapshot when vault enumeration fails", async () => {
     const app = {
       vault: {
