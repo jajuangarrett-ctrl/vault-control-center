@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.12 — 2026-09-18
+
+- Recover unobserved moves using a saved SHA-256 baseline and a unique exact content match, with bounded incremental hashing and sensitive/archived exclusions. Ambiguity and missing baselines remain explicit.
+- Add searchable native Locate file with cancellation, stale-file/history guards, combined-provenance correction, and persisted associations without moving or editing documents.
+- Group files by latest authoritative processing day using accessible collapsible sections, filtered counts, and disclosure choices retained across ordinary refreshes.
+- Keep current nine-dashboard membership and distinct output revisions, preserving history through event-key reuse.
+- Validation: 198 automated tests and build; live disposable recovery/Locate and performance checks. Warm refreshes in the 7,410-file vault measured 26–32 ms with zero content reads.
+
 ## 0.3.11 — 2026-09-18
 
 - Make the current document path in each File review row an underlined, focusable link that opens the exact file in Obsidian's reusable document tab, separately from the filename preview action.

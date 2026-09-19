@@ -48,7 +48,7 @@ import {
   buildSystemMemorySnapshot,
   type SystemMemorySnapshot,
 } from "./system-memory";
-import { FileReviewFolderModal } from "./file-review-modal";
+import { FileReviewFolderModal, FileReviewLocateModal } from "./file-review-modal";
 import { createButton, createIcon } from "./dom";
 import type VaultControlCenterPlugin from "./plugin";
 import { resolveProgramFolderPath } from "./program-navigation";
@@ -167,6 +167,7 @@ export class VaultControlCenterView extends ItemView {
     items: [],
   };
   private htmlThumbnailsGenerating = false;
+  private reviewDayExpansion = new Map<string, boolean>();
   private reviewFilters = { query: "", workflow: "" };
   private automations: AutomationSnapshot = {
     status: "ready",
@@ -764,6 +765,8 @@ export class VaultControlCenterView extends ItemView {
       automations: this.automations,
       fileReview: this.plugin.fileReview.snapshot,
       reviewFilters: this.reviewFilters,
+      reviewDayExpansion: this.reviewDayExpansion,
+      locateReviewFile: (row) => new FileReviewLocateModal(this.app, row, this.plugin.fileReview, () => this.renderContent()).open(),
       openReviewFile: (row) => void this.plugin.openReviewFileInTab(row),
       moveReviewFile: (row) => {
         if (row.file) {

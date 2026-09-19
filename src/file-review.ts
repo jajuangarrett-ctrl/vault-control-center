@@ -1,6 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { FJG_AUTOMATION_ALLOWLIST } from "./automations";
 import { isExcludedPath, isSensitivePath } from "./data";
+import { ReviewIdentityIndex, fileStamp, sameIdentity, validIdentity, type ReviewIdentity } from "./file-review-identity";
 
 export const REVIEW_RECORDS_PATH = "Artifacts/Vault Control Center Native Plugin/File Review Records.json";
 export interface ReviewSource { id: string; path: string; section: string; column: string; intake?: string }
@@ -17,12 +18,15 @@ export const REVIEW_SOURCES: readonly ReviewSource[] = [
 ];
 export interface ReviewRecord {
   id: string; workflow: string; processed: string; original: string; recordedPath: string;
+  identity?: ReviewIdentity; identityUpdatedAt?: number; locationEvidence?: string;
   sourcePath: string; fromPath?: string; currentPath?: string; unavailable?: boolean; locationUpdatedAt?: number;
 }
 export interface ReviewRow extends ReviewRecord { label: string; file: TFile | null; state: string; history: ReviewRecord[] }
 export interface ReviewCoverage { label: string; path?: string; message: string }
 export interface FileReviewSnapshot { rows: ReviewRow[]; coverage: ReviewCoverage[]; message: string }
 export const emptyFileReview = (): FileReviewSnapshot => ({ rows: [], coverage: [], message: "Loading recorded outputs…" });
+const recordKey = (r: ReviewRecord) => JSON.stringify([r.id, r.recordedPath]);
+const sameOutput = (a: ReviewRecord, b: ReviewRecord) => a.recordedPath === b.recordedPath || a.currentPath === b.recordedPath;
 const labelFor = (id: string) => FJG_AUTOMATION_ALLOWLIST.find(x => x.id === id)?.label ?? id;
 
 /** Exact vault-relative paths only; preserve significant spaces inside folder names. */
@@ -84,13 +88,16 @@ export class FileReviewStore {
   private queue: Promise<unknown> = Promise.resolve();
   private bindings = new Map<string, TFile>();
   private unavailable = new Set<string>();
-  constructor(private app: App) {}
+  private identity: ReviewIdentityIndex;
+  constructor(private app: App) { this.identity = new ReviewIdentityIndex(app, path => reviewPath(path) === path && path !== REVIEW_RECORDS_PATH); }
+  modified(file: TFile): void { this.identity.invalidate(file); }
   refresh(): Promise<FileReviewSnapshot> {
     const work = this.queue.then(() => this.load());
     this.queue = work.catch(() => undefined);
     return work;
   }
   private async load(): Promise<FileReviewSnapshot> {
+    this.identity.begin();
     const coverage: ReviewCoverage[] = [];
     let persistenceError = "";
     this.loaded = false;
@@ -102,9 +109,15 @@ export class FileReviewStore {
           if (data.version !== 1 || !Array.isArray(data.records)) throw new Error();
           for (const r of data.records) {
             if (validRecord(r)) {
-              const local = this.records.get(r.id);
+              const local = this.records.get(recordKey(r));
               const stored = { ...r, recordedPath: reviewPath(r.recordedPath)!, currentPath: r.currentPath ? reviewPath(r.currentPath)! : undefined };
-              this.records.set(r.id, local && (local.locationUpdatedAt ?? 0) >= (stored.locationUpdatedAt ?? 0) ? local : stored);
+              const localTime = Math.max(local?.locationUpdatedAt ?? 0, local?.identityUpdatedAt ?? 0);
+              const storedTime = Math.max(stored.locationUpdatedAt ?? 0, stored.identityUpdatedAt ?? 0);
+              const selected = local && localTime >= storedTime ? local : stored;
+              this.records.set(recordKey(r), selected);
+              if (selected === stored && !stored.unavailable && (stored.locationUpdatedAt ?? 0) > (local?.locationUpdatedAt ?? 0)) {
+                this.unavailable.delete(recordKey(r)); this.bindings.delete(recordKey(r));
+              }
             }
           }
           this.loaded = true;
@@ -123,32 +136,61 @@ export class FileReviewStore {
         const md = await this.app.vault.cachedRead(file);
         const records = parseReviewTable(md, source, this.app.vault.getName());
         for (const record of records) {
-          const old = this.records.get(record.id);
-          const sameOutput = old?.recordedPath === record.recordedPath || old?.currentPath === record.recordedPath;
-          const current = sameOutput && old?.locationUpdatedAt ? {
-            ...record, currentPath: old?.currentPath, unavailable: old?.unavailable,
-            locationUpdatedAt: old?.locationUpdatedAt,
+          const old = this.records.get(recordKey(record)) ?? [...this.records.values()].find(r => r.id === record.id && r.currentPath === record.recordedPath);
+          const current = old && sameOutput(old, record) ? {
+            ...record, currentPath: old.currentPath, unavailable: old.unavailable,
+            locationUpdatedAt: old.locationUpdatedAt, locationEvidence: old.locationEvidence,
+            identity: old.identity, identityUpdatedAt: old.identityUpdatedAt,
           } : record;
           activeRecords.set(record.id, current);
-          // Preserve a prior correction if a producer reused this event ID for a
-          // different output. It must not relocate the newly listed file.
-          if (!old?.locationUpdatedAt || sameOutput) this.records.set(record.id, current);
+          this.records.set(recordKey(record), current);
         }
         status.message = `${records.length} current processed-output entries · ${source.section} → ${source.column}.`;
         if (!records.length && !md.includes(`## ${source.section}`)) status.message = "History format not recognized; no files inferred.";
       } catch { status.message = "History source could not be read."; }
     }));
-    for (const id of this.bindings.keys()) if (!activeRecords.has(id)) this.bindings.delete(id);
+    const activeKeys = new Set([...activeRecords.values()].map(recordKey));
+    for (const key of this.bindings.keys()) if (!activeKeys.has(key)) this.bindings.delete(key);
     const records = [...activeRecords.values()].sort((a, b) => b.processed.localeCompare(a.processed));
-    const events = records.filter(record => reviewPath(resolveReviewPath(record, records))).map(record => {
-      const path = resolveReviewPath(record, records);
-      const found = this.app.vault.getAbstractFileByPath(path);
-      const prior = this.bindings.get(record.id);
+    const events: ReviewRow[] = [];
+    for (const record of records) {
+      let path = resolveReviewPath(record, records);
+      if (!reviewPath(path)) continue;
+      const key = recordKey(record);
+      let found = this.app.vault.getAbstractFileByPath(path);
+      const prior = this.bindings.get(key);
+      // Folder renames can update child TFile paths without individual rename events.
+      if (!found && prior && reviewPath(prior.path) && this.app.vault.getAbstractFileByPath(prior.path) === prior) {
+        this.correct(record, prior, "Observed live file identity");
+        path = prior.path; found = prior;
+      }
       let file = isFile(found) ? found : null;
-      if (record.unavailable || this.unavailable.has(record.id) || (prior && prior !== found && prior.path === path)) file = null;
-      if (file) this.bindings.set(record.id, file);
-      return { ...record, currentPath: path, label: labelFor(record.workflow), file, history: [record], state: file ? "Available" : "Missing or moved — refresh history; no filename guessing" };
-    });
+      if (record.unavailable || this.unavailable.has(key) || (prior && prior !== found && prior.path === path)) file = null;
+      let state = "Available";
+      if (file) {
+        const value = await this.identity.fingerprint(file);
+        // An existing baseline must verify a newly bound object after reload or replacement.
+        // Edits to the same live object can legitimately update its baseline.
+        if (record.identity && prior !== file && (!value || !sameIdentity(record.identity, value))) {
+          file = null;
+          state = value ? "Content changed since verification — use Locate file." : "Identity check incomplete — refresh to continue, or use Locate file.";
+        } else if (value && (!record.identity || !sameIdentity(record.identity, value))) {
+          record.identity = value; record.identityUpdatedAt = Date.now();
+        }
+      }
+      if (!file && !found && record.identity) {
+        const match = await this.identity.find(record.identity);
+        file = match.file; state = match.state;
+        if (file) {
+          path = file.path;
+          this.correct(record, file, "Unique exact SHA-256 content");
+        }
+      } else if (!file && state === "Available") {
+        state = record.identity ? "File unavailable or replaced — use Locate file." : "No saved identity for this missing file — use Locate file.";
+      }
+      if (file) this.bindings.set(key, file);
+      events.push({ ...record, currentPath: path, label: labelFor(record.workflow), file, history: [record], state });
+    }
     const grouped = new Map<string, ReviewRow>();
     for (const row of events) {
       const key = row.currentPath ?? row.recordedPath;
@@ -168,27 +210,64 @@ export class FileReviewStore {
   renamed(file: TFile, _oldPath: string): void {
     if (!reviewPath(file.path)) { this.deleted(file); return; }
     for (const r of this.records.values()) {
-      if (this.bindings.get(r.id) === file && (r.currentPath ?? r.recordedPath) !== file.path) {
+      if (this.bindings.get(recordKey(r)) === file && (r.currentPath ?? r.recordedPath) !== file.path) {
         r.currentPath = file.path;
         r.locationUpdatedAt = Date.now();
       }
     }
   }
   deleted(file: TFile): void {
-    for (const [id, bound] of this.bindings) if (bound === file) {
-      this.unavailable.add(id);
-      const record = this.records.get(id);
+    for (const [key, bound] of this.bindings) if (bound === file) {
+      this.unavailable.add(key);
+      const record = this.records.get(key);
       if (record) { record.unavailable = true; record.locationUpdatedAt = Date.now(); }
     }
   }
   async moved(file: TFile, oldPath: string): Promise<void> {
     for (const row of this.snapshot.rows) if (row.file === file || row.currentPath === oldPath) {
       for (const event of row.history) {
-        const record = this.records.get(event.id);
+        const record = this.records.get(recordKey(event));
         if (record) { record.currentPath = file.path; record.locationUpdatedAt = Date.now(); }
       }
     }
     await this.refresh();
+  }
+  private correct(record: ReviewRecord, file: TFile, evidence: string): void {
+    record.currentPath = file.path;
+    record.unavailable = false;
+    record.locationUpdatedAt = Date.now();
+    record.locationEvidence = evidence;
+    this.unavailable.delete(recordKey(record));
+    this.bindings.set(recordKey(record), file);
+  }
+  /** Explicit association only; never edits or moves the selected document. */
+  locate(row: ReviewRow, selection: LocateSelection | null): Promise<void> {
+    if (!selection) return Promise.resolve();
+    const work = this.queue.then(async () => {
+      const snapshot = await this.load();
+      if (!this.loaded) throw new Error("Saved review history is unreadable. Repair it before locating a file.");
+      const currentEvents = snapshot.rows.reduce<ReviewRecord[]>((all, r) => all.concat(r.history), []);
+      const events = row.history.map(old => currentEvents.find(r => recordKey(r) === recordKey(old)));
+      if (events.some((r, i) => !r || (r.currentPath ?? resolveReviewPath(r, currentEvents)) !== (row.history[i].currentPath ?? resolveReviewPath(row.history[i], currentEvents))))
+        throw new Error("Processing history or its location changed. Refresh and locate the file again.");
+      const { file, stamp } = selection;
+      const check = () => {
+        if (fileStamp(file) !== stamp || !reviewPath(file.path) || file.path === REVIEW_RECORDS_PATH || this.app.vault.getAbstractFileByPath(file.path) !== file)
+          throw new Error("The selected file changed, moved, or was replaced. Open Locate file again.");
+      };
+      check();
+      const identity = await this.identity.fingerprint(file);
+      check();
+      for (const record of events as ReviewRecord[]) {
+        this.correct(record, file, "Explicit Locate file selection");
+        record.identity = identity ?? undefined;
+        record.identityUpdatedAt = Date.now();
+      }
+      await this.persist();
+      await this.load();
+    });
+    this.queue = work.catch(() => undefined);
+    return work;
   }
   private async persist(): Promise<void> {
     const content = JSON.stringify({ version: 1, records: [...this.records.values()] }, null, 2) + "\n";
@@ -206,12 +285,16 @@ function validRecord(r: any): r is ReviewRecord {
   return r && [r.id,r.workflow,r.processed,r.original,r.sourcePath,r.recordedPath].every(x => typeof x === "string") &&
     REVIEW_SOURCES.some(x => x.id === r.workflow && x.path === r.sourcePath) &&
     Boolean(reviewPath(r.recordedPath)) && Boolean(reviewPath(r.sourcePath)) &&
+    (r.identity === undefined || validIdentity(r.identity)) &&
+    (r.identityUpdatedAt === undefined || (typeof r.identityUpdatedAt === "number" && Number.isFinite(r.identityUpdatedAt))) &&
+    (r.locationEvidence === undefined || typeof r.locationEvidence === "string") &&
     (r.locationUpdatedAt === undefined || (typeof r.locationUpdatedAt === "number" && Number.isFinite(r.locationUpdatedAt))) &&
     (!r.currentPath || (typeof r.currentPath === "string" && Boolean(reviewPath(r.currentPath)))) &&
     (!r.fromPath || (typeof r.fromPath === "string" && Boolean(reviewPath(r.fromPath))));
 }
 export function isFile(value: unknown): value is TFile { return !!value && typeof value === "object" && "stat" in value && "extension" in value; }
 
+export interface LocateSelection { file: TFile; stamp: string }
 export interface MoveSelection { file: TFile; path: string; ctime: number }
 const moving = new WeakSet<TFile>();
 export async function moveReviewedFile(app: App, selected: MoveSelection, folder: string | null): Promise<string> {

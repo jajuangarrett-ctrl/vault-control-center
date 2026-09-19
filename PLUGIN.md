@@ -44,7 +44,7 @@ The Home task panel delegates its primary action to `fjg-task-manager:open-dashb
 
 ## Data and security boundary
 
-The plugin persists validated settings only. Derived file lists, queue records, people records, bookmark results, task-workspace results, automation state, and RAM readings remain in memory. A capped safe-path preview history and the folder-rail disclosure state may remain in Obsidian workspace state. Explicitly generated HTML thumbnails are the intentional derived-file exception and are stored in the configured vault-relative runtime folder.
+The plugin persists validated settings and the compact File review provenance/location/fingerprint journal described below. Derived file lists, queue records, people records, bookmark results, task-workspace results, automation state, and RAM readings remain in memory. A capped safe-path preview history and the folder-rail disclosure state may remain in Obsidian workspace state. Explicitly generated HTML thumbnails are the intentional derived-file exception and are stored in the configured vault-relative runtime folder.
 
 Vault content discovery stays inside the configured vault roots and applies the shared sensitive, hidden, and archived-path filters. HTML discovery adds mechanical exclusions for inbox/queue, development, build, test, template, and reusable-design-system paths. Metadata reads are capped, individual file errors fail open to a fallback card, and HTML source is never executed by the gallery.
 
@@ -122,3 +122,9 @@ BRAT-compatible releases must include these runtime files at the repository root
 - `main.js`
 - `manifest.json`
 - `styles.css`
+
+### File review recovery and processing days (v0.3.12)
+
+File review now groups each current file under its latest recorded processing day, newest first, with keyboard-accessible expandable day headers and filtered counts. Disclosure choices survive ordinary refreshes. Earlier processing events remain in the file's history.
+
+Refresh reconnects unobserved moves only from a saved SHA-256 fingerprint and a unique exact content match among eligible vault files. **Locate file** handles missing baselines, changed content, duplicates and files above the 16 MiB fingerprint cap: select the intended current file to remember its location without moving or rewriting it. The same nine current dashboard output tables still control membership. Hashing is bounded and cached; no document content is stored in the synchronized review journal. See the repository's `docs/FILE_REVIEW.md` for criteria, limits and validation.

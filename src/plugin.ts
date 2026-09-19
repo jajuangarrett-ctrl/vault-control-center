@@ -73,7 +73,10 @@ export default class VaultControlCenterPlugin extends Plugin {
         if (file?.path !== REVIEW_RECORDS_PATH) this.scheduleRefresh();
       };
       this.registerEvent(this.app.vault.on("create", schedule));
-      this.registerEvent(this.app.vault.on("modify", schedule));
+      this.registerEvent(this.app.vault.on("modify", file => {
+        if (file instanceof TFile) this.fileReview.modified(file);
+        schedule(file);
+      }));
       this.registerEvent(this.app.vault.on("delete", file => {
         if (file instanceof TFile) this.fileReview.deleted(file);
         schedule(file);
