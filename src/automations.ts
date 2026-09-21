@@ -75,10 +75,10 @@ export const FJG_AUTOMATION_ALLOWLIST: readonly AutomationDefinition[] = [
   },
   {
     id: "iflytek-notes",
-    label: "iFLYTEK notes",
-    description: "Formats and files new iFLYTEK transcript sources.",
+    label: "AINOTE / iFLYTEK notes",
+    description: "Always-On MacBook Air M2 imports new converted text, verifies staging before moving the AINOTE source to Processed, appends dated notes in full to daily pages, and files undated subjects. Handwriting-only notes stay untouched; source Mac disabled. See status for intake, routing, and setup-versus-run evidence.",
     group: "routine-vault",
-    schedule: "Daily at 6:10 PM Pacific",
+    schedule: "Weekdays at 11:00 AM Pacific",
     manualPolicy: "routine",
     launchdLabel: "com.franklingarrett.iflytek-notes-process",
     statusPath: "00 Inbox/Iflytex Notes/Processed/iFLYTEK Notes Processing Status.md",

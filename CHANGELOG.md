@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.15 — 2026-09-21
+
+- Correct only the AINOTE/iFLYTEK automation card to weekdays at 11 a.m. Pacific on Always-On MacBook Air M2.
+- Describe future-only converted-text intake, verified staging before the AINOTE Processed move, full-content date-first daily routing, and undated subject filing.
+- Preserve all launch labels, manual-start checks, remote broker behavior, and unrelated automation entries. Status links distinguish migration checks from actual runs.
+- Validation: targeted automation tests and production build; no live processor invoked.
+
 ## 0.3.14 — 2026-09-18
 
 - Replace broad HTML-file discovery with an editable list of 30 audited, canonical home pages inside the existing safe gallery roots.

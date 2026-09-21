@@ -65,3 +65,9 @@ On the main Mac, generate the client token locally, save it directly into Obsidi
 ## Validation boundary
 
 Live validation may use authenticated health and deliberately invalid/non-executing requests. Do not submit a valid routine ID during acceptance testing. A real processor should run only after Franklin deliberately selects **Run now** in the dashboard.
+
+## AINOTE migration display — September 21, 2026
+
+The `iflytek-notes` card displays weekdays at 11 a.m. Pacific on Always-On MacBook Air M2; its source Mac is disabled. This is a presentation update only: the exact label, allowlist, executor proof, remote runner, and kickstart behavior are unchanged. The same existing processor now performs future-only converted-text intake, verified staging before movement into AINOTE’s top-level Processed folder, then full-content date-first daily routing and undated subject filing. Handwriting-only app notes remain untouched; mixed notes use available converted text only.
+
+The synchronized iFLYTEK status/dashboard links to `AINOTE Intake Status.md` and `Daily Note Routing Status.md` in `00 Inbox/Iflytex Notes/Processed/`. The cutoff is September 21, 2026, 8:38:23 a.m. Pacific; earlier notes remain excluded. Setup excluded 37 old notes without staging or movement. No real migrated scheduled run was observed at handoff; preserve that distinction when reading historical status. The vault Processed archive is separate from AINOTE’s app folder.
