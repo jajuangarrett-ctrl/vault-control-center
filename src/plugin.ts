@@ -9,7 +9,7 @@ import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
 import { VaultControlCenterView } from "./view";
 
-import { FileReviewStore, REVIEW_RECORDS_PATH, getLiveReviewFile, type ReviewRow } from "./file-review";
+import { FileReviewStore, affectsFileReview, getLiveReviewFile, type ReviewRow } from "./file-review";
 
 type CommandHost = {
   commands?: {
@@ -69,22 +69,21 @@ export default class VaultControlCenterPlugin extends Plugin {
     this.addSettingTab(new VaultControlCenterSettingTab(this.app, this));
 
     this.app.workspace.onLayoutReady(() => {
-      const schedule = (file?: { path: string }) => {
-        if (file?.path !== REVIEW_RECORDS_PATH) this.scheduleRefresh();
+      const updateReview = (file: { path: string }, oldPath?: string) => {
+        this.scheduleRefresh();
+        if (!affectsFileReview(file.path) && !(oldPath && affectsFileReview(oldPath))) return;
+        // Includes file and folder events; repaint only after the inventory is current.
+        void this.fileReview.refresh().then(() => {
+          for (const leaf of this.app.workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE)) {
+            if (leaf.view instanceof VaultControlCenterView) leaf.view.refreshFileReview();
+          }
+        }).catch(() => undefined);
       };
-      this.registerEvent(this.app.vault.on("create", schedule));
-      this.registerEvent(this.app.vault.on("modify", file => {
-        if (file instanceof TFile) this.fileReview.modified(file);
-        schedule(file);
-      }));
-      this.registerEvent(this.app.vault.on("delete", file => {
-        if (file instanceof TFile) this.fileReview.deleted(file);
-        schedule(file);
-      }));
-      this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
-        if (file instanceof TFile) this.fileReview.renamed(file, oldPath);
-        schedule(file);
-      }));
+      const schedule = () => this.scheduleRefresh();
+      this.registerEvent(this.app.vault.on("create", updateReview));
+      this.registerEvent(this.app.vault.on("modify", schedule));
+      this.registerEvent(this.app.vault.on("delete", updateReview));
+      this.registerEvent(this.app.vault.on("rename", updateReview));
       this.registerEvent(this.app.workspace.on("file-open", () => schedule()));
     });
   }

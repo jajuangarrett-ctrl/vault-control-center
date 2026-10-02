@@ -48,7 +48,7 @@ import {
   buildSystemMemorySnapshot,
   type SystemMemorySnapshot,
 } from "./system-memory";
-import { FileReviewFolderModal, FileReviewLocateModal } from "./file-review-modal";
+import { FileReviewFolderModal } from "./file-review-modal";
 import { createButton, createIcon } from "./dom";
 import type VaultControlCenterPlugin from "./plugin";
 import { resolveProgramFolderPath } from "./program-navigation";
@@ -65,6 +65,7 @@ import {
 } from "./native-markdown-editor";
 import {
   copyText,
+  renderFileReview,
   renderRoute,
   resetTemplateValue,
   type BookmarkFilter,
@@ -167,8 +168,8 @@ export class VaultControlCenterView extends ItemView {
     items: [],
   };
   private htmlThumbnailsGenerating = false;
-  private reviewDayExpansion = new Map<string, boolean>();
-  private reviewFilters = { query: "", workflow: "", dismissed: false };
+  private fileReviewRefreshing = false;
+  private reviewFilters = { query: "", folder: "" };
   private automations: AutomationSnapshot = {
     status: "ready",
     checkedAt: "",
@@ -672,6 +673,41 @@ export class VaultControlCenterView extends ItemView {
     }
   }
 
+  refreshFileReview(): void {
+    if (this.route !== "automations" || !this.contentRegionEl || !this.data) return;
+    const existing = this.contentRegionEl.querySelector<HTMLElement>(".fjg-vcc-file-review");
+    if (!existing) return;
+    const active = document.activeElement;
+    const search = existing.querySelector<HTMLInputElement>('input[type="search"]');
+    const focusedSearch = active === search;
+    const focusedFilter = active === existing.querySelector("select");
+    const scrollTop = this.contentRegionEl.scrollTop;
+    const holder = document.createElement("div");
+    renderFileReview(holder, this.renderContext());
+    existing.replaceWith(holder.firstElementChild!);
+    const next = this.contentRegionEl.querySelector<HTMLElement>(".fjg-vcc-file-review")!;
+    if (focusedSearch) {
+      const input = next.querySelector<HTMLInputElement>("input")!;
+      input.focus({ preventScroll: true });
+    } else if (focusedFilter) next.querySelector<HTMLSelectElement>("select")?.focus({ preventScroll: true });
+    this.contentRegionEl.scrollTop = scrollTop;
+  }
+
+  private async refreshReviewFiles(): Promise<void> {
+    if (this.fileReviewRefreshing) return;
+    this.fileReviewRefreshing = true;
+    this.refreshFileReview();
+    try {
+      await this.plugin.fileReview.refresh();
+      new Notice("File review refreshed.");
+    } catch {
+      new Notice("File review could not be refreshed.");
+    } finally {
+      this.fileReviewRefreshing = false;
+      this.refreshFileReview();
+    }
+  }
+
   private renderContent(): void {
     if (!this.contentRegionEl) return;
     if (!this.data) {
@@ -766,18 +802,12 @@ export class VaultControlCenterView extends ItemView {
       automations: this.automations,
       fileReview: this.plugin.fileReview.snapshot,
       reviewFilters: this.reviewFilters,
-      reviewDayExpansion: this.reviewDayExpansion,
-      setReviewDismissed: (row, dismissed) => {
-        void this.plugin.fileReview.setDismissed(row, dismissed).then(() => {
-          new Notice(dismissed ? "Dismissed from review. Use Show dismissed to restore it." : "Restored to review.");
-        }).catch(error => new Notice(error instanceof Error ? error.message : "The review entry could not be updated.", 8000))
-          .finally(() => this.renderContent());
-      },
-      locateReviewFile: (row) => new FileReviewLocateModal(this.app, row, this.plugin.fileReview, () => this.renderContent()).open(),
+      fileReviewRefreshing: this.fileReviewRefreshing,
+      refreshReviewFiles: () => void this.refreshReviewFiles(),
       openReviewFile: (row) => void this.plugin.openReviewFileInTab(row),
       moveReviewFile: (row) => {
         if (row.file) {
-          new FileReviewFolderModal(this.app, row, this.plugin.fileReview, () => this.renderContent()).open();
+          new FileReviewFolderModal(this.app, row, this.plugin.fileReview, () => this.refreshFileReview()).open();
         }
       },
       memory: this.memory,

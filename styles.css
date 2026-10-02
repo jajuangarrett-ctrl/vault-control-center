@@ -4156,13 +4156,14 @@ body.fjg-vcc-shell-enabled:is(.fjg-vcc-theme-dark, .fjg-vcc-theme-light) :is(
   }
 }
 
-/* Automation output review uses the same native controls and visual tokens. */
+/* Live inbox review uses the same native controls and visual tokens. */
 .fjg-vcc-file-review { margin-bottom: 18px; }
 .fjg-vcc-review-intro, .fjg-vcc-review-count, .fjg-vcc-review-context, .fjg-vcc-review-coverage { color: var(--text-muted); font-size: 12px; }
 .fjg-vcc-review-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .fjg-vcc-review-controls input { flex: 1 1 240px; min-width: 0; }
 .fjg-vcc-review-controls select { max-width: 100%; }
 .fjg-vcc-review-list { max-height: 520px; overflow-y: auto; margin: 8px 0 12px; }
+.fjg-vcc-review-day > h3 { margin: 12px 4px 2px; color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
 .fjg-vcc-review-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 4px; border-bottom: 1px solid var(--background-modifier-border); }
 .fjg-vcc-review-main { flex: 1; min-width: 0; }
 .fjg-vcc-review-row > button { flex-shrink: 0; }

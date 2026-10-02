@@ -16,6 +16,7 @@ Vault Control Center is a standalone native Obsidian community plugin. It presen
 - `src/automations.ts` owns the fixed automation inventory, synchronized status parsing, local launchd inspection, executor detection, and allowlisted local routine starts.
 - `src/remote-automation.ts` owns the fail-closed broker client, Secret Storage lookup, remote executor health, sanitized RAM parsing, and fixed-ID request submission.
 - `src/system-memory.ts` reads RAM only after the desktop-macOS and executor-host guards pass.
+- `src/file-review.ts` builds the recursive live inventory for the three watched AI Team inboxes and validates exact per-file moves.
 - `src/taskboard.ts` derives the Home task summary from local FJG Task Manager workspace notes; the older remote adapter remains inert compatibility code in v0.2.0.
 - `src/renderers.ts` renders all eleven routes with native DOM elements.
 - `src/settings.ts` exposes source paths, exact HTML home pages, HTML runtime paths, theme controls, and retained compatibility settings.
@@ -44,7 +45,7 @@ The Home task panel delegates its primary action to `fjg-task-manager:open-dashb
 
 ## Data and security boundary
 
-The plugin persists validated settings and the compact File review provenance/location/fingerprint journal described below. Derived file lists, queue records, people records, bookmark results, task-workspace results, automation state, and RAM readings remain in memory. A capped safe-path preview history and the folder-rail disclosure state may remain in Obsidian workspace state. Explicitly generated HTML thumbnails are the intentional derived-file exception and are stored in the configured vault-relative runtime folder.
+The plugin persists validated settings. Derived file lists, live File review membership, queue records, people records, bookmark results, task-workspace results, automation state, and RAM readings remain in memory. A capped safe-path preview history and the folder-rail disclosure state may remain in Obsidian workspace state. Explicitly generated HTML thumbnails are the intentional derived-file exception and are stored in the configured vault-relative runtime folder. The legacy File Review Records JSON is left untouched for backward evidence but is no longer read or written by the live queue.
 
 Vault content discovery stays inside the configured vault roots and applies the shared sensitive, hidden, and archived-path filters. HTML discovery additionally requires an exact `htmlHomePages` match inside `htmlRoots`, then applies mechanical exclusions for inbox/queue, development, build, test, template, and reusable-design-system paths. Metadata reads are capped, individual file errors fail open to a fallback card, and HTML source is never executed by the gallery.
 
@@ -81,9 +82,9 @@ The dedicated broker lives under `netlify/functions/`, and the current-user runn
 
 ## Automation file review
 
-Version 0.3.9 adds **Automations → File review** above the existing workflow controls. It combines recorded outputs from the nine processing dashboards (Vault Folder, Clippings, Root Inbox, Mira, iFLYTEK, YouTube, FJG Capture, Vocci, and Formatted Notes Filing), showing each resolved file once with its vault-relative path and expandable processing provenance. Search or filter the list, select a filename to preview it, or click its underlined current path (Tab then Enter also works) to open the exact file in an Obsidian document tab. Missing paths are non-actionable. Choose **Move** and an existing folder in the native searchable picker. Escape cancels; collisions and stale or missing files cannot overwrite another file. Obsidian manages link updates, and existing metadata-maintenance plugins continue to operate normally.
+Version 0.3.16 makes **Automations → File review** a live recursive queue for exactly `AI Team/Formatted_Notes/`, `AI Team/Team_Inbox/`, and `AI Team/owner_inbox/`. Every file currently known to Obsidian below those roots appears once, including files in subfolders and files never recorded by a processor. Search matches current filenames and paths, and the inbox filter groups current membership rather than historical workflows. A dedicated **Refresh files** button rescans only these three roots without starting or refreshing automations.
 
-Only output entries currently present in those nine dashboard tables are displayed. Saved records cannot add rows or filing-chain destinations. Processing details identify the source section, output column, and dashboard output separately from the original input. Observed outputs and corrected locations are retained as portable runtime data in `Artifacts/Vault Control Center Native Plugin/File Review Records.json`. Saved entries omitted from a current dashboard remain preserved but hidden; verified corrections still apply when their matching output is listed. Unresolved paths stay disabled without filename guessing. No automation execution settings are changed. See the source repository's `docs/FILE_REVIEW.md` for source mappings, retention behavior, and focused validation.
+Selecting a filename previews it when the existing preview safety policy permits; the underlined current path opens the exact live file in the reusable native document tab. Each row retains its individual **Move** action and native searchable destination picker. Moving within or between the watched roots keeps one row at its current path; moving outside all three removes it immediately. Vault create, rename, move, and delete events—including folder events—rebuild the inventory and update counts and empty states. Collisions, stale or replaced files, missing folders, and concurrent moves cannot overwrite another file. The old workflow filter, day grouping, provenance, Locate, Dismiss, and Show dismissed controls are no longer part of the live queue. Historical dashboards and `File Review Records.json` remain unchanged but do not control membership. See `docs/FILE_REVIEW.md` for the exact boundary and focused validation.
 
 ## FJG Task Manager
 
@@ -123,12 +124,6 @@ BRAT-compatible releases must include these runtime files at the repository root
 - `manifest.json`
 - `styles.css`
 
-### File review recovery and processing days (v0.3.12)
+### Live three-inbox File review (v0.3.16)
 
-File review now groups each current file under its latest recorded processing day, newest first, with keyboard-accessible expandable day headers and filtered counts. Disclosure choices survive ordinary refreshes. Earlier processing events remain in the file's history.
-
-Refresh reconnects unobserved moves only from a saved SHA-256 fingerprint and a unique exact content match among eligible vault files. **Locate file** handles missing baselines, changed content, duplicates and files above the 16 MiB fingerprint cap: select the intended current file to remember its location without moving or rewriting it. The same nine current dashboard output tables still control membership. Hashing is bounded and cached; no document content is stored in the synchronized review journal. See the repository's `docs/FILE_REVIEW.md` for criteria, limits and validation.
-
-### Dismissed File review entries (v0.3.13)
-
-Unresolved entries now offer **Dismiss from review** beside Locate file. Dismiss hides all processing histories in that row from the active list and its counts, without changing files or processing dashboards. **Show dismissed** opens a separate searchable view with **Restore to review**. Dismissals survive refresh/reload through the synchronized review journal and do not trigger repeated content recovery. New processing events and different recorded output revisions remain discoverable; older dismissed history stays hidden. Update other devices to v0.3.13 or newer through BRAT.
+File review now derives membership directly from the current recursive Obsidian inventory beneath Formatted Notes, Team Inbox, and Owner Inbox. Historical dashboard evidence, recovery fingerprints, and dismissal state no longer affect the queue. Automatic vault events and the section's **Refresh files** button keep current paths, counts, and empty states synchronized without moving real files or running processors.

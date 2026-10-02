@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.16 — 2026-10-02
+
+- Replace historical File review with a recursive live queue for Formatted Notes, Team Inbox and Owner Inbox, including files never recorded by a processor.
+- Group and filter by current inbox; remove historical day, provenance, Locate and dismissal controls. Preserve exact file opening and safe native Move.
+- Immediately update queue membership and counts on vault create, delete and rename, including folder moves and external filing; retain one current row for moves within or between inboxes.
+- Add a dedicated **Refresh files** control that rescans the three live inbox roots without triggering automation jobs or status checks.
+- Leave legacy journals, processing dashboards, automation controls and unrelated workflows unchanged.
+- Validation: automated tests and production build, dependency audit, and focused desktop fixture checks.
+
 ## 0.3.15 — 2026-09-21
 
 - Correct only the AINOTE/iFLYTEK automation card to weekdays at 11 a.m. Pacific on Always-On MacBook Air M2.

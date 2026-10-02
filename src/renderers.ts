@@ -1,4 +1,3 @@
-import { groupReviewDays, reviewDayOpen, setReviewDayOpen } from "./file-review-days";
 import { Notice, setIcon } from "obsidian";
 import type {
   AiFolderKey,
@@ -35,7 +34,7 @@ import type {
   AutomationSnapshot,
 } from "./automations";
 import { VISIBLE_AUTOMATION_GROUPS } from "./automations";
-import { REVIEW_SOURCES, type FileReviewSnapshot, type ReviewRow } from "./file-review";
+import { reviewPath, filterReviewRows, type FileReviewSnapshot, type ReviewRow } from "./file-review";
 import { renderReviewPath } from "./file-review-path";
 import type { SystemMemorySnapshot } from "./system-memory";
 import type { TaskboardSnapshot } from "./taskboard";
@@ -68,11 +67,10 @@ export interface DashboardRenderContext {
   htmlThumbnailsGenerating: boolean;
   automations: AutomationSnapshot;
   fileReview: FileReviewSnapshot;
-  reviewFilters: { query: string; workflow: string; dismissed: boolean };
-  setReviewDismissed: (row: ReviewRow, dismissed: boolean) => void;
+  reviewFilters: { query: string; folder: string };
+  fileReviewRefreshing: boolean;
+  refreshReviewFiles: () => void;
   moveReviewFile: (row: ReviewRow) => void;
-  locateReviewFile: (row: ReviewRow) => void;
-  reviewDayExpansion: Map<string, boolean>;
   openReviewFile: (row: ReviewRow) => void;
   memory: SystemMemorySnapshot;
   automationStartingIds: ReadonlySet<string>;
@@ -350,87 +348,59 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
   }
 }
 
-function renderFileReview(parent: HTMLElement, context: DashboardRenderContext): void {
+export function renderFileReview(parent: HTMLElement, context: DashboardRenderContext): void {
   const snapshot = context.fileReview;
   const panel = createPanel(parent, `File review · ${snapshot.rows.length} files`, { className: "fjg-vcc-file-review" });
-  panel.body.createEl("p", { cls: "fjg-vcc-review-intro", text: "Processed output files from your nine processing dashboards. Grouped by latest processing day. Move files, locate a missing document, or dismiss an intentionally deleted file from review." });
+  panel.body.createEl("p", { cls: "fjg-vcc-review-intro", text: "Live inbox queue, including subfolders. Open a file to review it, then choose Move to file it. Files leave this queue when moved outside all three inboxes." });
   const controls = panel.body.createDiv({ cls: "fjg-vcc-review-controls" });
-  const search = controls.createEl("input", { type: "search", placeholder: "Search filenames, paths, or workflows", attr: { "aria-label": "Search file review" } });
-  const filter = controls.createEl("select", { attr: { "aria-label": "Filter file review by workflow" } });
-  filter.createEl("option", { value: "", text: "All 9 processing dashboards" });
-  for (const source of snapshot.coverage) filter.createEl("option", { value: source.label, text: source.label });
+  const search = controls.createEl("input", { type: "search", placeholder: "Search filenames or paths", attr: { "aria-label": "Search file review" } });
+  const filter = controls.createEl("select", { attr: { "aria-label": "Filter file review by inbox folder" } });
+  filter.createEl("option", { value: "", text: "All three inboxes" });
+  for (const source of snapshot.coverage) filter.createEl("option", { value: source.path, text: source.label });
+  createButton(controls, {
+    label: context.fileReviewRefreshing ? "Refreshing…" : "Refresh files",
+    icon: "refresh-cw",
+    className: "fjg-vcc-button",
+    disabled: context.fileReviewRefreshing,
+    title: "Rescan the three watched inbox folders",
+    onClick: context.refreshReviewFiles,
+  });
   search.value = context.reviewFilters.query;
-  filter.value = context.reviewFilters.workflow;
-  const mode = controls.createEl("button", { cls: "fjg-vcc-button", attr: { "aria-label": "Show dismissed review entries", "aria-pressed": String(!!context.reviewFilters.dismissed) } });
+  filter.value = context.reviewFilters.folder;
   const count = panel.body.createDiv({ cls: "fjg-vcc-review-count", attr: { "aria-live": "polite" } });
   const list = panel.body.createDiv({ cls: "fjg-vcc-review-list" });
   const renderRows = () => {
     context.reviewFilters.query = search.value;
-    context.reviewFilters.workflow = filter.value;
+    context.reviewFilters.folder = filter.value;
     list.empty();
-    const dismissed = !!context.reviewFilters.dismissed;
-    mode.setText(dismissed ? "Back to active review" : `Show dismissed (${snapshot.dismissedRows.length})`);
-    mode.setAttribute("aria-pressed", String(dismissed));
-    mode.setAttribute("aria-label", dismissed ? "Back to active review" : "Show dismissed review entries");
-    const rows = (dismissed ? snapshot.dismissedRows : snapshot.rows).filter(row => (!filter.value || row.label.includes(filter.value)) &&
-      matchesQuery([context.state.query, search.value].filter(Boolean).join(" "), row.currentPath ?? "", row.label, row.original, ...row.history.map(r => r.original)));
-    count.setText(`${rows.length} ${dismissed ? "dismissed " : ""}${rows.length === 1 ? "file" : "files"} from current dashboard tables`);
-    if (!rows.length) createEmptyState(list, dismissed ? "No dismissed files match" : "No recorded files match", dismissed ? "Clear the filters to see dismissed entries. Restore returns an entry to active review." : "Clear the filters, check Show dismissed, or refresh status to read new processing results.", "files");
-    const scope = [dismissed ? "dismissed" : "", context.state.query, search.value, filter.value].filter(Boolean).join("\u0000");
-    for (const [index, group] of groupReviewDays(rows).entries()) {
-      const section = list.createEl("details", { cls: "fjg-vcc-review-day" });
-      section.open = reviewDayOpen(context.reviewDayExpansion, scope, group.key, index);
-      const header = section.createEl("summary", { text: `${group.label} · ${group.rows.length} ${group.rows.length === 1 ? "file" : "files"}` });
-      header.setAttribute("aria-expanded", String(section.open));
-      // Native summary provides Tab focus, Enter/Space, disclosure and screen-reader semantics.
-      let previousOpen = section.open;
-      section.addEventListener("toggle", () => {
-        if (!section.isConnected || section.open === previousOpen) return;
-        previousOpen = section.open;
-        header.setAttribute("aria-expanded", String(section.open));
-        setReviewDayOpen(context.reviewDayExpansion, scope, group.key, section.open);
-      });
-      for (const row of group.rows) {
-      const entry = section.createDiv({ cls: "fjg-vcc-review-row" });
-      const main = entry.createDiv({ cls: "fjg-vcc-review-main" });
-      const path = row.currentPath ?? row.recordedPath;
-      createButton(main, { label: path.split("/").pop() ?? path, className: "fjg-vcc-review-filename", disabled: !row.file, onClick: () => context.openFile(path) });
-      renderReviewPath(main, row, context.openReviewFile);
-      main.createDiv({ cls: "fjg-vcc-review-context", text: `${row.label} · ${row.processed}` });
-      if (!row.file) main.createDiv({ cls: "fjg-vcc-review-missing", text: row.state });
-      const detail = main.createEl("details", { cls: "fjg-vcc-review-provenance" });
-      detail.createEl("summary", { text: `Processing history · ${row.history.length}` });
-      for (const event of row.history) {
-        const provenance = detail.createDiv();
-        const source = REVIEW_SOURCES.find(s => s.id === event.workflow);
-        provenance.createDiv({ text: `${source?.section} → ${source?.column} · ${event.processed}` });
-        provenance.createDiv({ text: `Dashboard output: ${event.recordedPath}` });
-        provenance.createDiv({ text: `Original input: ${event.original}` });
-        if (event.locationEvidence) provenance.createDiv({ text: `Location verified: ${event.locationEvidence}` });
-        createButton(provenance, { label: `Open ${snapshot.coverage.find(c => c.path === event.sourcePath)?.label ?? "processing"} history`, className: "fjg-vcc-button", onClick: () => context.openFile(event.sourcePath) });
-      }
-      const actions = entry.createDiv({ cls: "fjg-vcc-review-actions" });
-      if (dismissed) {
-        createButton(actions, { label: "Restore to review", icon: "undo-2", className: "fjg-vcc-button is-primary", title: "Return these processing entries to active review", onClick: () => context.setReviewDismissed(row, false) });
-      } else {
-        if (!row.file) {
-          createButton(actions, { label: "Locate file", icon: "search", className: "fjg-vcc-button", title: "Choose this document’s current file without moving it", onClick: () => context.locateReviewFile(row) });
-          createButton(actions, { label: "Dismiss from review", icon: "eye-off", className: "fjg-vcc-button", title: "Hide these processing entries. Files and processing history stay unchanged; restore through Show dismissed.", onClick: () => context.setReviewDismissed(row, true) });
-        }
-        createButton(actions, { label: "Move", icon: "folder-input", className: "fjg-vcc-button is-primary", disabled: !row.file,
-          title: row.file ? `Choose a destination for ${row.file.name}` : row.state, onClick: () => context.moveReviewFile(row) });
-      }
+    const rows = filterReviewRows(snapshot, [context.state.query, search.value].filter(Boolean).join(" "), filter.value);
+    count.setText(`${rows.length} ${rows.length === 1 ? "file" : "files"} awaiting filing`);
+    if (!rows.length) createEmptyState(list, snapshot.rows.length ? "No inbox files match" : "Inbox queue is empty",
+      snapshot.rows.length ? "Clear the search or choose another inbox folder." : "New files in the watched inboxes appear here automatically.", "files");
+    for (const source of snapshot.coverage) {
+      const group = rows.filter(row => row.sourcePath === source.path);
+      if (!group.length) continue;
+      const section = list.createDiv({ cls: "fjg-vcc-review-day" });
+      section.createEl("h3", { text: `${source.label} · ${group.length} ${group.length === 1 ? "file" : "files"}` });
+      for (const row of group) {
+        const entry = section.createDiv({ cls: "fjg-vcc-review-row" });
+        const main = entry.createDiv({ cls: "fjg-vcc-review-main" });
+        const path = row.currentPath!;
+        createButton(main, { label: row.file!.name, className: "fjg-vcc-review-filename", onClick: () => reviewPath(path) ? context.openFile(path) : context.openReviewFile(row) });
+        renderReviewPath(main, row, context.openReviewFile);
+        const actions = entry.createDiv({ cls: "fjg-vcc-review-actions" });
+        createButton(actions, { label: "Move", icon: "folder-input", className: "fjg-vcc-button is-primary",
+          title: `Choose a destination for ${row.file!.name}`, onClick: () => context.moveReviewFile(row) });
       }
     }
   };
-  mode.addEventListener("click", () => { context.reviewFilters.dismissed = !context.reviewFilters.dismissed; renderRows(); });
   search.addEventListener("input", renderRows);
   filter.addEventListener("change", renderRows);
   renderRows();
   const coverage = panel.body.createEl("details", { cls: "fjg-vcc-review-coverage" });
-  coverage.createEl("summary", { text: "History sources and limitations" });
+  coverage.createEl("summary", { text: "Watched inbox folders" });
   coverage.createEl("p", { text: snapshot.message });
-  for (const source of snapshot.coverage) coverage.createDiv({ text: `${source.label}: ${source.message}` });
+  for (const source of snapshot.coverage) coverage.createDiv({ text: `${source.path}: ${source.message}` });
 }
 
 function renderMemoryCard(parent: HTMLElement, context: DashboardRenderContext): void {

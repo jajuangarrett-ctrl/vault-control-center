@@ -141,4 +141,4 @@ The interface follows a reference-driven workflow: one stable information archit
 
 MIT © Franklin Garrett
 
-Automation output review: see [File review](docs/FILE_REVIEW.md) for the nine recorded-history sources, safe per-file moves, and retention limits.
+Live inbox review: see [File review](docs/FILE_REVIEW.md) for the three watched inbox folders, recursive membership, automatic and manual refresh, and safe per-file moves.
