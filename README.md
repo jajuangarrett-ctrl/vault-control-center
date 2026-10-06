@@ -110,6 +110,8 @@ The native plugin and an older HTML-launcher plugin can coexist during migration
 
 ## Development
 
+The local 0.3.17 build adds **Move** beside the preview's upper-right Edit/Open in tab/Hide files controls. It uses the existing single-file destination picker; cancel leaves the item untouched, and collisions never overwrite. The icon remains accessible and at least 44 px at narrow widths. See [File review](docs/FILE_REVIEW.md).
+
 ```bash
 npm ci
 npm run check

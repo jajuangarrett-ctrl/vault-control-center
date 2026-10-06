@@ -544,6 +544,7 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 }
 
 .fjg-vcc-preview-back,
+.fjg-vcc-preview-move,
 .fjg-vcc-preview-mode-toggle,
 .fjg-vcc-preview-open-tab,
 .fjg-vcc-preview-browser-toggle {
@@ -564,6 +565,7 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 }
 
 .fjg-vcc-preview-back:hover,
+.fjg-vcc-preview-move:hover,
 .fjg-vcc-preview-mode-toggle:hover,
 .fjg-vcc-preview-open-tab:hover,
 .fjg-vcc-preview-browser-toggle:hover {
@@ -2707,6 +2709,7 @@ a.fjg-vcc-row {
   }
 
   .fjg-vcc-preview-back,
+  .fjg-vcc-preview-move,
   .fjg-vcc-preview-mode-toggle,
   .fjg-vcc-preview-open-tab,
   .fjg-vcc-preview-browser-toggle {
@@ -2717,6 +2720,7 @@ a.fjg-vcc-row {
   }
 
   .fjg-vcc-preview-back > span:last-child,
+  .fjg-vcc-preview-move > span:last-child,
   .fjg-vcc-preview-mode-toggle > span:last-child,
   .fjg-vcc-preview-open-tab > span:last-child,
   .fjg-vcc-preview-browser-toggle > span:last-child {
@@ -2850,6 +2854,7 @@ a.fjg-vcc-row {
   }
 
   .fjg-vcc-preview-back,
+  .fjg-vcc-preview-move,
   .fjg-vcc-preview-mode-toggle,
   .fjg-vcc-preview-open-tab {
     width: 42px;
@@ -2859,6 +2864,7 @@ a.fjg-vcc-row {
   }
 
   .fjg-vcc-preview-back > span:last-child,
+  .fjg-vcc-preview-move > span:last-child,
   .fjg-vcc-preview-mode-toggle > span:last-child,
   .fjg-vcc-preview-open-tab > span:last-child {
     display: none;
@@ -3032,6 +3038,7 @@ a.fjg-vcc-row {
   }
 
   .fjg-vcc-preview-back,
+  .fjg-vcc-preview-move,
   .fjg-vcc-preview-mode-toggle,
   .fjg-vcc-preview-open-tab {
     width: 42px;
@@ -3041,12 +3048,14 @@ a.fjg-vcc-row {
   }
 
   .fjg-vcc-preview-back > span:last-child,
+  .fjg-vcc-preview-move > span:last-child,
   .fjg-vcc-preview-mode-toggle > span:last-child,
   .fjg-vcc-preview-open-tab > span:last-child {
     display: none;
   }
 
   .fjg-vcc-preview-back .fjg-vcc-icon,
+  .fjg-vcc-preview-move .fjg-vcc-icon,
   .fjg-vcc-preview-mode-toggle .fjg-vcc-icon,
   .fjg-vcc-preview-open-tab .fjg-vcc-icon {
     font-size: 16px;
@@ -3682,6 +3691,7 @@ a.fjg-vcc-row {
 
   .fjg-vcc :is(
     .fjg-vcc-preview-back,
+    .fjg-vcc-preview-move,
     .fjg-vcc-preview-mode-toggle,
     .fjg-vcc-preview-open-tab,
     .fjg-vcc-preview-browser-toggle,
@@ -4198,3 +4208,6 @@ body.fjg-vcc-shell-enabled:is(.fjg-vcc-theme-dark, .fjg-vcc-theme-light) :is(
   .fjg-vcc-review-main { flex-basis: 100%; }
   .fjg-vcc-review-actions { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* Item Move remains a comfortable touch target in every preview layout. */
+.fjg-vcc .fjg-vcc-preview-move { min-width: 44px; min-height: 44px; }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.17 — 2026-10-05 (local build)
+
+- Add an individual **Move** control in the preview's upper-right action group beside Edit, Open in tab, and Hide files.
+- Reuse the native searchable existing-folder picker and safe single-file rename; preserve all existing row and automation controls.
+- Keep a 44 px minimum Move target and compact icon layout at narrow widths, with a descriptive accessible label.
+- Guard repeated taps and selections; release the control on cancel/error and refresh the preview path and live queue after moving.
+- Validation: 193 tests, TypeScript check, production bundle, and focused rendered desktop/mobile-width checks using disposable fixtures. No GitHub release or push.
+
 ## 0.3.16 — 2026-10-02
 
 - Replace historical File review with a recursive live queue for Formatted Notes, Team Inbox and Owner Inbox, including files never recorded by a processor.

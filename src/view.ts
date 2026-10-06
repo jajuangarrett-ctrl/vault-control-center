@@ -223,6 +223,7 @@ export class VaultControlCenterView extends ItemView {
   private previewBrowserCollapsed = false;
   private folderRailCollapsed = false;
   private previewRequestId = 0;
+  private previewMoveFile: TFile | null = null;
   private htmlOpenRequestId = 0;
   private previewHistory: string[] = [];
   private previewResizeObserver: ResizeObserver | null = null;
@@ -1282,6 +1283,38 @@ export class VaultControlCenterView extends ItemView {
     await this.renderPreview(target, false);
   }
 
+  private movePreviewFile(file: TFile, path: string, ctime: number): void {
+    if (this.previewMoveFile) return;
+    if (this.activePreviewFile !== file || file.path !== path || file.stat.ctime !== ctime || this.app.vault.getAbstractFileByPath(path) !== file) {
+      new Notice("That file is no longer available. Refresh and select it again.");
+      return;
+    }
+    this.previewMoveFile = file;
+    const button = this.previewPaneEl?.querySelector<HTMLButtonElement>(".fjg-vcc-preview-move");
+    if (button) button.disabled = true;
+    const settle = () => {
+      this.previewMoveFile = null;
+      const current = this.previewPaneEl?.querySelector<HTMLButtonElement>(".fjg-vcc-preview-move");
+      if (current) current.disabled = false;
+    };
+    try {
+      new FileReviewFolderModal(
+        this.app,
+        { file, path, ctime },
+        this.plugin.fileReview,
+        async () => {
+          this.refreshFileReview();
+          // Do not reopen a preview the user closed or replaced while choosing.
+          if (this.activePreviewFile === file) await this.restoreActivePreview();
+        },
+        settle,
+      ).open();
+    } catch (error) {
+      settle();
+      new Notice(error instanceof Error ? error.message : "The destination picker could not open.");
+    }
+  }
+
   private async renderPreview(file: TFile, focus: boolean): Promise<void> {
     const pane = this.previewPaneEl;
     if (!pane) return;
@@ -1337,6 +1370,17 @@ export class VaultControlCenterView extends ItemView {
         ),
       });
     }
+    const movePath = file.path;
+    const moveCtime = file.stat.ctime;
+    createButton(actions, {
+      label: "Move",
+      icon: "folder-input",
+      className: "fjg-vcc-button fjg-vcc-preview-move",
+      ariaLabel: `Move ${file.name} to another folder`,
+      title: "Move this file",
+      disabled: this.previewMoveFile === file,
+      onClick: () => this.movePreviewFile(file, movePath, moveCtime),
+    });
     createButton(actions, {
       label: "Open in tab",
       icon: "external-link",
