@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.19 — 2026-10-06
+
+- Distribute the mobile HTML renderer through BRAT release assets; 0.3.18 was a local-only build and was not available from BRAT.
+- Detect the native mobile app independently of its UI layout, so desktop-style mobile layouts still render HTML.
+- Label mobile previews `HTML interactive · 0.3.19`, identifying the executing renderer even when synced plugin files arrive at different times.
+- Desktop HTML opening and curation remain unchanged. Physical iPhone verification is still pending.
+
+
+## 0.3.18 — 2026-10-06
+
+- Mobile HTML tab discovers all synced `.html` and `.htm` files, including inboxes, archives, and templates; hidden, credential-like, and dependency paths remain excluded. Desktop retains its curated home-page list and registered viewer.
+- Mobile previews embed local CSS (including nested quoted imports), scripts, images, media, and fonts into an in-memory HTML document. Original files and support assets are never rewritten.
+- Preserve supported interactions in an opaque-origin sandbox, with per-page device-local storage, bounded read-only local JSON/CSV/TXT fetches, and relative HTML navigation.
+- Report missing, oversized, online, and unsupported dependencies. Online services still require connectivity; server apps, raw JSX, multi-file module imports, IndexedDB, workers, and browser-only APIs are not made portable automatically.
+- Avoid resetting the active mobile page on unrelated background refreshes.
+- Focused validation: 196 automated tests, type-check/build, and a real-browser synthetic interaction fixture. Physical iOS/Android and native Obsidian command-driven verification remain outstanding.
+
+
 ## 0.3.17 — 2026-10-05 (local build)
 
 - Add an individual **Move** control in the preview's upper-right action group beside Edit, Open in tab, and Hide files.

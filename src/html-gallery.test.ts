@@ -16,6 +16,16 @@ import {
 } from "./html-gallery";
 
 describe("HTML gallery discovery", () => {
+  it("lists all mobile HTML/HTM without altering desktop home-page curation", async () => {
+    const paths = ["Artifacts/Current.html", "00 Inbox/Other.htm", "Archive/Old.HTML", "Templates/Start.html", ".obsidian/hidden.html", "Secrets/hidden.html"];
+    const app = fakeApp(paths.map(p => file(p, 100)), {});
+    const mobile = await buildHtmlGallerySnapshot(app, ["Artifacts"], DEFAULT_HTML_THUMBNAIL_FOLDER, [], true);
+    expect(mobile.items.map(item => item.path).sort()).toEqual(paths.slice(0, 4).sort());
+    const desktop = await buildHtmlGallerySnapshot(app, ["Artifacts"], DEFAULT_HTML_THUMBNAIL_FOLDER, [paths[0]]);
+    expect(desktop.items.map(item => item.path)).toEqual([paths[0]]);
+    expect((await buildHtmlGallerySnapshot(app, ["Artifacts"], DEFAULT_HTML_THUMBNAIL_FOLDER, [])).items).toEqual([]);
+  });
+
   it("includes configured HTML roots and mechanically excludes unsafe or development paths", async () => {
     const included = [
       file("Artifacts/Agent Mission Control/index.html", 500),

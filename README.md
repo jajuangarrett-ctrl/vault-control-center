@@ -144,3 +144,11 @@ The interface follows a reference-driven workflow: one stable information archit
 MIT © Franklin Garrett
 
 Live inbox review: see [File review](docs/FILE_REVIEW.md) for the three watched inbox folders, recursive membership, automatic and manual refresh, and safe per-file moves.
+
+## Mobile HTML viewing (0.3.18)
+
+Mobile now lists every eligible synced HTML/HTM page, independently of desktop home-page curation. Pages open inside the dashboard as an in-memory document with local assets embedded, script isolation, device-local per-page storage, read-only JSON/CSV/TXT fetches inside the page folder, and relative HTML navigation. Original HTML and plugin settings are preserved. Online dependencies and server-backed apps still require their services; unsupported/missing assets produce notices. Desktop HTML discovery and opening remain unchanged. See `src/mobile-html.ts` and the synthetic browser acceptance fixture in `tests/mobile-html-browser.js`. Physical mobile verification is pending.
+
+### BRAT delivery (0.3.19)
+
+The 0.3.18 mobile build was local-only. Version 0.3.19 publishes the renderer as a BRAT release, recognizes native mobile apps even in desktop-style layouts, and labels the mobile preview `HTML interactive · 0.3.19`. Update this plugin through BRAT and restart Obsidian on the receiving device. The original HTML file remains unchanged.

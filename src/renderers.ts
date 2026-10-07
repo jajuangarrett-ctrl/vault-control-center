@@ -1,4 +1,5 @@
-import { Notice, setIcon } from "obsidian";
+import { usesMobileHtmlViewer } from "./mobile-html";
+import { Notice, Platform, setIcon } from "obsidian";
 import type {
   AiFolderKey,
   DashboardBookmark,
@@ -181,13 +182,16 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
   const toolbar = parent.createDiv({ cls: "fjg-vcc-html-toolbar" });
   const copy = toolbar.createDiv({ cls: "fjg-vcc-html-toolbar-copy" });
   copy.createEl("h2", {
-    text: `${items.length} active home page${items.length === 1 ? "" : "s"}`,
+    text: usesMobileHtmlViewer(Platform)
+      ? `${items.length} HTML file${items.length === 1 ? "" : "s"}`
+      : `${items.length} active home page${items.length === 1 ? "" : "s"}`,
   });
   copy.createEl("p", {
-    text:
-      "Clickable previews for the active HTML dashboard and tool home pages selected in plugin settings.",
+    text: usesMobileHtmlViewer(Platform)
+      ? "All synced HTML pages. Tap a page to view it here with supported interactive features."
+      : "Clickable previews for the active HTML dashboard and tool home pages selected in plugin settings.",
   });
-  createButton(toolbar, {
+  if (!usesMobileHtmlViewer(Platform)) createButton(toolbar, {
     label: context.htmlThumbnailsGenerating
       ? "Updating previews…"
       : "Update previews",
@@ -200,10 +204,14 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
   if (!items.length) {
     createEmptyState(
       parent,
-      context.state.query ? "No active home pages match" : "No active home pages found",
+      usesMobileHtmlViewer(Platform)
+        ? (context.state.query ? "No HTML pages match" : "No HTML pages found")
+        : (context.state.query ? "No active home pages match" : "No active home pages found"),
       context.state.query
         ? "Try another search or clear the current query."
-        : "Check the HTML home pages and gallery roots in plugin settings, then refresh.",
+        : usesMobileHtmlViewer(Platform)
+          ? "Enable Sync all other types on both devices, let HTML and support files finish syncing, then refresh."
+          : "Check the HTML home pages and gallery roots in plugin settings, then refresh.",
       "panels-top-left"
     );
     return;
@@ -211,7 +219,7 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
 
   const grid = parent.createDiv({
     cls: "fjg-vcc-html-grid",
-    attr: { "aria-label": "Active HTML home page gallery" },
+    attr: { "aria-label": usesMobileHtmlViewer(Platform) ? "Mobile HTML file gallery" : "Active HTML home page gallery" },
   });
   for (const item of items) {
     const card = grid.createEl("button", {
@@ -249,7 +257,7 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
       });
       createIcon(placeholder, "panels-top-left");
       placeholder.createSpan({ text: item.title });
-      placeholder.createEl("small", { text: "Local preview needs refresh" });
+      placeholder.createEl("small", { text: usesMobileHtmlViewer(Platform) ? "Tap to open" : "Local preview needs refresh" });
     }
     const cardCopy = card.createDiv({ cls: "fjg-vcc-html-card-copy" });
     cardCopy.createSpan({ cls: "fjg-vcc-html-card-title", text: item.title });

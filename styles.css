@@ -4211,3 +4211,9 @@ body.fjg-vcc-shell-enabled:is(.fjg-vcc-theme-dark, .fjg-vcc-theme-light) :is(
 
 /* Item Move remains a comfortable touch target in every preview layout. */
 .fjg-vcc .fjg-vcc-preview-move { min-width: 44px; min-height: 44px; }
+
+/* Mobile HTML uses an opaque-origin frame; these rules do not change desktop previews. */
+.fjg-vcc-preview-body.fjg-vcc-mobile-html { display: flex; flex-direction: column; padding: 0; min-height: 0; overflow: hidden; }
+.fjg-vcc-mobile-html-frame { display: block; width: 100%; flex: 1 1 auto; min-height: 360px; border: 0; background: white; }
+.fjg-vcc-mobile-html-status { padding: 10px 14px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; max-height: 110px; overflow: auto; flex: 0 0 auto; }
+.fjg-vcc-mobile-html-status[hidden] { display: none; }

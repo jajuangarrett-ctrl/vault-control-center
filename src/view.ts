@@ -1,3 +1,4 @@
+import { isMobileHtmlPath, renderMobileHtml, usesMobileHtmlViewer, MOBILE_HTML_BUILD } from "./mobile-html";
 import {
   Component,
   ItemView,
@@ -456,7 +457,8 @@ export class VaultControlCenterView extends ItemView {
           this.app,
           this.plugin.settings.htmlRoots,
           this.plugin.settings.htmlThumbnailFolder,
-          this.plugin.settings.htmlHomePages
+          this.plugin.settings.htmlHomePages,
+          usesMobileHtmlViewer(Platform)
         ),
         operationsPromise,
       ]);
@@ -486,7 +488,12 @@ export class VaultControlCenterView extends ItemView {
       this.renderContent();
       if (this.activePreviewFile || this.pendingPreviewPath) {
         const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
-        if (!this.nativeMarkdownEditor.isEditing(activePath)) {
+        const mobileFrame = this.previewPaneEl?.querySelector<HTMLIFrameElement>(".fjg-vcc-mobile-html-frame");
+        const file = this.activePreviewFile;
+        const keepMobilePage = usesMobileHtmlViewer(Platform) && !forceRemote && file &&
+          this.app.vault.getAbstractFileByPath(file.path) === file &&
+          mobileFrame?.dataset.sourceRevision === `${file.path}:${file.stat.mtime}:${file.stat.size}`;
+        if (!this.nativeMarkdownEditor.isEditing(activePath) && !keepMobilePage) {
           void this.restoreActivePreview();
         }
       }
@@ -913,7 +920,7 @@ export class VaultControlCenterView extends ItemView {
     const normalizedPath = normalizeVaultPath(path);
     if (
       !normalizedPath ||
-      isExcludedPath(normalizedPath) ||
+      (isExcludedPath(normalizedPath) && !(usesMobileHtmlViewer(Platform) && isMobileHtmlPath(normalizedPath))) ||
       isSensitivePath(normalizedPath)
     ) {
       return "";
@@ -924,6 +931,10 @@ export class VaultControlCenterView extends ItemView {
 
   private async openHtml(path: string): Promise<void> {
     const requestId = ++this.htmlOpenRequestId;
+    if (usesMobileHtmlViewer(Platform)) {
+      await this.openPreview(path, { htmlOpenRequestId: requestId });
+      return;
+    }
     let shouldPreviewSource = false;
     try {
       const result = await this.plugin.openHtmlFileInteractively(path);
@@ -966,7 +977,8 @@ export class VaultControlCenterView extends ItemView {
         this.app,
         this.plugin.settings.htmlRoots,
         this.plugin.settings.htmlThumbnailFolder,
-        this.plugin.settings.htmlHomePages
+        this.plugin.settings.htmlHomePages,
+        usesMobileHtmlViewer(Platform)
       );
       if (htmlGeneration === this.htmlSnapshotGeneration) {
         this.htmlGallery = htmlGallery;
@@ -1229,7 +1241,7 @@ export class VaultControlCenterView extends ItemView {
     const normalizedPath = normalizeVaultPath(path);
     if (
       !normalizedPath ||
-      isExcludedPath(normalizedPath) ||
+      (isExcludedPath(normalizedPath) && !(usesMobileHtmlViewer(Platform) && isMobileHtmlPath(normalizedPath))) ||
       isSensitivePath(normalizedPath)
     ) {
       new Notice("That file is not available from the dashboard.");
@@ -1267,7 +1279,7 @@ export class VaultControlCenterView extends ItemView {
       this.activePreviewFile?.path || this.pendingPreviewPath
     );
     if (!path) return;
-    if (isExcludedPath(path) || isSensitivePath(path)) {
+    if ((isExcludedPath(path) && !(usesMobileHtmlViewer(Platform) && isMobileHtmlPath(path))) || isSensitivePath(path)) {
       await this.closePreview({ restoreFocus: false });
       return;
     }
@@ -1339,8 +1351,9 @@ export class VaultControlCenterView extends ItemView {
     const headingGroup = header.createDiv({ cls: "fjg-vcc-preview-heading" });
     headingGroup.createSpan({
       cls: "fjg-vcc-preview-kicker",
-      text:
-        file.extension.toLocaleLowerCase() === "md" && this.markdownPaneMode === "edit"
+      text: usesMobileHtmlViewer(Platform) && isMobileHtmlPath(file.path)
+        ? `HTML interactive · ${MOBILE_HTML_BUILD}`
+        : file.extension.toLocaleLowerCase() === "md" && this.markdownPaneMode === "edit"
           ? "MD editor"
           : `${file.extension.toLocaleUpperCase() || "FILE"} preview`,
     });
@@ -1412,7 +1425,11 @@ export class VaultControlCenterView extends ItemView {
 
     try {
       const kind = classifyPreviewKind(file.extension);
-      if (kind === "markdown" && this.markdownPaneMode === "edit") {
+      if (usesMobileHtmlViewer(Platform) && isMobileHtmlPath(file.path)) {
+        await renderMobileHtml(this.app, file, body, session,
+          () => this.isCurrentPreviewRequest(requestId, file.path),
+          (path) => { void this.openHtml(path); });
+      } else if (kind === "markdown" && this.markdownPaneMode === "edit") {
         body.empty();
         body.removeAttribute("tabindex");
         body.addClass("fjg-vcc-preview-native-editor");

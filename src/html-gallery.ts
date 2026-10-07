@@ -1,3 +1,4 @@
+import { isMobileHtmlPath } from "./mobile-html";
 import type { App, FileSystemAdapter, TAbstractFile, TFile } from "obsidian";
 import {
   isExcludedPath,
@@ -140,7 +141,8 @@ export async function buildHtmlGallerySnapshot(
   app: App,
   roots: string[],
   thumbnailFolder: string,
-  homePages?: readonly string[]
+  homePages?: readonly string[],
+  mobileAllFiles = false
 ): Promise<HtmlGallerySnapshot> {
   const normalizedRoots = normalizeRoots(roots);
   const normalizedHomePages = normalizeHomePages(homePages);
@@ -165,7 +167,7 @@ export async function buildHtmlGallerySnapshot(
 
   try {
     for (const file of app.vault.getFiles()) {
-      if (!isHtmlFile(file)) continue;
+      if (!(mobileAllFiles ? /\.html?$/i.test(file.path) : isHtmlFile(file))) continue;
       scannedCount += 1;
       const path = normalizeVaultPath(file.path);
       const withinConfiguredRoot = normalizedRoots.some((root) =>
@@ -175,9 +177,9 @@ export async function buildHtmlGallerySnapshot(
         normalizedHomePages === null ||
         normalizedHomePages.has(path.toLocaleLowerCase());
       if (
-        !withinConfiguredRoot ||
-        !isConfiguredHomePage ||
-        shouldExcludeHtmlPath(path)
+        mobileAllFiles
+          ? !isMobileHtmlPath(path)
+          : !withinConfiguredRoot || !isConfiguredHomePage || shouldExcludeHtmlPath(path)
       ) {
         excludedCount += 1;
         continue;
