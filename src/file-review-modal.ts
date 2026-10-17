@@ -16,7 +16,9 @@ export class FileReviewFolderModal extends FuzzySuggestModal<TFolder> {
   }
   getItemText(folder: TFolder): string { return folder.isRoot() ? "(vault root)" : folder.path; }
   onChooseItem(folder: TFolder): void {
-    if (this.choosing || this.finished) return;
+    if (this.choosing) return;
+    // Obsidian may deliver selection after onClose has already settled cancellation.
+    this.finished = false;
     this.choosing = true;
     void this.move(folder);
   }

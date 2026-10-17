@@ -1,3 +1,4 @@
+import { filterReviewRows, nextReviewPath } from "./file-review";
 import { isMobileHtmlPath, renderMobileHtml, usesMobileHtmlViewer, MOBILE_HTML_BUILD } from "./mobile-html";
 import {
   Component,
@@ -170,6 +171,8 @@ export class VaultControlCenterView extends ItemView {
   };
   private htmlThumbnailsGenerating = false;
   private fileReviewRefreshing = false;
+  private reviewOrder: string[] = [];
+  private reviewAnchor = "";
   private reviewFilters = { query: "", folder: "" };
   private automations: AutomationSnapshot = {
     status: "ready",
@@ -665,6 +668,7 @@ export class VaultControlCenterView extends ItemView {
           "ai-team",
           "html",
           "automations",
+          "file-review",
         ].includes(this.route),
         action: () => this.navigate("settings"),
       },
@@ -682,15 +686,15 @@ export class VaultControlCenterView extends ItemView {
   }
 
   refreshFileReview(): void {
-    if (this.route !== "automations" || !this.contentRegionEl || !this.data) return;
+    if (this.route !== "file-review" || !this.contentRegionEl || !this.data) return;
     const existing = this.contentRegionEl.querySelector<HTMLElement>(".fjg-vcc-file-review");
     if (!existing) return;
-    const active = document.activeElement;
+    const active = existing.ownerDocument.activeElement;
     const search = existing.querySelector<HTMLInputElement>('input[type="search"]');
     const focusedSearch = active === search;
     const focusedFilter = active === existing.querySelector("select");
     const scrollTop = this.contentRegionEl.scrollTop;
-    const holder = document.createElement("div");
+    const holder = existing.ownerDocument.createElement("div");
     renderFileReview(holder, this.renderContext());
     existing.replaceWith(holder.firstElementChild!);
     const next = this.contentRegionEl.querySelector<HTMLElement>(".fjg-vcc-file-review")!;
@@ -699,6 +703,7 @@ export class VaultControlCenterView extends ItemView {
       input.focus({ preventScroll: true });
     } else if (focusedFilter) next.querySelector<HTMLSelectElement>("select")?.focus({ preventScroll: true });
     this.contentRegionEl.scrollTop = scrollTop;
+    this.updateReviewNextButton();
   }
 
   private async refreshReviewFiles(): Promise<void> {
@@ -815,7 +820,10 @@ export class VaultControlCenterView extends ItemView {
       openReviewFile: (row) => void this.plugin.openReviewFileInTab(row),
       moveReviewFile: (row) => {
         if (row.file) {
-          new FileReviewFolderModal(this.app, row, this.plugin.fileReview, () => this.refreshFileReview()).open();
+          new FileReviewFolderModal(this.app, row, this.plugin.fileReview, async () => {
+            this.refreshFileReview();
+            if (this.activePreviewFile === row.file) await this.restoreActivePreview();
+          }).open();
         }
       },
       memory: this.memory,
@@ -1265,6 +1273,10 @@ export class VaultControlCenterView extends ItemView {
       this.previewReturnFocusEl = activeElement;
     }
 
+    if (this.route === "file-review") {
+      this.reviewOrder = this.currentReviewPaths();
+      this.reviewAnchor = target.path;
+    }
     const fileChanged = this.activePreviewFile?.path !== target.path;
     this.activePreviewFile = target;
     this.pendingPreviewPath = target.path;
@@ -1295,6 +1307,30 @@ export class VaultControlCenterView extends ItemView {
     await this.renderPreview(target, false);
   }
 
+  private currentReviewPaths(): string[] {
+    return filterReviewRows(this.plugin.fileReview.snapshot,
+      [this.renderState.query, this.reviewFilters.query].filter(Boolean).join(" "), this.reviewFilters.folder)
+      .map(row => row.currentPath!).filter(path => !!this.app.vault.getAbstractFileByPath(path));
+  }
+
+  private nextReviewFilePath(): string | null {
+    return nextReviewPath(this.currentReviewPaths(), this.reviewAnchor, this.reviewOrder);
+  }
+
+  private updateReviewNextButton(): void {
+    const button = this.previewPaneEl?.querySelector<HTMLButtonElement>(".fjg-vcc-preview-next");
+    if (button) button.disabled = !!this.previewMoveFile || !this.nextReviewFilePath();
+  }
+
+  private async openNextReviewFile(): Promise<void> {
+    if (this.previewMoveFile) return;
+    await this.plugin.fileReview.refresh();
+    this.refreshFileReview();
+    const path = this.nextReviewFilePath();
+    if (path) await this.openPreview(path);
+    else new Notice("No more files match this review queue.");
+  }
+
   private movePreviewFile(file: TFile, path: string, ctime: number): void {
     if (this.previewMoveFile) return;
     if (this.activePreviewFile !== file || file.path !== path || file.stat.ctime !== ctime || this.app.vault.getAbstractFileByPath(path) !== file) {
@@ -1302,10 +1338,12 @@ export class VaultControlCenterView extends ItemView {
       return;
     }
     this.previewMoveFile = file;
+    this.updateReviewNextButton();
     const button = this.previewPaneEl?.querySelector<HTMLButtonElement>(".fjg-vcc-preview-move");
     if (button) button.disabled = true;
     const settle = () => {
       this.previewMoveFile = null;
+      this.updateReviewNextButton();
       const current = this.previewPaneEl?.querySelector<HTMLButtonElement>(".fjg-vcc-preview-move");
       if (current) current.disabled = false;
     };
@@ -1381,6 +1419,14 @@ export class VaultControlCenterView extends ItemView {
           file,
           editing ? "preview" : "edit"
         ),
+      });
+    }
+    if (this.route === "file-review") {
+      createButton(actions, {
+        label: "Next", icon: "arrow-right", className: "fjg-vcc-button fjg-vcc-preview-next",
+        ariaLabel: "Next file in the review queue", title: "Next file in the review queue",
+        disabled: !!this.previewMoveFile || !this.nextReviewFilePath(),
+        onClick: () => void this.openNextReviewFile(),
       });
     }
     const movePath = file.path;

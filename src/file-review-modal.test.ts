@@ -49,6 +49,14 @@ describe("item destination picker lifecycle", () => {
     await Promise.resolve(); expect(f.settle).not.toHaveBeenCalled();
     finish(); await vi.waitFor(() => expect(f.settle).toHaveBeenCalledOnce());
   });
+  it("does not discard a selection delivered after close's microtask", async () => {
+    const f = fixture();
+    f.modal.onClose();
+    await Promise.resolve();
+    f.modal.onChooseItem(f.folder);
+    await vi.waitFor(() => expect(f.refresh).toHaveBeenCalledOnce());
+    expect(f.renameFile).toHaveBeenCalledExactlyOnceWith(f.file, "Target/Disposable.md");
+  });
   it("refuses collisions and stale/deleted items, then refreshes and releases the button", async () => {
     for (const state of ["collision", "deleted", "moved"]) {
       const f = fixture();

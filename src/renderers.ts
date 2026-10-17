@@ -156,6 +156,9 @@ export function renderRoute(
     case "automations":
       renderAutomations(view, context);
       break;
+    case "file-review":
+      renderFileReview(view, context);
+      break;
     case "recent":
       renderRecent(view, context);
       break;
@@ -317,7 +320,6 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
     });
   }
 
-  renderFileReview(parent, context);
   renderMemoryCard(parent, context);
 
   const groupLabels: Record<(typeof VISIBLE_AUTOMATION_GROUPS)[number], string> = {

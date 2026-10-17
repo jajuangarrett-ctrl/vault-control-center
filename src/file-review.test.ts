@@ -64,7 +64,7 @@ describe("selected file moves", () => {
     f.renameFile.mockImplementationOnce(() => new Promise<void>(resolve => {release=resolve;}));
     const pending=moveReviewedFile(f.app,f.selected,"Target");
     await expect(moveReviewedFile(f.app,f.selected,"Target")).rejects.toThrow(/progress/);
-    release(); await pending;
+    release(); await expect(pending).rejects.toThrow(/could not be verified/);
     f.renameFile.mockRejectedValueOnce(new Error("Target exists"));
     await expect(moveReviewedFile(f.app,f.selected,"Target")).rejects.toThrow(/Target exists/);
   });

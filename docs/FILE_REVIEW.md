@@ -1,3 +1,11 @@
+# File Review — 0.3.20
+
+Open **Vault Control Center → File Review** to review and file inbox notes. The queue has moved out of Automations. Open a filename, choose **Move**, then choose **Next** to review the next matching file without returning to the list. Next follows the current search and inbox filter, skips files that have left the queue, and disables when no other matching file remains. A move keeps its destination visible for inspection until Next is selected.
+
+The picker accepts selection even when Obsidian delivers it after the close callback. Successful moves are checked against Obsidian's destination inventory before displaying success. Queue and preview refreshes follow both row and preview moves. Existing collision, stale-file, and repeated-move protection remains.
+
+Automated validation: 200 tests, TypeScript, and production build pass. Live computer-use validation is pending; do not treat this build as accepted until the desktop move and Next scenarios pass.
+
 # Live inbox File review
 
 Version 0.3.16 replaces processing-history membership with a live queue in **Vault Control Center → Automations → File review**. These exact vault-relative folders are watched:

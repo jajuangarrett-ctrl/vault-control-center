@@ -1,3 +1,11 @@
+## 0.3.20
+
+- Give the live inbox filing queue its own File Review tab.
+- Add Next to review previews, preserving filtered queue order after a move.
+- Accept folder selections delivered after the picker close callback; verify destination identity before reporting a successful move.
+- Refresh the queue and open preview after row moves, and use the view document when replacing the queue.
+- Update the transitive busboy dependency to 3.2.3.
+
 # Changelog
 
 ## 0.3.19 — 2026-10-06

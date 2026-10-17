@@ -145,6 +145,9 @@ export async function moveReviewedFile(app: App, selected: MoveSelection, folder
   try {
     // FileManager preserves Obsidian's configured link-update behavior and rejects collisions.
     await app.fileManager.renameFile(file, destination);
+    if (file.path !== destination || app.vault.getAbstractFileByPath(destination) !== file || app.vault.getAbstractFileByPath(path) === file) {
+      throw new Error("The move could not be verified at the selected destination. Refresh File Review and check the current path.");
+    }
     return `Moved to ${destination}`;
   } finally { moving.delete(file); }
 }
@@ -155,4 +158,12 @@ export function getLiveReviewFile(app: App, row: ReviewRow): TFile | null {
   const file = row.file;
   return file && file.path === path && (reviewPath(path) === path || !!reviewInbox(path)) &&
     app.vault.getAbstractFileByPath(path) === file ? file : null;
+}
+
+/** Keep the original review order after filing the current item; wrap only to remaining items. */
+export function nextReviewPath(paths: string[], current: string, previous: string[]): string | null {
+  const index = paths.indexOf(current);
+  if (index >= 0) return paths[index + 1] ?? paths.find(path => path !== current) ?? null;
+  const oldIndex = previous.indexOf(current);
+  return previous.slice(oldIndex + 1).find(path => paths.includes(path)) ?? paths[0] ?? null;
 }
