@@ -815,6 +815,7 @@ export class VaultControlCenterView extends ItemView {
       automations: this.automations,
       fileReview: this.plugin.fileReview.snapshot,
       reviewFilters: this.reviewFilters,
+      reviewFiltersChanged: () => this.updateReviewNextButton(),
       fileReviewRefreshing: this.fileReviewRefreshing,
       refreshReviewFiles: () => void this.refreshReviewFiles(),
       openReviewFile: (row) => void this.plugin.openReviewFileInTab(row),
@@ -1314,7 +1315,9 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private nextReviewFilePath(): string | null {
-    return nextReviewPath(this.currentReviewPaths(), this.reviewAnchor, this.reviewOrder);
+    const paths = this.currentReviewPaths();
+    const currentPath = this.activePreviewFile?.path;
+    return nextReviewPath(paths, currentPath && paths.includes(currentPath) ? currentPath : this.reviewAnchor, this.reviewOrder);
   }
 
   private updateReviewNextButton(): void {

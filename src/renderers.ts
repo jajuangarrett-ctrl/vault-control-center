@@ -69,6 +69,7 @@ export interface DashboardRenderContext {
   automations: AutomationSnapshot;
   fileReview: FileReviewSnapshot;
   reviewFilters: { query: string; folder: string };
+  reviewFiltersChanged: () => void;
   fileReviewRefreshing: boolean;
   refreshReviewFiles: () => void;
   moveReviewFile: (row: ReviewRow) => void;
@@ -382,6 +383,7 @@ export function renderFileReview(parent: HTMLElement, context: DashboardRenderCo
   const renderRows = () => {
     context.reviewFilters.query = search.value;
     context.reviewFilters.folder = filter.value;
+    context.reviewFiltersChanged();
     list.empty();
     const rows = filterReviewRows(snapshot, [context.state.query, search.value].filter(Boolean).join(" "), filter.value);
     count.setText(`${rows.length} ${rows.length === 1 ? "file" : "files"} awaiting filing`);

@@ -4,7 +4,7 @@ Open **Vault Control Center → File Review** to review and file inbox notes. Th
 
 The picker accepts selection even when Obsidian delivers it after the close callback. Successful moves are checked against Obsidian's destination inventory before displaying success. Queue and preview refreshes follow both row and preview moves. Existing collision, stale-file, and repeated-move protection remains.
 
-Automated validation: 200 tests, TypeScript, and production build pass. Live computer-use validation is pending; do not treat this build as accepted until the desktop move and Next scenarios pass.
+Validation on October 16, 2026: 200 tests, TypeScript, production build, diff checks, and production dependency audit pass. Focused computer-use testing in Obsidian verified the dedicated tab, Escape cancellation, preview Move outside the inboxes (453 → 452), Next opening the remaining matching note, row moves between inboxes with one current-path row and unchanged total, collision refusal without overwriting, and the final move restoring the baseline (452 → 451; zero matching fixture files). A live-test edge case was corrected: Next excludes the current file after an inbox-to-inbox move and updates immediately when search/filter changes. Both were retested in the final build. Filesystem checks confirmed the final locations. Only newly created fixtures were moved; they are retained outside the inboxes. Physical mobile and second-device Sync were not tested.
 
 # Live inbox File review
 
