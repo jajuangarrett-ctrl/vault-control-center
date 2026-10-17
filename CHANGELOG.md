@@ -1,3 +1,9 @@
+## 0.3.21
+
+- When moving an inbox Markdown note to an existing matching note outside the inboxes, archive the redundant inbox copy instead of blocking filing.
+- Compare all content and metadata except the single scalar location property; differing or concurrently changed notes remain untouched.
+- Preserve duplicate copies under the plugin artifact folder with original inbox paths and collision-safe suffixes.
+
 ## 0.3.20
 
 - Give the live inbox filing queue its own File Review tab.

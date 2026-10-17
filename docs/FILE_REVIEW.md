@@ -1,3 +1,11 @@
+# Matching duplicates — 0.3.21
+
+If Move encounters an existing Markdown note outside the watched inboxes, it compares the two files. Only a scalar top-level `location` property is ignored; every other byte must match. A matching inbox copy is moved to `Artifacts/Vault Control Center Native Plugin/Archived Duplicates/`, preserving its original inbox path. Archive name collisions receive a numbered suffix. The filed destination is not rewritten. Changed content, different metadata, non-Markdown collisions, and destinations inside the watched inboxes remain blocked.
+
+The source and destination are reread and their identities rechecked after archive folder creation. Existing stale-selection and overlapping-move protections still apply. Nothing is deleted. The normal move refresh removes the archived item from File Review.
+
+Validation on October 17, 2026: 204 tests, TypeScript, production build, diff checks, and production dependency audit pass. Live desktop computer use verified matching-duplicate filing through both preview Move and queue-row Move: each filtered queue became empty and the overall queue fell from 449 to 447. Both existing filed notes retained their original SHA-256 hashes; both inbox sources were found in the archive and absent from their old paths. A different-content fixture was refused without overwriting, then moved normally to a separate retention folder; the filtered queue returned to zero and overall count to 447. Fixtures remain under Wiki/VCC Filing Validation. Physical mobile and second-device Sync were not tested.
+
 # File Review — 0.3.20
 
 Open **Vault Control Center → File Review** to review and file inbox notes. The queue has moved out of Automations. Open a filename, choose **Move**, then choose **Next** to review the next matching file without returning to the list. Next follows the current search and inbox filter, skips files that have left the queue, and disables when no other matching file remains. A move keeps its destination visible for inspection until Next is selected.

@@ -1,3 +1,4 @@
+import { archiveMatchingInboxNote } from "./file-review-duplicates";
 import type { App, TFile } from "obsidian";
 import { isExcludedPath, isSensitivePath } from "./data";
 import type { ReviewIdentity } from "./file-review-identity";
@@ -140,9 +141,15 @@ export async function moveReviewedFile(app: App, selected: MoveSelection, folder
   if (!reviewPath(path) && !reviewInbox(path)) throw new Error("This file is not available for review.");
   const destination = folder ? `${folder}/${file.name}` : file.name;
   if (destination === path) return "The file is already in that folder.";
-  if (app.vault.getAbstractFileByPath(destination)) throw new Error("A file or folder with this name already exists there. Nothing was overwritten.");
+  const existing = app.vault.getAbstractFileByPath(destination);
   moving.add(file);
   try {
+    if (existing) {
+      if (reviewInbox(path) && !reviewInbox(destination) && file.extension.toLowerCase() === "md" && "extension" in existing && typeof existing.extension === "string" && existing.extension.toLowerCase() === "md") {
+        return await archiveMatchingInboxNote(app, file, existing as TFile, path);
+      }
+      throw new Error("A file or folder with this name already exists there. Nothing was overwritten.");
+    }
     // FileManager preserves Obsidian's configured link-update behavior and rejects collisions.
     await app.fileManager.renameFile(file, destination);
     if (file.path !== destination || app.vault.getAbstractFileByPath(destination) !== file || app.vault.getAbstractFileByPath(path) === file) {
