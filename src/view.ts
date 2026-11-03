@@ -589,7 +589,13 @@ export class VaultControlCenterView extends ItemView {
     this.renderContent();
 
     if (typeof ResizeObserver !== "undefined") {
-      this.previewResizeObserver = new ResizeObserver(() => this.updatePreviewLayoutMode());
+      this.previewResizeObserver = new ResizeObserver(() => {
+        this.updatePreviewLayoutMode();
+        if (Platform.isMobile && this.mobileFolderDetail && (this.route === "areas" || this.route === "programs")) {
+          const collapsed = this.effectiveFolderRailCollapsed();
+          if ((this.rootEl?.getAttribute("data-folder-rail-collapsed") === "true") !== collapsed) this.renderContent();
+        }
+      });
       this.previewResizeObserver.observe(this.rootEl);
     }
     if (this.activePreviewFile || this.pendingPreviewPath) {
@@ -839,9 +845,10 @@ export class VaultControlCenterView extends ItemView {
       state: this.renderState,
       activePreviewPath: this.activePreviewFile?.path ?? this.pendingPreviewPath,
       folderRailId: this.folderRailId,
-      folderRailCollapsed: this.folderRailCollapsed,
+      folderRailCollapsed: this.effectiveFolderRailCollapsed(),
       setFolderRailCollapsed: (collapsed) => {
         this.folderRailCollapsed = collapsed;
+        this.mobileFolderDetail = false;
         this.syncFolderRailAttribute();
       },
       clearSearch: () => {
@@ -1173,18 +1180,41 @@ export class VaultControlCenterView extends ItemView {
   private syncFolderRailAttribute(): void {
     const activeRoute = this.route === "areas" || this.route === "programs";
     const folderBrowserVisible = !this.renderState.query.trim();
-    if (activeRoute && folderBrowserVisible && this.folderRailCollapsed) {
+    if (activeRoute && folderBrowserVisible && this.effectiveFolderRailCollapsed()) {
       this.rootEl?.setAttribute("data-folder-rail-collapsed", "true");
     } else {
       this.rootEl?.removeAttribute("data-folder-rail-collapsed");
     }
   }
 
+  private mobileFolderDetail = false;
+
+  private folderBrowserWidth(): number {
+    return this.contentRegionEl?.querySelector<HTMLElement>(".fjg-vcc-program-layout")?.clientWidth || this.contentRegionEl?.clientWidth || 0;
+  }
+
+  private effectiveFolderRailCollapsed(): boolean {
+    return this.folderRailCollapsed || Boolean(Platform?.isMobile && this.mobileFolderDetail &&
+      this.contentRegionEl && this.folderBrowserWidth() < 560);
+  }
+
   private focusFolderHeading(): void {
+    if (Platform?.isMobile) {
+      this.mobileFolderDetail = true;
+      this.renderContent();
+      const path = this.currentFolderPath();
+      if (path) window.dispatchEvent(new CustomEvent("fjg-vcc-folder-context", { detail: { path } }));
+    }
     window.setTimeout(() => {
-      this.contentRegionEl
-        ?.querySelector<HTMLElement>(".fjg-vcc-folder-heading")
-        ?.focus({ preventScroll: true });
+      const heading = this.contentRegionEl?.querySelector<HTMLElement>(".fjg-vcc-folder-heading");
+      heading?.focus({ preventScroll: true });
+      if (Platform?.isMobile) {
+        // Keep the folder controls and opened contents in view, rather than below the roots list.
+        const target = this.contentRegionEl?.querySelector<HTMLElement>(
+          this.folderBrowserWidth() < 560 ? ".fjg-vcc-folder-rail" : ".fjg-vcc-folder-toolbar"
+        );
+        target?.scrollIntoView({ block: "start", behavior: "instant" as ScrollBehavior });
+      }
     }, 0);
   }
 

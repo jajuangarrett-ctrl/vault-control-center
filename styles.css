@@ -4228,3 +4228,33 @@ body.fjg-vcc-shell-enabled:is(.fjg-vcc-theme-dark, .fjg-vcc-theme-light) :is(
 .fjg-vcc-mobile-html-frame { display: block; width: 100%; flex: 1 1 auto; min-height: 360px; border: 0; background: white; }
 .fjg-vcc-mobile-html-status { padding: 10px 14px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; max-height: 110px; overflow: auto; flex: 0 0 auto; }
 .fjg-vcc-mobile-html-status[hidden] { display: none; }
+
+/* Mobile navigation: native sidebar controls keep their own handlers. */
+body.is-mobile .sidebar-toggle-button,
+body.is-mobile .sidebar-toggle-button > .clickable-icon {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+body.is-mobile .fjg-vcc :is(.fjg-vcc-folder-chip, .fjg-vcc-folder-up, .fjg-vcc-folder-crumb, .fjg-vcc-folder-copy-path, .fjg-vcc-folder-rail-toggle) {
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+body.is-mobile .fjg-vcc .fjg-vcc-folder-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--vcc-surface);
+}
+/* Keep the wide mobile browser beside its roots. Older viewport rules above
+   otherwise force one column even when the actual dashboard panel is wide. */
+@container fjg-vcc-route (min-width: 560px) {
+  body.is-mobile .fjg-vcc .fjg-vcc-program-layout {
+    grid-template-columns: minmax(180px, .65fr) minmax(0, 1.55fr);
+  }
+  body.is-mobile .fjg-vcc[data-folder-rail-collapsed="true"] .fjg-vcc-program-layout {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+}

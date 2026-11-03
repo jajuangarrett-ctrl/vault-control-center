@@ -1,3 +1,11 @@
+## 0.3.22
+
+- Mobile only: selecting an Areas or Programs folder shows its contents without scrolling past the roots list. Compact panels temporarily collapse the list; Show list restores it without losing the selection.
+- Use the dashboard panel width for mobile folder columns, overriding legacy viewport rules that stacked wide mobile layouts.
+- Keep mobile folder controls and native sidebar toggle targets at least 44px. Preserve native toggle handlers.
+- Share the selected mobile folder with File Focus Duo shortcuts without opening or changing sidebar visibility.
+- Desktop navigation and saved folder-list preferences are unchanged.
+
 ## 0.3.21
 
 - When moving an inbox Markdown note to an existing matching note outside the inboxes, archive the redundant inbox copy instead of blocking filing.

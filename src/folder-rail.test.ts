@@ -22,6 +22,7 @@ vi.mock("obsidian", () => {
     MarkdownRenderer: { render: vi.fn() },
     MarkdownView: class extends MockItemView {},
     Notice: class {},
+    Platform: {isMobile:false},
     TFile: class {},
     TFolder: class {},
     Vault: class {},
@@ -32,7 +33,7 @@ vi.mock("obsidian", () => {
   };
 });
 
-import { TFolder } from "obsidian";
+import { TFolder, Platform } from "obsidian";
 import type { DashboardData, DashboardFileItem, DashboardProgram } from "./data";
 import { VaultControlCenterView } from "./view";
 
@@ -378,5 +379,45 @@ describe("dashboard keyboard boundaries", () => {
     view.handleKeyboard(event);
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(view.searchInputEl.focus).not.toHaveBeenCalled();
+  });
+});
+
+describe("mobile folder detail navigation", () => {
+  afterEach(()=>{ (Platform as any).isMobile=false; vi.unstubAllGlobals(); });
+  it("collapses the roots after a narrow mobile selection, scrolls controls into view, and can reopen without losing selection", () => {
+    (Platform as any).isMobile=true;
+    const view=makeView() as any;
+    const scrollIntoView=vi.fn(), focus=vi.fn();
+    view.contentRegionEl={clientWidth:390,querySelector:(selector:string)=>selector.includes("heading")?{focus}:selector.includes("program-layout")?{clientWidth:342}:{scrollIntoView}};
+    view.rootEl=new AttributeHost();
+    view.data=dashboardData({});
+    view.route="areas";
+    view.renderContent=vi.fn(()=>view.syncFolderRailAttribute());
+    view.currentFolderPath=()=>"03 Areas/Department/Subfolder";
+    const dispatchEvent=vi.fn();
+    vi.stubGlobal("window",{setTimeout:(fn:()=>void)=>fn(),dispatchEvent});
+    vi.stubGlobal("CustomEvent",class {constructor(public type:string,public options:unknown){}});
+    view.focusFolderHeading();
+    expect(view.rootEl.getAttribute("data-folder-rail-collapsed")).toBe("true");
+    expect(scrollIntoView).toHaveBeenCalledWith({block:"start",behavior:"instant"});
+    expect(dispatchEvent).toHaveBeenCalledOnce();
+    expect(view.folderRailCollapsed).toBe(false); // temporary mobile drill-down is not a saved desktop preference
+    view.renderContext().setFolderRailCollapsed(false);
+    expect(view.rootEl.getAttribute("data-folder-rail-collapsed")).toBeNull();
+    expect(view.currentFolderPath()).toBe("03 Areas/Department/Subfolder");
+    view.mobileFolderDetail=true;
+    view.contentRegionEl.querySelector=()=>({clientWidth:867});
+    expect(view.effectiveFolderRailCollapsed()).toBe(false);
+  });
+  it("keeps desktop selection focus without scrolling or hiding the roots",()=>{
+    const view=makeView() as any;
+    const focus=vi.fn();
+    view.contentRegionEl={querySelector:()=>({focus})};
+    view.renderContent=vi.fn();
+    vi.stubGlobal("window",{setTimeout:(fn:()=>void)=>fn()});
+    view.focusFolderHeading();
+    expect(focus).toHaveBeenCalledWith({preventScroll:true});
+    expect(view.renderContent).not.toHaveBeenCalled();
+    expect(view.mobileFolderDetail).toBe(false);
   });
 });
