@@ -1,3 +1,4 @@
+import { bindNavigationTap } from "./mobile-tab-tap";
 import { filterReviewRows, nextReviewPath } from "./file-review";
 import { isMobileHtmlPath, renderMobileHtml, usesMobileHtmlViewer, MOBILE_HTML_BUILD } from "./mobile-html";
 import {
@@ -607,6 +608,15 @@ export class VaultControlCenterView extends ItemView {
 
   private renderRouteTabs(): void {
     if (!this.routeTabsEl) return;
+    if (Platform.isMobile && this.routeTabsEl.children.length === ROUTE_DEFINITIONS.length) {
+      // Keep the same touch targets attached during rapid successive taps.
+      for (const [index, route] of ROUTE_DEFINITIONS.entries()) {
+        const button=this.routeTabsEl.children[index] as HTMLButtonElement;
+        button.classList.toggle("is-active", this.route===route.id);
+        button.setAttribute("aria-selected",String(this.route===route.id));
+      }
+      return;
+    }
     this.routeTabsEl.empty();
     for (const route of ROUTE_DEFINITIONS) {
       const button = this.routeTabsEl.createEl("button", {
@@ -619,7 +629,7 @@ export class VaultControlCenterView extends ItemView {
           tabindex: "0",
         },
       });
-      button.addEventListener("click", () => this.navigate(route.id));
+      bindNavigationTap(button, Platform.isMobile, () => this.navigate(route.id));
     }
   }
 
@@ -687,7 +697,7 @@ export class VaultControlCenterView extends ItemView {
       });
       createIcon(button, item.icon);
       button.createSpan({ text: item.label });
-      button.addEventListener("click", item.action);
+      bindNavigationTap(button, Platform.isMobile, item.action);
     }
   }
 
@@ -847,10 +857,13 @@ export class VaultControlCenterView extends ItemView {
       folderRailId: this.folderRailId,
       folderRailCollapsed: this.effectiveFolderRailCollapsed(),
       setFolderRailCollapsed: (collapsed) => {
-        this.folderRailCollapsed = collapsed;
-        this.mobileFolderDetail = false;
+        if (Platform.isMobile) {
+          this.mobileRootsVisible = !collapsed;
+          this.mobileFolderDetail = collapsed;
+        } else this.folderRailCollapsed = collapsed;
         this.syncFolderRailAttribute();
       },
+      showFolderRoots: () => this.showFolderRoots(),
       clearSearch: () => {
         this.renderState.query = "";
         if (this.searchInputEl) this.searchInputEl.value = "";
@@ -1168,13 +1181,30 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private navigate(route: DashboardRoute): void {
-    if (this.route === route) return;
+    if (this.route === route) {
+      if (Platform.isMobile) {
+        if (route === "areas" || route === "programs") this.showFolderRoots();
+        else this.contentEl.scrollTo({top:0});
+      }
+      return;
+    }
     void this.closePreview({ restoreFocus: false });
     this.route = route;
     this.renderRouteTabs();
     this.renderMobileDock();
     this.renderContent();
-    this.contentRegionEl?.scrollTo({ top: 0 });
+    if (Platform.isMobile) this.contentEl.scrollTo({top:0});
+    else this.contentRegionEl?.scrollTo({ top: 0 });
+  }
+
+  private showFolderRoots(): void {
+    this.mobileRootsVisible = true;
+    this.mobileFolderDetail = false;
+    this.renderState.query = "";
+    if(this.searchInputEl)this.searchInputEl.value="";
+    this.renderContent();
+    this.contentEl.scrollTo({top:0});
+    this.contentRegionEl?.querySelector<HTMLElement>(".fjg-vcc-folder-rail button")?.focus({preventScroll:true});
   }
 
   private syncFolderRailAttribute(): void {
@@ -1193,18 +1223,21 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private mobileFolderDetail = false;
+  private mobileRootsVisible: boolean | null = null;
 
   private folderBrowserWidth(): number {
     return this.contentRegionEl?.querySelector<HTMLElement>(".fjg-vcc-program-layout")?.clientWidth || this.contentRegionEl?.clientWidth || 0;
   }
 
   private effectiveFolderRailCollapsed(): boolean {
+    if (Platform.isMobile && this.mobileRootsVisible !== null) return !this.mobileRootsVisible;
     return this.folderRailCollapsed || Boolean(Platform?.isMobile && this.mobileFolderDetail &&
       this.contentRegionEl && this.folderBrowserWidth() < 560);
   }
 
   private focusFolderHeading(): void {
     if (Platform?.isMobile) {
+      this.mobileRootsVisible = null;
       this.mobileFolderDetail = true;
       this.renderContent();
       const path = this.currentFolderPath();

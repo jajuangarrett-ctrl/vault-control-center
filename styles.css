@@ -4276,3 +4276,8 @@ body.is-mobile .fjg-vcc[data-mobile-folder-detail="true"] :is(.fjg-vcc-header, .
     gap: 5px;
   }
 }
+
+body.is-mobile .fjg-vcc :is(.fjg-vcc-route-tab, .fjg-vcc-mobile-dock-item) {
+  min-height: 44px;
+  touch-action: manipulation;
+}

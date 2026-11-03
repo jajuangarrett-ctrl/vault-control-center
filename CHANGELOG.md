@@ -1,3 +1,11 @@
+## 0.3.24
+
+- Mobile only: add Back at every Areas and Programs folder depth, including Back to Areas/Programs at a root.
+- Tapping the active Areas/Programs tab restores its folder list; switching tabs returns the actual scrolling dashboard host to the top.
+- Keep mobile route buttons mounted during navigation and recognize completed touch taps while preserving scrolling, cancellation, and keyboard activation.
+- Keep desktop navigation and the saved desktop folder-list preference unchanged.
+- Validation: 216 unit tests and production build pass. Physical-phone verification is tracked separately from browser and Mac emulation checks.
+
 ## 0.3.23
 
 - Mobile only: let the dashboard header and route tabs scroll away after selecting a folder, keeping sticky folder navigation unobscured.

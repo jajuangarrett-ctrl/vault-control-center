@@ -88,6 +88,7 @@ export interface DashboardRenderContext {
   folderRailId: string;
   folderRailCollapsed: boolean;
   setFolderRailCollapsed: (collapsed: boolean) => void;
+  showFolderRoots: () => void;
   clearSearch: () => void;
   navigate: (route: DashboardRoute) => void;
   openFile: (path: string) => void;
@@ -884,13 +885,13 @@ function renderFolderCollection(
 
   const browser = detail.body.createDiv({ cls: "fjg-vcc-program-browser" });
   const toolbar = browser.createDiv({ cls: "fjg-vcc-folder-toolbar" });
-  if (folderView.parentPath) {
+  if (Platform.isMobile || folderView.parentPath) {
     createButton(toolbar, {
-      label: "Up",
-      icon: "arrow-up",
+      label: Platform.isMobile ? (folderView.parentPath ? "Back" : `Back to ${options.title}`) : "Up",
+      icon: Platform.isMobile ? "arrow-left" : "arrow-up",
       className: "fjg-vcc-folder-up",
-      ariaLabel: `Go up from ${folderView.name}`,
-      onClick: () => options.selectFolder(folderView.parentPath ?? selected.path),
+      ariaLabel: !Platform.isMobile ? `Go up from ${folderView.name}` : folderView.parentPath ? `Go back from ${folderView.name}` : `Back to ${options.title} list`,
+      onClick: () => folderView.parentPath ? options.selectFolder(folderView.parentPath) : context.showFolderRoots(),
     });
   }
   const breadcrumbs = toolbar.createEl("nav", {

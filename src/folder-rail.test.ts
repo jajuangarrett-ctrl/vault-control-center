@@ -423,3 +423,42 @@ describe("mobile folder detail navigation", () => {
     expect(view.mobileFolderDetail).toBe(false);
   });
 });
+
+describe("mobile Back and tab return",()=>{
+ afterEach(()=>{(Platform as any).isMobile=false;vi.unstubAllGlobals();});
+ it.each(["areas","programs"])("returns to the %s list when its active tab is tapped again", route=>{
+  (Platform as any).isMobile=true;
+  const view=makeView() as any;view.route=route;view.data=dashboardData({});
+  view.folderRailCollapsed=true;view.mobileFolderDetail=true;
+  view.renderState.query="stale filter";view.searchInputEl={value:"stale filter"};
+  view.rootEl=new AttributeHost();view.renderContent=vi.fn(()=>view.syncFolderRailAttribute());
+  view.contentEl={scrollTo:vi.fn()};view.contentRegionEl={querySelector:()=>null,scrollTo:vi.fn()};
+  view.navigate(route);
+  expect(view.contentEl.scrollTo).toHaveBeenCalledWith({top:0});
+  expect(view.contentRegionEl.scrollTo).not.toHaveBeenCalled();
+  expect(view.effectiveFolderRailCollapsed()).toBe(false);
+  expect(view.folderRailCollapsed).toBe(true); // mobile Back does not overwrite the saved desktop preference
+  expect(view.renderState.query).toBe("");
+  expect(view.rootEl.getAttribute("data-mobile-folder-detail")).toBeNull();
+ });
+ it("scrolls the actual mobile host when changing tabs",()=>{
+  (Platform as any).isMobile=true;
+  const view=makeView() as any;view.route="areas";
+  view.closePreview=vi.fn();view.renderRouteTabs=vi.fn();view.renderMobileDock=vi.fn();view.renderContent=vi.fn();
+  view.contentEl={scrollTo:vi.fn()};view.contentRegionEl={scrollTo:vi.fn()};
+  view.navigate("programs");
+  expect(view.route).toBe("programs");
+  expect(view.contentEl.scrollTo).toHaveBeenCalledWith({top:0});
+  expect(view.contentRegionEl.scrollTo).not.toHaveBeenCalled();
+ });
+ it("keeps explicit Hide list usable on a wide mobile panel",()=>{
+  (Platform as any).isMobile=true;
+  const view=makeView() as any;view.data=dashboardData({});view.route="areas";view.rootEl=new AttributeHost();
+  view.contentRegionEl={clientWidth:867,querySelector:()=>null};
+  view.renderContext().setFolderRailCollapsed(true);
+  expect(view.effectiveFolderRailCollapsed()).toBe(true);
+  expect(view.folderRailCollapsed).toBe(false);
+  view.renderContext().setFolderRailCollapsed(false);
+  expect(view.effectiveFolderRailCollapsed()).toBe(false);
+ });
+});
