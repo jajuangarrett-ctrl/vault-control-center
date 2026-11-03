@@ -1180,6 +1180,11 @@ export class VaultControlCenterView extends ItemView {
   private syncFolderRailAttribute(): void {
     const activeRoute = this.route === "areas" || this.route === "programs";
     const folderBrowserVisible = !this.renderState.query.trim();
+    if (Platform.isMobile && activeRoute && folderBrowserVisible && this.mobileFolderDetail) {
+      this.rootEl?.setAttribute("data-mobile-folder-detail", "true");
+    } else {
+      this.rootEl?.removeAttribute("data-mobile-folder-detail");
+    }
     if (activeRoute && folderBrowserVisible && this.effectiveFolderRailCollapsed()) {
       this.rootEl?.setAttribute("data-folder-rail-collapsed", "true");
     } else {

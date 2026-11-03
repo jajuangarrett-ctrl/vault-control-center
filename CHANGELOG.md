@@ -1,3 +1,9 @@
+## 0.3.23
+
+- Mobile only: let the dashboard header and route tabs scroll away after selecting a folder, keeping sticky folder navigation unobscured.
+- Reduce bottom dock height in short landscape windows while retaining 44px touch targets and every destination.
+- Follow-up from the folded portrait/landscape screen recording; desktop styles are unchanged.
+
 ## 0.3.22
 
 - Mobile only: selecting an Areas or Programs folder shows its contents without scrolling past the roots list. Compact panels temporarily collapse the list; Show list restores it without losing the selection.

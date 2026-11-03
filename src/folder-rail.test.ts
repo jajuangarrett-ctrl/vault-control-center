@@ -400,11 +400,13 @@ describe("mobile folder detail navigation", () => {
     view.focusFolderHeading();
     expect(view.rootEl.getAttribute("data-folder-rail-collapsed")).toBe("true");
     expect(scrollIntoView).toHaveBeenCalledWith({block:"start",behavior:"instant"});
+    expect(view.rootEl.getAttribute("data-mobile-folder-detail")).toBe("true");
     expect(dispatchEvent).toHaveBeenCalledOnce();
     expect(view.folderRailCollapsed).toBe(false); // temporary mobile drill-down is not a saved desktop preference
     view.renderContext().setFolderRailCollapsed(false);
     expect(view.rootEl.getAttribute("data-folder-rail-collapsed")).toBeNull();
     expect(view.currentFolderPath()).toBe("03 Areas/Department/Subfolder");
+    expect(view.rootEl.getAttribute("data-mobile-folder-detail")).toBeNull();
     view.mobileFolderDetail=true;
     view.contentRegionEl.querySelector=()=>({clientWidth:867});
     expect(view.effectiveFolderRailCollapsed()).toBe(false);
