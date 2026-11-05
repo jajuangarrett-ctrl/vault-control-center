@@ -440,6 +440,14 @@ describe("mobile Back and tab return",()=>{
   expect(view.folderRailCollapsed).toBe(true); // mobile Back does not overwrite the saved desktop preference
   expect(view.renderState.query).toBe("");
   expect(view.rootEl.getAttribute("data-mobile-folder-detail")).toBeNull();
+  expect(view.rootEl.getAttribute("data-mobile-folder-roots")).toBe("true");
+  // Returning again at the top remains an explicit list view, not a scroll-only no-op.
+  view.showFolderRoots();
+  expect(view.rootEl.getAttribute("data-mobile-folder-roots")).toBe("true");
+  vi.stubGlobal("window",{setTimeout:vi.fn(),dispatchEvent:vi.fn()});
+  view.currentFolderPath=()=>"";
+  view.focusFolderHeading();
+  expect(view.rootEl.getAttribute("data-mobile-folder-roots")).toBeNull();
  });
  it("scrolls the actual mobile host when changing tabs",()=>{
   (Platform as any).isMobile=true;

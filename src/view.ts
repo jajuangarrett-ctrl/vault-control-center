@@ -859,6 +859,7 @@ export class VaultControlCenterView extends ItemView {
       folderRailCollapsed: this.effectiveFolderRailCollapsed(),
       setFolderRailCollapsed: (collapsed) => {
         if (Platform.isMobile) {
+          this.mobileRootsOnly = false;
           this.mobileRootsVisible = !collapsed;
           this.mobileFolderDetail = collapsed;
         } else this.folderRailCollapsed = collapsed;
@@ -1199,6 +1200,7 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private showFolderRoots(): void {
+    this.mobileRootsOnly = true;
     this.mobileRootsVisible = true;
     this.mobileFolderDetail = false;
     this.renderState.query = "";
@@ -1211,6 +1213,9 @@ export class VaultControlCenterView extends ItemView {
   private syncFolderRailAttribute(): void {
     const activeRoute = this.route === "areas" || this.route === "programs";
     const folderBrowserVisible = !this.renderState.query.trim();
+    if (Platform.isMobile && activeRoute && folderBrowserVisible && this.mobileRootsOnly) {
+      this.rootEl?.setAttribute("data-mobile-folder-roots", "true");
+    } else this.rootEl?.removeAttribute("data-mobile-folder-roots");
     if (Platform.isMobile && activeRoute && folderBrowserVisible && this.mobileFolderDetail) {
       this.rootEl?.setAttribute("data-mobile-folder-detail", "true");
     } else {
@@ -1223,6 +1228,7 @@ export class VaultControlCenterView extends ItemView {
     }
   }
 
+  private mobileRootsOnly = false;
   private mobileFolderDetail = false;
   private mobileRootsVisible: boolean | null = null;
 
@@ -1238,6 +1244,7 @@ export class VaultControlCenterView extends ItemView {
 
   private focusFolderHeading(): void {
     if (Platform?.isMobile) {
+      this.mobileRootsOnly = false;
       this.mobileRootsVisible = null;
       this.mobileFolderDetail = true;
       this.renderContent();

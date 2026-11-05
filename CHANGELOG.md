@@ -1,3 +1,7 @@
+## 0.3.26
+
+- On mobile, Back to Areas/Programs opens a full-width roots list, even when already at the top. Selecting a root restores its detail view. Desktop split-view behavior is unchanged.
+
 ## 0.3.25
 
 - Protect mobile dashboard buttons, including Back to Areas/Programs, folder rows, breadcrumbs and actions, from drawer swipe interception.

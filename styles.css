@@ -4281,3 +4281,12 @@ body.is-mobile .fjg-vcc :is(.fjg-vcc-route-tab, .fjg-vcc-mobile-dock-item) {
   min-height: 44px;
   touch-action: manipulation;
 }
+
+/* Back to Areas/Programs is an explicit mobile list view even at scrollTop 0. */
+body.is-mobile .fjg-vcc[data-mobile-folder-roots="true"] .fjg-vcc-program-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+body.is-mobile .fjg-vcc[data-mobile-folder-roots="true"] .fjg-vcc-program-layout > .fjg-vcc-panel:not(.fjg-vcc-folder-rail),
+body.is-mobile .fjg-vcc[data-mobile-folder-roots="true"] .fjg-vcc-folder-rail-toggle {
+  display: none;
+}
