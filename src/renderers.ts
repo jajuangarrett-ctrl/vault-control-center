@@ -1,3 +1,4 @@
+import { createControlButton } from "./dom";
 import { usesMobileHtmlViewer } from "./mobile-html";
 import { Notice, Platform, setIcon } from "obsidian";
 import type {
@@ -227,7 +228,7 @@ function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext)
     attr: { "aria-label": usesMobileHtmlViewer(Platform) ? "Mobile HTML file gallery" : "Active HTML home page gallery" },
   });
   for (const item of items) {
-    const card = grid.createEl("button", {
+    const card = createControlButton(grid, {
       cls: "fjg-vcc-html-card",
       attr: {
         type: "button",
@@ -596,7 +597,7 @@ function renderCaptureActions(parent: HTMLElement, context: DashboardRenderConte
   const grid = parent.createDiv({ cls: "fjg-vcc-capture-grid", attr: { "aria-label": "Capture" } });
 
   for (const action of actions) {
-    const button = grid.createEl("button", {
+    const button = createControlButton(grid, {
       cls: "fjg-vcc-capture-action",
       attr: { type: "button", "aria-label": `Capture ${action.label}` },
     });
@@ -637,7 +638,7 @@ function renderSignals(parent: HTMLElement, context: DashboardRenderContext): vo
   const strip = parent.createDiv({ cls: "fjg-vcc-signal-strip", attr: { "aria-label": "Vault signals" } });
 
   for (const signal of signals) {
-    const button = strip.createEl("button", {
+    const button = createControlButton(strip, {
       cls: "fjg-vcc-signal",
       attr: { type: "button", "aria-label": `${signal.label}: ${signal.value}` },
     });
@@ -671,7 +672,7 @@ function renderCurrentWork(parent: HTMLElement, context: DashboardRenderContext)
     if (!group.programs.length) continue;
     const status = group.tone === "attention" ? "warning" : group.tone;
     const groupEl = panel.body.createDiv({ cls: "fjg-vcc-group", attr: { "data-status": status } });
-    const header = groupEl.createEl("button", {
+    const header = createControlButton(groupEl, {
       cls: "fjg-vcc-group-header",
       attr: { type: "button", "aria-expanded": "true" },
     });
@@ -687,7 +688,7 @@ function renderCurrentWork(parent: HTMLElement, context: DashboardRenderContext)
     for (const program of group.programs.slice(0, 6)) {
       const timestamp = programModifiedAt(program);
       const activity = activityScore(timestamp);
-      const row = body.createEl("button", {
+      const row = createControlButton(body, {
         cls: "fjg-vcc-progress-row",
         attr: { type: "button", "aria-label": `Open ${program.name}`, "data-status": status },
       });
@@ -727,7 +728,7 @@ function renderTaskManagement(parent: HTMLElement, context: DashboardRenderConte
     .slice(0, 8);
   const list = panel.body.createDiv({ cls: "fjg-vcc-row-list" });
   for (const task of visible) {
-    const row = list.createEl("button", { cls: "fjg-vcc-row", attr: { type: "button", "data-tone": "task" } });
+    const row = createControlButton(list, { cls: "fjg-vcc-row", attr: { type: "button", "data-tone": "task" } });
     createIcon(row, "circle-dot", "fjg-vcc-row-icon");
     const main = row.createDiv({ cls: "fjg-vcc-row-main" });
     main.createSpan({ cls: "fjg-vcc-row-title", text: task.title });
@@ -836,7 +837,7 @@ function renderFolderCollection(
   } else {
     const list = listPanel.body.createDiv({ cls: "fjg-vcc-select-list" });
     for (const root of matches) {
-      const row = list.createEl("button", {
+      const row = createControlButton(list, {
         cls: `fjg-vcc-row fjg-vcc-select-row${root.path === selected?.path ? " is-selected" : ""}`,
         attr: { type: "button", "aria-pressed": String(root.path === selected?.path) },
       });
@@ -950,7 +951,7 @@ function renderFolderCollection(
       attr: { "aria-label": `Folders in ${folderView.name}` },
     });
     for (const folder of visibleFolders) {
-      const button = folderList.createEl("button", {
+      const button = createControlButton(folderList, {
         cls: "fjg-vcc-folder-chip",
         attr: {
           type: "button",
@@ -1041,7 +1042,7 @@ function renderAiTeam(parent: HTMLElement, context: DashboardRenderContext): voi
   const cards = parent.createDiv({ cls: "fjg-vcc-queue-grid" });
   for (const key of AI_QUEUE_ORDER) {
     const queue = context.data.aiQueues[key];
-    const button = cards.createEl("button", {
+    const button = createControlButton(cards, {
       cls: `fjg-vcc-queue-card${context.state.selectedAiQueue === key ? " is-selected" : ""}`,
       attr: { type: "button", "aria-pressed": String(context.state.selectedAiQueue === key) },
     });
@@ -1109,7 +1110,7 @@ function renderBookmarks(parent: HTMLElement, context: DashboardRenderContext): 
   }
   for (const bookmark of bookmarks) {
     const previewsFile = bookmark.type !== "url";
-    const row = panel.body.createEl("button", {
+    const row = createControlButton(panel.body, {
       cls: `fjg-vcc-row${bookmark.type === "file" && context.activePreviewPath === bookmark.target ? " is-selected" : ""}`,
       attr: {
         type: "button",
@@ -1196,7 +1197,7 @@ function renderSettings(parent: HTMLElement, context: DashboardRenderContext): v
   appearance.createEl("p", { text: "The dashboard structure stays fixed while theme tokens change." });
   const themeOptions = appearance.createDiv({ cls: "fjg-vcc-theme-options" });
   for (const theme of ["dark", "light"] as const) {
-    const button = themeOptions.createEl("button", {
+    const button = createControlButton(themeOptions, {
       cls: `fjg-vcc-theme-option${context.settings.theme === theme ? " is-selected" : ""}`,
       attr: { type: "button", "aria-pressed": String(context.settings.theme === theme) },
     });
@@ -1283,7 +1284,7 @@ function renderFileRow(
   context: DashboardRenderContext,
   endText?: string
 ): void {
-  const row = parent.createEl("button", {
+  const row = createControlButton(parent, {
     cls: `fjg-vcc-row${context.activePreviewPath === file.path ? " is-selected" : ""}`,
     attr: {
       type: "button",
@@ -1314,7 +1315,7 @@ function renderPeopleRows(
   }
   const list = parent.createDiv({ cls: "fjg-vcc-row-list" });
   for (const file of files) {
-    const row = list.createEl("button", {
+    const row = createControlButton(list, {
       cls: `fjg-vcc-row${context.activePreviewPath === file.path ? " is-selected" : ""}`,
       attr: {
         type: "button",
@@ -1340,7 +1341,7 @@ function renderFilterBar<T extends string>(
 ): void {
   const bar = parent.createDiv({ cls: "fjg-vcc-filter-bar", attr: { "aria-label": "Filters" } });
   for (const filter of filters) {
-    const button = bar.createEl("button", {
+    const button = createControlButton(bar, {
       cls: `fjg-vcc-filter-chip${filter.id === current ? " is-selected" : ""}`,
       text: filter.label,
       attr: { type: "button", "aria-pressed": String(filter.id === current) },

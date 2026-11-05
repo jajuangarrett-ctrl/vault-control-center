@@ -1,3 +1,8 @@
+## 0.3.25
+
+- Protect mobile dashboard buttons, including Back to Areas/Programs, folder rows, breadcrumbs and actions, from drawer swipe interception.
+- Retain native click handlers and existing navigation tap deduplication; desktop buttons and non-button swipe surfaces are unchanged.
+
 ## 0.3.24
 
 - Mobile only: add Back at every Areas and Programs folder depth, including Back to Areas/Programs at a root.

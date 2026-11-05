@@ -1,4 +1,4 @@
-import { setIcon } from "obsidian";
+import { Platform, setIcon } from "obsidian";
 
 export interface ButtonOptions {
   label: string;
@@ -16,8 +16,17 @@ export function createIcon(parent: HTMLElement, name: string, className = "fjg-v
   return icon;
 }
 
+/** Keep native clicks on mobile controls out of Obsidian's drawer swipe recognizer.
+ * Scope the opt-out to buttons, preserving scrolling and gestures elsewhere.
+ */
+export function createControlButton(parent: HTMLElement, options: DomElementInfo): HTMLButtonElement {
+  const button = parent.createEl("button", options);
+  if (Platform.isMobile) button.dataset.ignoreSwipe = "true";
+  return button;
+}
+
 export function createButton(parent: HTMLElement, options: ButtonOptions): HTMLButtonElement {
-  const button = parent.createEl("button", {
+  const button = createControlButton(parent, {
     cls: options.className,
     attr: {
       type: "button",

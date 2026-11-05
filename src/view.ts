@@ -1,3 +1,4 @@
+import { createControlButton } from "./dom";
 import { bindNavigationTap } from "./mobile-tab-tap";
 import { filterReviewRows, nextReviewPath } from "./file-review";
 import { isMobileHtmlPath, renderMobileHtml, usesMobileHtmlViewer, MOBILE_HTML_BUILD } from "./mobile-html";
@@ -619,7 +620,7 @@ export class VaultControlCenterView extends ItemView {
     }
     this.routeTabsEl.empty();
     for (const route of ROUTE_DEFINITIONS) {
-      const button = this.routeTabsEl.createEl("button", {
+      const button = createControlButton(this.routeTabsEl, {
         cls: `fjg-vcc-route-tab${this.route === route.id ? " is-active" : ""}`,
         text: route.label,
         attr: {
@@ -691,7 +692,7 @@ export class VaultControlCenterView extends ItemView {
     ];
 
     for (const item of items) {
-      const button = this.mobileDockEl.createEl("button", {
+      const button = createControlButton(this.mobileDockEl, {
         cls: `fjg-vcc-mobile-dock-item${item.active ? " is-active" : ""}`,
         attr: { type: "button", "aria-current": item.active ? "page" : "false" },
       });
