@@ -37,6 +37,34 @@ import { TFolder, Platform } from "obsidian";
 import type { DashboardData, DashboardFileItem, DashboardProgram } from "./data";
 import { VaultControlCenterView } from "./view";
 
+describe("background dashboard refresh", () => {
+  it("defers hidden data work and refreshes when the view becomes visible", async () => {
+    const view = Object.create(VaultControlCenterView.prototype);
+    let visible = false;
+    view.contentEl = { isShown: () => visible };
+    view.refresh = vi.fn().mockResolvedValue(undefined);
+    await view.refreshWhenVisible();
+    await view.refreshWhenVisible();
+    expect(view.refresh).not.toHaveBeenCalled();
+    expect(view.backgroundRefreshPending).toBe(true);
+    visible = true;
+    view.onResize();
+    expect(view.refresh).toHaveBeenCalledTimes(1);
+    expect(view.backgroundRefreshPending).toBe(false);
+    view.onResize();
+    expect(view.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors an explicit refresh even while hidden", async () => {
+    const view = Object.create(VaultControlCenterView.prototype);
+    view.contentEl = { isShown: () => false };
+    view.refresh = vi.fn().mockResolvedValue(undefined);
+    await view.refreshWhenVisible(true);
+    expect(view.refresh).toHaveBeenCalledWith(true);
+    expect(view.backgroundRefreshPending).toBe(false);
+  });
+});
+
 interface FolderRailViewInternals {
   route: string;
   rootEl: HTMLElement | null;

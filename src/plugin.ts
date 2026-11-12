@@ -205,7 +205,7 @@ export default class VaultControlCenterPlugin extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE);
     await Promise.all(
       leaves.map(async (leaf) => {
-        if (leaf.view instanceof VaultControlCenterView) await leaf.view.refresh(showNotice);
+        if (leaf.view instanceof VaultControlCenterView) await leaf.view.refreshWhenVisible(showNotice);
       })
     );
     if (showNotice) new Notice("Vault Control Center refreshed.");

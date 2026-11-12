@@ -1,3 +1,8 @@
+## 0.3.27
+
+- Coalesce refresh requests while the dashboard is hidden and load fresh data when it becomes visible.
+- Suspend hidden Automations memory polling and hidden File Review repainting; preserve explicit refresh commands.
+
 ## 0.3.26
 
 - On mobile, Back to Areas/Programs opens a full-width roots list, even when already at the top. Selecting a root restores its detail view. Desktop split-view behavior is unchanged.

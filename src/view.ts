@@ -237,6 +237,7 @@ export class VaultControlCenterView extends ItemView {
   private refreshPromise: Promise<void> | null = null;
   private refreshQueued = false;
   private refreshQueuedForce = false;
+  private backgroundRefreshPending = false;
   private htmlSnapshotGeneration = 0;
   private automationSnapshotGeneration = 0;
   private automationSnapshotAppliedGeneration = 0;
@@ -275,13 +276,19 @@ export class VaultControlCenterView extends ItemView {
     if (this.pendingPreviewPath) {
       void this.openPreview(this.pendingPreviewPath, { focus: false, recordHistory: false });
     }
-    await this.refresh();
+    const refreshWhenShown = () => {
+      if (this.backgroundRefreshPending && this.contentEl.isShown()) void this.refreshWhenVisible();
+    };
+    this.registerEvent(this.app.workspace.on("active-leaf-change", refreshWhenShown));
+    this.registerEvent(this.app.workspace.on("layout-change", refreshWhenShown));
+    await this.refreshWhenVisible();
     this.systemStatusTimer = window.setInterval(() => {
-      if (this.route === "automations") void this.refreshMemoryOnly();
+      if (this.route === "automations" && this.contentEl.isShown()) void this.refreshMemoryOnly();
     }, 30_000);
   }
 
   async onClose(): Promise<void> {
+    this.backgroundRefreshPending = false;
     if (this.templateSaveTimer !== null) {
       window.clearTimeout(this.templateSaveTimer);
       this.templateSaveTimer = null;
@@ -397,6 +404,19 @@ export class VaultControlCenterView extends ItemView {
         void this.closePreview({ restoreFocus: false });
       }
     }
+  }
+
+  async refreshWhenVisible(forceRemote = false): Promise<void> {
+    if (!forceRemote && !this.contentEl.isShown()) {
+      this.backgroundRefreshPending = true;
+      return;
+    }
+    this.backgroundRefreshPending = false;
+    await this.refresh(forceRemote);
+  }
+
+  onResize(): void {
+    if (this.backgroundRefreshPending && this.contentEl.isShown()) void this.refreshWhenVisible();
   }
 
   async refresh(forceRemote = false): Promise<void> {
@@ -703,6 +723,7 @@ export class VaultControlCenterView extends ItemView {
   }
 
   refreshFileReview(): void {
+    if (!this.contentEl.isShown()) { this.backgroundRefreshPending = true; return; }
     if (this.route !== "file-review" || !this.contentRegionEl || !this.data) return;
     const existing = this.contentRegionEl.querySelector<HTMLElement>(".fjg-vcc-file-review");
     if (!existing) return;
