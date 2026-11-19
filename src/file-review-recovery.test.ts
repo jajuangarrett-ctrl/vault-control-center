@@ -1,10 +1,10 @@
 import type { App, TFile } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
-import { FileReviewStore, REVIEW_INBOXES, REVIEW_RECORDS_PATH, affectsFileReview, filterReviewRows, getLiveReviewFile, moveReviewedFile } from "./file-review";
+import { FileReviewStore, REVIEW_FOLDERS, REVIEW_INBOXES, REVIEW_RECORDS_PATH, affectsFileReview, filterReviewRows, getLiveReviewFile, moveReviewedFile } from "./file-review";
 
 function fixture() {
   const files = new Map<string, TFile>();
-  const folders = new Set<string>(REVIEW_INBOXES.map(root => root.path));
+  const folders = new Set<string>(REVIEW_FOLDERS.map(root => root.path));
   folders.add("Filed");
   const add = (path: string) => {
     const file = { path, name: path.split("/").pop()!, extension: path.split(".").pop()!, stat: { size: 12, ctime: 1, mtime: 1 } } as TFile;
@@ -32,10 +32,59 @@ describe("live inbox membership", () => {
     const snapshot = await f.store.refresh();
     expect(snapshot.rows).toHaveLength(12);
     expect(new Set(snapshot.rows.map(row => row.currentPath)).size).toBe(12);
-    expect(snapshot.coverage.map(root => root.message)).toEqual(Array(3).fill("4 files, including subfolders."));
+    expect(snapshot.coverage.map(root => root.message)).toEqual([...Array(3).fill("4 files, including subfolders."), ...Array(2).fill("0 files, including subfolders.")]);
     for (const row of snapshot.rows) expect(getLiveReviewFile(f.app, row)).toBe(row.file);
     expect(f.vault.read).not.toHaveBeenCalled(); expect(f.vault.readBinary).not.toHaveBeenCalled();
     expect(f.vault.modify).not.toHaveBeenCalled(); expect(f.vault.create).not.toHaveBeenCalled();
+  });
+  it("adds Inbox and Wiki to the folder filter, including nested files without expanding private-path exceptions", async () => {
+    const f = fixture();
+    f.add("AI Team/owner_inbox/Existing.md");
+    f.add("00 Inbox/Intake.md");
+    f.add("00 Inbox/Unsorted/Nested/Intake.pdf");
+    f.add("Wiki/Overview.md");
+    f.add("Wiki/Guides/Deep/Welcome.md");
+    f.add("Wiki/Guides/Credentials.md");
+    f.add("Wiki/.private/Hidden.md");
+    f.add("Wiki/../Outside.md");
+    f.add("Wiki Archive/Outside.md");
+    f.add("00 Inbox Old/Outside.md");
+
+    const snapshot = await f.store.refresh();
+    expect(snapshot.coverage.map(root => root.label)).toEqual(["Formatted Notes", "Team Inbox", "Owner Inbox", "00 Inbox", "Wiki"]);
+    expect(filterReviewRows(snapshot, "", "")).toHaveLength(5);
+    expect(filterReviewRows(snapshot, "", "00 Inbox").map(row => row.currentPath)).toEqual([
+      "00 Inbox/Intake.md", "00 Inbox/Unsorted/Nested/Intake.pdf",
+    ]);
+    expect(filterReviewRows(snapshot, "Guides Deep", "Wiki").map(row => row.currentPath)).toEqual([
+      "Wiki/Guides/Deep/Welcome.md",
+    ]);
+    expect(affectsFileReview("00 Inbox")).toBe(true);
+    expect(affectsFileReview("Wiki/Guides/Deep")).toBe(true);
+    expect(affectsFileReview("Wiki Archive")).toBe(false);
+    expect(affectsFileReview("00 Inbox Old")).toBe(false);
+    expect(f.vault.read).not.toHaveBeenCalled();
+    expect(f.vault.modify).not.toHaveBeenCalled();
+  });
+  it("refreshes a manual Inbox-to-Wiki move and refuses to archive or replace collided notes in the new roots", async () => {
+    const f = fixture();
+    f.folders.add("Wiki/Guides");
+    const source = f.add("00 Inbox/Note.md");
+    const path = source.path;
+    await moveReviewedFile(f.app, { file: source, path, ctime: 1 }, "Wiki/Guides");
+    await f.store.moved(source, path);
+    expect(filterReviewRows(f.store.snapshot, "", "00 Inbox")).toEqual([]);
+    expect(filterReviewRows(f.store.snapshot, "", "Wiki").map(row => row.currentPath)).toEqual(["Wiki/Guides/Note.md"]);
+
+    f.add("Filed/Note.md");
+    const original = f.add("AI Team/owner_inbox/Note.md");
+    for (const [file, destination] of [[source, "Filed"], [original, "Wiki/Guides"]] as const) {
+      await expect(moveReviewedFile(f.app, { file, path: file.path, ctime: 1 }, destination)).rejects.toThrow(/already exists/);
+    }
+    expect(source.path).toBe("Wiki/Guides/Note.md");
+    expect(original.path).toBe("AI Team/owner_inbox/Note.md");
+    expect(f.vault.read).not.toHaveBeenCalled();
+    expect(f.app.fileManager.renameFile).toHaveBeenCalledTimes(1);
   });
   it("responds to external create, delete, replacement and moves within, between and outside watched roots; reload uses current membership", async () => {
     const f = fixture(), first = REVIEW_INBOXES[0].path, second = REVIEW_INBOXES[1].path;

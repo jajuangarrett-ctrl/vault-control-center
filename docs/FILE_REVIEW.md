@@ -1,3 +1,9 @@
+# File Review locations — 0.3.28
+
+**Vault Control Center → File Review** now watches the three original AI Team inboxes plus `00 Inbox/` and `Wiki/`. Select **All review folders**, **00 Inbox**, or **Wiki** in the folder filter; Wiki subfolders are included recursively and searchable by their path. Existing private/hidden path exclusions apply to the two new locations. Review membership is live and does not run automations or change file contents.
+
+A manually moved file stays on the list if its destination is another review location. Existing Move collision protection still applies, and duplicate archiving remains limited to qualifying copies from the original inboxes whose destination is outside all review locations.
+
 # Matching duplicates — 0.3.21
 
 If Move encounters an existing Markdown note outside the watched inboxes, it compares the two files. Only a scalar top-level `location` property is ignored; every other byte must match. A matching inbox copy is moved to `Artifacts/Vault Control Center Native Plugin/Archived Duplicates/`, preserving its original inbox path. Archive name collisions receive a numbered suffix. The filed destination is not rewritten. Changed content, different metadata, non-Markdown collisions, and destinations inside the watched inboxes remain blocked.

@@ -1,3 +1,8 @@
+## 0.3.28
+
+- Add 00 Inbox and Wiki, including nested folders, to the Vault Control Center File Review tab. Select either folder or use the All review folders view.
+- Keep the original three inboxes and manual Move controls. Large source groups display in batches of 50, with counts and search covering all matching files. Review does not run automations or remove files.
+
 ## 0.3.27
 
 - Coalesce refresh requests while the dashboard is hidden and load fresh data when it becomes visible.

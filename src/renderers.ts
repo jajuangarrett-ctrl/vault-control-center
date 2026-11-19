@@ -364,18 +364,18 @@ function renderAutomations(parent: HTMLElement, context: DashboardRenderContext)
 export function renderFileReview(parent: HTMLElement, context: DashboardRenderContext): void {
   const snapshot = context.fileReview;
   const panel = createPanel(parent, `File review · ${snapshot.rows.length} files`, { className: "fjg-vcc-file-review" });
-  panel.body.createEl("p", { cls: "fjg-vcc-review-intro", text: "Live inbox queue, including subfolders. Open a file to review it, then choose Move to file it. Files leave this queue when moved outside all three inboxes." });
+  panel.body.createEl("p", { cls: "fjg-vcc-review-intro", text: "Browse files in the inboxes and Wiki, including their subfolders. Open a file to review it, or choose Move to change its location." });
   const controls = panel.body.createDiv({ cls: "fjg-vcc-review-controls" });
   const search = controls.createEl("input", { type: "search", placeholder: "Search filenames or paths", attr: { "aria-label": "Search file review" } });
-  const filter = controls.createEl("select", { attr: { "aria-label": "Filter file review by inbox folder" } });
-  filter.createEl("option", { value: "", text: "All three inboxes" });
+  const filter = controls.createEl("select", { attr: { "aria-label": "Filter file review by location" } });
+  filter.createEl("option", { value: "", text: "All review folders" });
   for (const source of snapshot.coverage) filter.createEl("option", { value: source.path, text: source.label });
   createButton(controls, {
     label: context.fileReviewRefreshing ? "Refreshing…" : "Refresh files",
     icon: "refresh-cw",
     className: "fjg-vcc-button",
     disabled: context.fileReviewRefreshing,
-    title: "Rescan the three watched inbox folders",
+    title: "Rescan all review folders",
     onClick: context.refreshReviewFiles,
   });
   search.value = context.reviewFilters.query;
@@ -388,23 +388,43 @@ export function renderFileReview(parent: HTMLElement, context: DashboardRenderCo
     context.reviewFiltersChanged();
     list.empty();
     const rows = filterReviewRows(snapshot, [context.state.query, search.value].filter(Boolean).join(" "), filter.value);
-    count.setText(`${rows.length} ${rows.length === 1 ? "file" : "files"} awaiting filing`);
-    if (!rows.length) createEmptyState(list, snapshot.rows.length ? "No inbox files match" : "Inbox queue is empty",
-      snapshot.rows.length ? "Clear the search or choose another inbox folder." : "New files in the watched inboxes appear here automatically.", "files");
+    count.setText(`${rows.length} ${rows.length === 1 ? "file" : "files"} available for review`);
+    if (!rows.length) createEmptyState(list, snapshot.rows.length ? "No files match" : "File Review is empty",
+      snapshot.rows.length ? "Clear the search or choose another review folder." : "New files in the review folders appear here automatically.", "files");
     for (const source of snapshot.coverage) {
       const group = rows.filter(row => row.sourcePath === source.path);
       if (!group.length) continue;
       const section = list.createDiv({ cls: "fjg-vcc-review-day" });
       section.createEl("h3", { text: `${source.label} · ${group.length} ${group.length === 1 ? "file" : "files"}` });
-      for (const row of group) {
-        const entry = section.createDiv({ cls: "fjg-vcc-review-row" });
-        const main = entry.createDiv({ cls: "fjg-vcc-review-main" });
-        const path = row.currentPath!;
-        createButton(main, { label: row.file!.name, className: "fjg-vcc-review-filename", onClick: () => reviewPath(path) ? context.openFile(path) : context.openReviewFile(row) });
-        renderReviewPath(main, row, context.openReviewFile);
-        const actions = entry.createDiv({ cls: "fjg-vcc-review-actions" });
-        createButton(actions, { label: "Move", icon: "folder-input", className: "fjg-vcc-button is-primary",
-          title: `Choose a destination for ${row.file!.name}`, onClick: () => context.moveReviewFile(row) });
+      const entries = section.createDiv();
+      const pageSize = 50;
+      let shown = 0;
+      let showMore: HTMLButtonElement | undefined;
+      const renderPage = () => {
+        const end = Math.min(shown + pageSize, group.length);
+        for (const row of group.slice(shown, end)) {
+          const entry = entries.createDiv({ cls: "fjg-vcc-review-row" });
+          const main = entry.createDiv({ cls: "fjg-vcc-review-main" });
+          const path = row.currentPath!;
+          createButton(main, { label: row.file!.name, className: "fjg-vcc-review-filename", onClick: () => reviewPath(path) ? context.openFile(path) : context.openReviewFile(row) });
+          renderReviewPath(main, row, context.openReviewFile);
+          const actions = entry.createDiv({ cls: "fjg-vcc-review-actions" });
+          createButton(actions, { label: "Move", icon: "folder-input", className: "fjg-vcc-button is-primary",
+            title: `Choose a destination for ${row.file!.name}`, onClick: () => context.moveReviewFile(row) });
+        }
+        shown = end;
+        if (showMore) {
+          showMore.setText(`Show ${Math.min(pageSize, group.length - shown)} more in ${source.label}`);
+          showMore.hidden = shown >= group.length;
+        }
+      };
+      renderPage();
+      if (shown < group.length) {
+        showMore = createButton(section, {
+          label: `Show ${Math.min(pageSize, group.length - shown)} more in ${source.label}`,
+          className: "fjg-vcc-button",
+          onClick: renderPage,
+        });
       }
     }
   };
@@ -412,7 +432,7 @@ export function renderFileReview(parent: HTMLElement, context: DashboardRenderCo
   filter.addEventListener("change", renderRows);
   renderRows();
   const coverage = panel.body.createEl("details", { cls: "fjg-vcc-review-coverage" });
-  coverage.createEl("summary", { text: "Watched inbox folders" });
+  coverage.createEl("summary", { text: "Review folders" });
   coverage.createEl("p", { text: snapshot.message });
   for (const source of snapshot.coverage) coverage.createDiv({ text: `${source.path}: ${source.message}` });
 }

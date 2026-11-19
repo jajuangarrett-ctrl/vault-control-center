@@ -143,7 +143,7 @@ The interface follows a reference-driven workflow: one stable information archit
 
 MIT © Franklin Garrett
 
-Live inbox review: see [File review](docs/FILE_REVIEW.md) for the three watched inbox folders, recursive membership, automatic and manual refresh, and safe per-file moves.
+Live file review: see [File review](docs/FILE_REVIEW.md) for the watched inbox and Wiki folders, recursive membership, automatic and manual refresh, and safe per-file moves.
 
 ## Mobile HTML viewing (0.3.18)
 

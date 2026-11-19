@@ -25,7 +25,7 @@ export interface ReviewRecord {
 export interface ReviewRow extends ReviewRecord { label: string; file: TFile | null; state: string; history: ReviewRecord[] }
 export interface ReviewCoverage { label: string; path?: string; message: string }
 export interface FileReviewSnapshot { rows: ReviewRow[]; dismissedRows: ReviewRow[]; coverage: ReviewCoverage[]; message: string }
-export const emptyFileReview = (): FileReviewSnapshot => ({ rows: [], dismissedRows: [], coverage: [], message: "Loading inbox files…" });
+export const emptyFileReview = (): FileReviewSnapshot => ({ rows: [], dismissedRows: [], coverage: [], message: "Loading files for review…" });
 
 /** Exact vault-relative paths only; preserve significant spaces inside folder names. */
 export function reviewPath(raw: string, vaultName = "FJG Vault"): string | null {
@@ -85,14 +85,28 @@ export const REVIEW_INBOXES = [
   { path: "AI Team/owner_inbox", label: "Owner Inbox" },
 ] as const;
 
-/** Segment boundary, not a prefix or filename match. All descendants are included. */
+const ADDITIONAL_REVIEW_FOLDERS = [
+  { path: "00 Inbox", label: "00 Inbox" },
+  { path: "Wiki", label: "Wiki" },
+] as const;
+export const REVIEW_FOLDERS = [...REVIEW_INBOXES, ...ADDITIONAL_REVIEW_FOLDERS] as const;
+
+/** The original intake folders retain their existing review and duplicate rules. */
 export function reviewInbox(path: string) {
   return REVIEW_INBOXES.find(root => path.startsWith(`${root.path}/`));
 }
 
+function reviewFolder(path: string) {
+  const inbox = reviewInbox(path);
+  if (inbox) return inbox;
+  const folder = ADDITIONAL_REVIEW_FOLDERS.find(root => path.startsWith(`${root.path}/`));
+  // Broader browsing roots do not inherit the intake folders' exception to preview exclusions.
+  return folder && reviewPath(path) === path ? folder : undefined;
+}
+
 /** Include ancestor folder events, since renaming AI Team can move all watched files. */
 export function affectsFileReview(path: string): boolean {
-  return REVIEW_INBOXES.some(root => path === root.path || path.startsWith(`${root.path}/`) || root.path.startsWith(`${path}/`));
+  return REVIEW_FOLDERS.some(root => path === root.path || path.startsWith(`${root.path}/`) || root.path.startsWith(`${path}/`));
 }
 
 export function filterReviewRows(snapshot: FileReviewSnapshot, query: string, folder: string): ReviewRow[] {
@@ -109,20 +123,20 @@ export class FileReviewStore {
     const seen = new Set<string>();
     const rows: ReviewRow[] = [];
     for (const file of this.app.vault.getFiles()) {
-      const root = reviewInbox(file.path);
+      const root = reviewFolder(file.path);
       if (!root || seen.has(file.path)) continue;
       seen.add(file.path);
       rows.push({ id: file.path, workflow: root.path, sourcePath: root.path,
         recordedPath: file.path, currentPath: file.path, original: file.name,
-        processed: "", label: root.label, file, state: "Awaiting filing", history: [] });
+        processed: "", label: root.label, file, state: "Available for review", history: [] });
     }
     rows.sort((a, b) => a.sourcePath.localeCompare(b.sourcePath) || a.currentPath!.localeCompare(b.currentPath!));
-    const coverage = REVIEW_INBOXES.map(root => ({ ...root,
+    const coverage = REVIEW_FOLDERS.map(root => ({ ...root,
       message: this.app.vault.getFolderByPath(root.path)
         ? `${rows.filter(row => row.sourcePath === root.path).length} files, including subfolders.`
         : "Folder is unavailable on this device." }));
     this.snapshot = { rows, dismissedRows: [], coverage,
-      message: "Current files in these three inboxes, including every subfolder. Moving outside all three removes a file from review." };
+      message: "Includes subfolders of all review locations. Moving outside all review locations removes the file from this list. Existing path exclusions apply to 00 Inbox and Wiki." };
     return Promise.resolve(this.snapshot);
   }
   async moved(_file: TFile, _oldPath: string): Promise<void> { await this.refresh(); }
@@ -145,7 +159,7 @@ export async function moveReviewedFile(app: App, selected: MoveSelection, folder
   moving.add(file);
   try {
     if (existing) {
-      if (reviewInbox(path) && !reviewInbox(destination) && file.extension.toLowerCase() === "md" && "extension" in existing && typeof existing.extension === "string" && existing.extension.toLowerCase() === "md") {
+      if (reviewInbox(path) && !REVIEW_FOLDERS.some(root => destination.startsWith(`${root.path}/`)) && file.extension.toLowerCase() === "md" && "extension" in existing && typeof existing.extension === "string" && existing.extension.toLowerCase() === "md") {
         return await archiveMatchingInboxNote(app, file, existing as TFile, path);
       }
       throw new Error("A file or folder with this name already exists there. Nothing was overwritten.");
