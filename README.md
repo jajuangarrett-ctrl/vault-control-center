@@ -12,7 +12,7 @@ The dashboard keeps eleven views in one consistent throwback navy, gold, orange,
 
 | View | Purpose |
 | --- | --- |
-| Home | Capture actions, live signals, current programs, recent files, people, and local FJG Task Manager status |
+| Home | Talk to Vault, capture actions, live signals, current programs, recent files, people, and local FJG Task Manager status |
 | Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with a collapsible root rail, recursive drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
 | Programs | Program folders, activity groups, a collapsible root rail, recursive subfolder drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
 | HTML | A searchable card gallery of explicitly selected active HTML home pages inside configurable vault roots, with optional Quick Look thumbnails |
@@ -27,6 +27,7 @@ The dashboard keeps eleven views in one consistent throwback navy, gold, orange,
 Additional features:
 
 - Native ribbon icon and command-palette actions
+- **Home → Talk to Vault** opens the existing voice experience in FJG File Focus Duo, or FJG Objective Manager if Duo is unavailable. Enable at least one of those community plugins and complete its voice setup. Vault Control Center does not manage additional credentials, capture audio, or start a separate voice session.
 - A visible **Copy path** action in the Areas and Programs folder browser that follows drill-down, **Up**, and breadcrumb navigation and copies the current vault-relative folder path for Obsidian Clipper
 - Searchable active HTML home-page cards with title, description, category, folder, modified time, and a reusable native-tab opening flow
 - Explicit **Update previews** regeneration for HTML thumbnails through macOS Quick Look; generated PNGs use stable names in a configurable vault-relative runtime folder

@@ -973,6 +973,7 @@ export class VaultControlCenterView extends ItemView {
       openBookmark: (bookmark) => void this.openBookmark(bookmark),
       openExternal: (url) => this.openExternal(url),
       capture: (commandId, label) => this.plugin.executeCapture(commandId, label),
+      openTalkToVault: () => this.plugin.openTalkToVault(),
       selectArea: (path) => {
         const area = [this.data?.areasRoot, ...(this.data?.areas ?? [])].find(
           (candidate) => candidate?.path === path

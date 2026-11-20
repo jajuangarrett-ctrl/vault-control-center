@@ -83,6 +83,10 @@ Object.assign(HTMLElement.prototype,{
 });
 document.body.classList.toggle('is-mobile',Platform.isMobile);
 window.notices=[];
+const commandInvocations=[];
+const enabledVoiceProviders=new Set();
+let commandFailure='';
+
 const entries=new Map();
 const folder=path=>{
   const e=new TFolder(path);
@@ -123,6 +127,11 @@ const on=(event,fn)=>{if(!handlers.has(event))handlers.set(event,[]);handlers.ge
 const emit=(event,...args)=>{for(const cb of handlers.get(event)||[])cb(...args);};
 const leaves=[];
 const app={
+  commands:{executeCommandById(id){
+    commandInvocations.push(id);
+    if(id===commandFailure)throw new Error('Provider launch error');
+    return enabledVoiceProviders.has(id);
+  }},
   workspace:{on, onLayoutReady:fn=>fn(), getLeavesOfType:()=>leaves,
     getLastOpenFiles:()=>[], getActiveViewOfType:()=>null,},
   vault:{on, getRoot:()=>fixtureRoot, getFiles:()=>[...entries.values()].filter(e=>e instanceof TFile),
@@ -144,6 +153,11 @@ leaf.view=view;leaves.push(leaf);
   await view.onOpen();
   window.fixture={
     create(path){emit('create',folder(path));},
+    voiceProviders(ids,failure=''){
+      enabledVoiceProviders.clear();ids.forEach(id=>enabledVoiceProviders.add(id));
+      commandFailure=failure;commandInvocations.length=0;window.notices.length=0;
+    },
+    voiceResult(){return {calls:[...commandInvocations], notices:[...window.notices]};},
     restoreOldTaskSelection(){return view.setState({route:'task-folders',selectedTaskFolderPath:subtasks,selectedTaskSubfolderPath:subtasks},{});},
     selectedTaskPath(){return view.getState().selectedTaskSubfolderPath;},
     setAllFilesFolder(path){return view.setState({route:'all-files',allFilesFolderPath:path},{});},
@@ -176,7 +190,7 @@ async function main() {
   const browser = await chromium.launch({ executablePath: process.env.VCC_BROWSER_BIN,
     args:["--disable-background-networking","--disable-component-update","--disable-sync","--host-resolver-rules=MAP * ~NOTFOUND"] });
   try {
-    for (const [width,mobile] of [[320,true],[867,true],[1050,false]]) {
+    for (const [width,mobile] of [[320,true],[386,true],[867,true],[1050,false]]) {
       const page = await browser.newPage({viewport:{width,height:700},hasTouch:mobile});
       await page.route("**/*",route=>route.request().url().startsWith("http://vcc-task-folders.test")
         ? route.fulfill({contentType:"text/html",body:"<!doctype html><html><body><div id='host' class='view-content'></div></body></html>"})
@@ -198,6 +212,30 @@ async function main() {
       assert.equal(await capture.getByRole("button",{name:"Capture Program update"}).count(),0);
       assert.equal(await tabs.getByRole("tab",{name:"All Files"}).count(),0);
       if (process.env.VCC_FIXTURE_OUTPUT_DIR) await page.screenshot({path:`${process.env.VCC_FIXTURE_OUTPUT_DIR}/all-files-home-${width}.png`});
+      const voice=page.getByRole("button",{name:"Talk to Vault",exact:true});
+      const voiceBox=await voice.boundingBox();
+      assert.ok(voiceBox && voiceBox.height>=44 && voiceBox.x>=0 && voiceBox.x+voiceBox.width<=width, "Voice entry stays reachable within the viewport");
+      assert.equal(await voice.evaluate(button=>getComputedStyle(button).borderTopWidth),"1px");
+      const duo="fjg-file-focus-duo:talk-to-vault";
+      const objectives="fjg-task-manager:talk-to-dashboard";
+      assert.deepEqual(await page.evaluate(()=>fixture.voiceResult()),{calls:[],notices:[]});
+      await page.evaluate((ids)=>fixture.voiceProviders(ids),[duo,objectives]);
+      await activate(voice);
+      assert.deepEqual(await page.evaluate(()=>fixture.voiceResult()),{calls:[duo],notices:[]});
+      await page.evaluate((ids)=>fixture.voiceProviders(ids),[objectives]);
+      await activate(voice);
+      assert.deepEqual(await page.evaluate(()=>fixture.voiceResult()),{calls:[duo,objectives],notices:[]});
+      await page.evaluate(()=>fixture.voiceProviders([]));
+      await activate(voice);
+      const missingProvider=await page.evaluate(()=>fixture.voiceResult());
+      assert.deepEqual(missingProvider.calls,[duo,objectives]);
+      assert.match(missingProvider.notices[0],/enable FJG File Focus Duo or FJG Objective Manager/);
+      await page.evaluate(([duo,objectives])=>fixture.voiceProviders([duo,objectives],duo),[duo,objectives]);
+      await activate(voice);
+      const providerFailure=await page.evaluate(()=>fixture.voiceResult());
+      assert.deepEqual(providerFailure.calls,[duo]);
+      assert.match(providerFailure.notices[0],/could not open/);
+      assert.equal(await tabs.getByRole("tab",{name:"Home",exact:true}).getAttribute("aria-selected"),"true");
       const globalSearch=page.getByRole("searchbox",{name:"Search the current dashboard tab"});
       await globalSearch.fill("old home search");
       await activate(capture.getByRole("button",{name:"All Files",exact:true}));
@@ -343,7 +381,7 @@ async function main() {
       await activate(review);
       await page.locator(".fjg-vcc-file-review").waitFor();
       assert.deepEqual(errors,[]);
-      console.log(`PASS Tasks Folders at ${width}px ${mobile?"mobile":"desktop"}: tab, inbox first, search, nested navigation, live create/rename/move/delete and File Review`);
+      console.log(`PASS Tasks Folders at ${width}px ${mobile?"mobile":"desktop"}: voice launch, tab, inbox first, search, nested navigation, live create/rename/move/delete and File Review`);
       await page.close();
     }
   } finally {await browser.close();}

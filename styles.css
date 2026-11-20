@@ -891,6 +891,42 @@ body.fjg-vcc-theme-light .fjg-vcc .fjg-vcc-route-tabs,
 /* Home: capture and signals                                                   */
 /* -------------------------------------------------------------------------- */
 
+.fjg-vcc .fjg-vcc-talk-to-vault {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin-bottom: var(--vcc-space-3);
+  padding: 6px 12px;
+  gap: 8px;
+  border: 1px solid var(--vcc-border);
+  border-radius: var(--vcc-radius-md);
+  background: rgb(var(--vcc-blue-rgb) / 0.06);
+  box-shadow: none;
+  color: var(--vcc-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fjg-vcc .fjg-vcc-talk-to-vault:hover,
+.fjg-vcc .fjg-vcc-talk-to-vault:focus-visible {
+  border-color: var(--vcc-blue);
+  background: rgb(var(--vcc-blue-rgb) / 0.06);
+}
+
+.fjg-vcc .fjg-vcc-talk-to-vault:focus-visible {
+  outline: 2px solid var(--vcc-blue);
+  outline-offset: 2px;
+}
+
+.fjg-vcc .fjg-vcc-talk-to-vault .fjg-vcc-icon:first-child {
+  color: var(--vcc-blue);
+}
+
 .fjg-vcc-capture-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

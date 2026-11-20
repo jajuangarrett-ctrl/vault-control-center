@@ -1,3 +1,8 @@
+## 0.3.34
+
+- Add Home → Talk to Vault, a mobile-friendly shortcut to the existing FJG File Focus Duo or FJG Objective Manager voice experience. Leave all Home capture tiles in place.
+- Keep voice credentials, microphone controls, and the session in the provider plugin; Vault Control Center only launches it.
+
 ## 0.3.33
 
 - Replace the Home Program update tile with All Files. Browse the vault root and descend into regular folders, including empty folders. Filter the current folder and open files with the existing dashboard preview.

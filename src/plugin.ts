@@ -4,6 +4,7 @@ import {
   ReusableFileLeafController,
   type ReusableFileLeafOpenResult,
 } from "./reusable-file-leaf";
+import { launchTalkToVault } from "./talk-to-vault";
 import { VaultControlCenterSettingTab } from "./settings";
 import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
@@ -221,6 +222,17 @@ export default class VaultControlCenterPlugin extends Plugin {
     const leaf = this.app.workspace.getLeaf("tab");
     await leaf.setViewState({ type: DASHBOARD_VIEW_TYPE, active: true });
     await this.app.workspace.revealLeaf(leaf);
+  }
+
+  openTalkToVault(): void {
+    const host = this.app as unknown as CommandHost;
+    const commands = host.commands;
+    const outcome = launchTalkToVault((id) => commands?.executeCommandById?.(id) ?? false);
+    if (outcome === "unavailable") {
+      new Notice("To use Talk to Vault, enable FJG File Focus Duo or FJG Objective Manager in Community plugins.");
+    } else if (outcome === "failed") {
+      new Notice("Talk to Vault could not open. Try opening it directly from its provider plugin.");
+    }
   }
 
   executeCapture(commandId: string, label: string): void {

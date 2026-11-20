@@ -111,6 +111,7 @@ export interface DashboardRenderContext {
   openBookmark: (bookmark: DashboardBookmark) => void;
   openExternal: (url: string) => void;
   capture: (commandId: string, label: string) => void;
+  openTalkToVault: () => void;
   selectArea: (path: string) => void;
   selectAreaFolder: (path: string) => void;
   selectProgram: (path: string) => void;
@@ -585,6 +586,7 @@ function formatNumber(value: number): string {
 }
 
 function renderHome(parent: HTMLElement, context: DashboardRenderContext): void {
+  renderTalkToVault(parent, context);
   renderCaptureActions(parent, context);
   renderSignals(parent, context);
 
@@ -618,6 +620,17 @@ function renderHome(parent: HTMLElement, context: DashboardRenderContext): void 
   );
 
   renderTaskManagement(parent, context);
+}
+
+function renderTalkToVault(parent: HTMLElement, context: DashboardRenderContext): void {
+  const button = createControlButton(parent, {
+    cls: "fjg-vcc-talk-to-vault",
+    attr: { type: "button" },
+  });
+  createIcon(button, "audio-lines");
+  button.createSpan({ text: "Talk to Vault" });
+  createIcon(button, "chevron-right");
+  button.addEventListener("click", context.openTalkToVault);
 }
 
 function renderCaptureActions(parent: HTMLElement, context: DashboardRenderContext): void {
