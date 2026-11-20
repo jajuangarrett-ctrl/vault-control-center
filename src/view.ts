@@ -94,6 +94,8 @@ interface PersistedViewState {
   selectedAreaFolderPath?: unknown;
   selectedProgramPath?: unknown;
   selectedProgramFolderPath?: unknown;
+  selectedTaskFolderPath?: unknown;
+  selectedTaskSubfolderPath?: unknown;
   selectedAiQueue?: unknown;
   recentFilter?: unknown;
   bookmarkFilter?: unknown;
@@ -209,6 +211,8 @@ export class VaultControlCenterView extends ItemView {
     selectedAreaFolderPath: "",
     selectedProgramPath: "",
     selectedProgramFolderPath: "",
+    selectedTaskFolderPath: "",
+    selectedTaskSubfolderPath: "",
     selectedAiQueue: "emailQueue",
     recentFilter: "all",
     bookmarkFilter: "all",
@@ -327,6 +331,8 @@ export class VaultControlCenterView extends ItemView {
       selectedAreaFolderPath: this.renderState.selectedAreaFolderPath,
       selectedProgramPath: this.renderState.selectedProgramPath,
       selectedProgramFolderPath: this.renderState.selectedProgramFolderPath,
+      selectedTaskFolderPath: this.renderState.selectedTaskFolderPath,
+      selectedTaskSubfolderPath: this.renderState.selectedTaskSubfolderPath,
       selectedAiQueue: this.renderState.selectedAiQueue,
       recentFilter: this.renderState.recentFilter,
       bookmarkFilter: this.renderState.bookmarkFilter,
@@ -353,6 +359,12 @@ export class VaultControlCenterView extends ItemView {
     }
     if (typeof saved.selectedProgramFolderPath === "string") {
       this.renderState.selectedProgramFolderPath = saved.selectedProgramFolderPath;
+    }
+    if (typeof saved.selectedTaskFolderPath === "string") {
+      this.renderState.selectedTaskFolderPath = saved.selectedTaskFolderPath;
+    }
+    if (typeof saved.selectedTaskSubfolderPath === "string") {
+      this.renderState.selectedTaskSubfolderPath = saved.selectedTaskSubfolderPath;
     }
     const savedAiQueue = saved.selectedAiQueue;
     if (typeof savedAiQueue === "string" && AI_QUEUE_KEYS.includes(savedAiQueue as AiFolderKey)) {
@@ -395,6 +407,7 @@ export class VaultControlCenterView extends ItemView {
     if (this.rootEl) {
       this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
+      this.canonicalizeTaskFolderSelection();
       this.renderRouteTabs();
       this.renderContent();
       this.renderMobileDock();
@@ -510,6 +523,7 @@ export class VaultControlCenterView extends ItemView {
       }
       this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
+      this.canonicalizeTaskFolderSelection();
       this.renderContent();
       if (this.activePreviewFile || this.pendingPreviewPath) {
         const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
@@ -613,7 +627,10 @@ export class VaultControlCenterView extends ItemView {
     if (typeof ResizeObserver !== "undefined") {
       this.previewResizeObserver = new ResizeObserver(() => {
         this.updatePreviewLayoutMode();
-        if (Platform.isMobile && this.mobileFolderDetail && (this.route === "areas" || this.route === "programs")) {
+        const folderDetail = this.route === "task-folders"
+          ? Boolean(this.renderState.selectedTaskFolderPath && !this.renderState.query.trim())
+          : this.mobileFolderDetail && (this.route === "areas" || this.route === "programs");
+        if (Platform.isMobile && folderDetail) {
           const collapsed = this.effectiveFolderRailCollapsed();
           if ((this.rootEl?.getAttribute("data-folder-rail-collapsed") === "true") !== collapsed) this.renderContent();
         }
@@ -636,6 +653,7 @@ export class VaultControlCenterView extends ItemView {
         button.classList.toggle("is-active", this.route===route.id);
         button.setAttribute("aria-selected",String(this.route===route.id));
       }
+      this.keepTasksTabVisible();
       return;
     }
     this.routeTabsEl.empty();
@@ -652,6 +670,17 @@ export class VaultControlCenterView extends ItemView {
       });
       bindNavigationTap(button, Platform.isMobile, () => this.navigate(route.id));
     }
+    this.keepTasksTabVisible();
+  }
+
+  private keepTasksTabVisible(): void {
+    const tabs = this.routeTabsEl;
+    const tab = tabs?.children[ROUTE_DEFINITIONS.findIndex(({ id }) => id === "task-folders")];
+    if (this.route !== "task-folders" || !tabs || !(tab instanceof HTMLElement)) return;
+    const strip = tabs.getBoundingClientRect();
+    const button = tab.getBoundingClientRect();
+    if (button.right > strip.right) tabs.scrollLeft += button.right - strip.right;
+    else if (button.left < strip.left) tabs.scrollLeft -= strip.left - button.left;
   }
 
   private renderMobileDock(): void {
@@ -798,20 +827,29 @@ export class VaultControlCenterView extends ItemView {
     );
   }
 
+  private canonicalizeTaskFolderSelection(): void {
+    if (!this.data || !this.renderState.selectedTaskFolderPath) return;
+    const root = this.data.taskFolders.find((folder) => folder.path === this.renderState.selectedTaskFolderPath);
+    this.renderState.selectedTaskFolderPath = root?.path ?? "";
+    this.renderState.selectedTaskSubfolderPath = root
+      ? resolveProgramFolderPath(root, this.renderState.selectedTaskSubfolderPath || root.path)
+      : "";
+  }
+
   currentFolderPath(): string {
     const rootPath = normalizeVaultPath(
       this.route === "areas"
         ? this.renderState.selectedAreaPath
         : this.route === "programs"
           ? this.renderState.selectedProgramPath
-          : ""
+          : this.route === "task-folders" ? this.renderState.selectedTaskFolderPath : ""
     );
     const folderPath = normalizeVaultPath(
       this.route === "areas"
         ? this.renderState.selectedAreaFolderPath
         : this.route === "programs"
           ? this.renderState.selectedProgramFolderPath
-          : ""
+          : this.route === "task-folders" ? this.renderState.selectedTaskSubfolderPath : ""
     );
     if (
       !rootPath ||
@@ -834,7 +872,7 @@ export class VaultControlCenterView extends ItemView {
     const normalizedPath = normalizeVaultPath(path);
     const currentPath = this.currentFolderPath();
     if (!normalizedPath || !currentPath || normalizedPath !== currentPath) {
-      new Notice("Choose a folder in Areas or Programs before copying its path.");
+      new Notice("Choose a folder in Areas, Programs, or Tasks before copying its path.");
       return false;
     }
     return copyText(
@@ -879,7 +917,9 @@ export class VaultControlCenterView extends ItemView {
       folderRailId: this.folderRailId,
       folderRailCollapsed: this.effectiveFolderRailCollapsed(),
       setFolderRailCollapsed: (collapsed) => {
-        if (Platform.isMobile) {
+        if (this.route === "task-folders") {
+          this.taskFoldersRailCollapsed = collapsed;
+        } else if (Platform.isMobile) {
           this.mobileRootsOnly = false;
           this.mobileRootsVisible = !collapsed;
           this.mobileFolderDetail = collapsed;
@@ -943,6 +983,24 @@ export class VaultControlCenterView extends ItemView {
           program,
           path
         );
+        this.renderContent();
+        this.focusFolderHeading();
+      },
+      selectTaskFolder: (path) => {
+        const root = this.data?.taskFolders.find((folder) => folder.path === path);
+        if (!root) return;
+        this.renderState.selectedTaskFolderPath = root.path;
+        this.renderState.selectedTaskSubfolderPath = root.path;
+        this.renderState.query = "";
+        if (this.searchInputEl) this.searchInputEl.value = "";
+        this.taskFoldersRailCollapsed = null;
+        this.renderContent();
+        this.focusFolderHeading();
+      },
+      selectTaskSubfolder: (path) => {
+        const root = this.data?.taskFolders.find((folder) => folder.path === this.renderState.selectedTaskFolderPath);
+        if (!root || !pathIsWithin(path, root.path)) return;
+        this.renderState.selectedTaskSubfolderPath = resolveProgramFolderPath(root, path);
         this.renderContent();
         this.focusFolderHeading();
       },
@@ -1206,7 +1264,7 @@ export class VaultControlCenterView extends ItemView {
   private navigate(route: DashboardRoute): void {
     if (this.route === route) {
       if (Platform.isMobile) {
-        if (route === "areas" || route === "programs") this.showFolderRoots();
+        if (route === "areas" || route === "programs" || route === "task-folders") this.showFolderRoots();
         else this.contentEl.scrollTo({top:0});
       }
       return;
@@ -1221,34 +1279,46 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private showFolderRoots(): void {
-    this.mobileRootsOnly = true;
-    this.mobileRootsVisible = true;
-    this.mobileFolderDetail = false;
+    if (this.route === "task-folders") {
+      this.renderState.selectedTaskFolderPath = "";
+      this.renderState.selectedTaskSubfolderPath = "";
+      this.taskFoldersRailCollapsed = null;
+    } else {
+      this.mobileRootsOnly = true;
+      this.mobileRootsVisible = true;
+      this.mobileFolderDetail = false;
+    }
     this.renderState.query = "";
     if(this.searchInputEl)this.searchInputEl.value="";
     this.renderContent();
-    this.contentEl.scrollTo({top:0});
-    this.contentRegionEl?.querySelector<HTMLElement>(".fjg-vcc-folder-rail button")?.focus({preventScroll:true});
+    if (Platform.isMobile) this.contentEl.scrollTo({top:0});
+    else this.contentRegionEl?.scrollTo({top:0});
+    this.contentRegionEl?.querySelector<HTMLElement>(this.route === "task-folders" ? ".fjg-vcc-folder-rail .fjg-vcc-select-row" : ".fjg-vcc-folder-rail button")?.focus({preventScroll:true});
   }
 
   private syncFolderRailAttribute(): void {
-    const activeRoute = this.route === "areas" || this.route === "programs";
-    const folderBrowserVisible = !this.renderState.query.trim();
-    if (Platform.isMobile && activeRoute && folderBrowserVisible && this.mobileRootsOnly) {
+    const taskRoute = this.route === "task-folders";
+    const activeRoute = taskRoute || this.route === "areas" || this.route === "programs";
+    const searching = Boolean(this.renderState.query.trim());
+    const folderBrowserVisible = taskRoute || !searching;
+    const rootsOnly = taskRoute ? searching || !this.renderState.selectedTaskFolderPath : this.mobileRootsOnly;
+    const folderDetail = taskRoute ? !rootsOnly : this.mobileFolderDetail;
+    if (Platform.isMobile && activeRoute && folderBrowserVisible && rootsOnly) {
       this.rootEl?.setAttribute("data-mobile-folder-roots", "true");
     } else this.rootEl?.removeAttribute("data-mobile-folder-roots");
-    if (Platform.isMobile && activeRoute && folderBrowserVisible && this.mobileFolderDetail) {
+    if (Platform.isMobile && activeRoute && folderBrowserVisible && folderDetail) {
       this.rootEl?.setAttribute("data-mobile-folder-detail", "true");
     } else {
       this.rootEl?.removeAttribute("data-mobile-folder-detail");
     }
-    if (activeRoute && folderBrowserVisible && this.effectiveFolderRailCollapsed()) {
+    if (activeRoute && folderBrowserVisible && (!taskRoute || !rootsOnly) && this.effectiveFolderRailCollapsed()) {
       this.rootEl?.setAttribute("data-folder-rail-collapsed", "true");
     } else {
       this.rootEl?.removeAttribute("data-folder-rail-collapsed");
     }
   }
 
+  private taskFoldersRailCollapsed: boolean | null = null;
   private mobileRootsOnly = false;
   private mobileFolderDetail = false;
   private mobileRootsVisible: boolean | null = null;
@@ -1258,6 +1328,10 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private effectiveFolderRailCollapsed(): boolean {
+    if (this.route === "task-folders") {
+      if (!this.renderState.selectedTaskFolderPath || this.renderState.query.trim()) return false;
+      return this.taskFoldersRailCollapsed ?? (Platform.isMobile && this.folderBrowserWidth() < 560);
+    }
     if (Platform.isMobile && this.mobileRootsVisible !== null) return !this.mobileRootsVisible;
     return this.folderRailCollapsed || Boolean(Platform?.isMobile && this.mobileFolderDetail &&
       this.contentRegionEl && this.folderBrowserWidth() < 560);
@@ -1265,12 +1339,14 @@ export class VaultControlCenterView extends ItemView {
 
   private focusFolderHeading(): void {
     if (Platform?.isMobile) {
-      this.mobileRootsOnly = false;
-      this.mobileRootsVisible = null;
-      this.mobileFolderDetail = true;
-      this.renderContent();
-      const path = this.currentFolderPath();
-      if (path) window.dispatchEvent(new CustomEvent("fjg-vcc-folder-context", { detail: { path } }));
+      if (this.route !== "task-folders") {
+        this.mobileRootsOnly = false;
+        this.mobileRootsVisible = null;
+        this.mobileFolderDetail = true;
+        this.renderContent();
+        const path = this.currentFolderPath();
+        if (path) window.dispatchEvent(new CustomEvent("fjg-vcc-folder-context", { detail: { path } }));
+      }
     }
     window.setTimeout(() => {
       const heading = this.contentRegionEl?.querySelector<HTMLElement>(".fjg-vcc-folder-heading");
@@ -1965,6 +2041,7 @@ export class VaultControlCenterView extends ItemView {
       this.data.recent,
       this.data.areasRoot.files,
       ...this.data.programs.map((program) => program.files),
+      ...this.data.taskFolders.map((folder) => folder.files),
       ...Object.values(this.data.aiQueues).map((queue) => queue.files),
       this.data.people.files,
     ];

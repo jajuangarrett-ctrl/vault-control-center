@@ -120,6 +120,55 @@ Not a task [ ]
 });
 
 describe("buildDashboardData", () => {
+  it("indexes real task folders by basename, pins the existing inbox, and avoids duplicate roots", async () => {
+    const inbox = "08 Tasks/Inbox/Files";
+    const calworks = "02 Programs/CalWORKs/CalWORKs Tasks";
+    const duplicate = "03 Areas/CalWORKs Tasks";
+    const namedLikeFolderFile = "Misc/Tasks";
+    const files = [
+      file(`${inbox}/Item.md`, 90),
+      file(`${calworks}/2026/Plan.md`, 100),
+      file(`${calworks}/2026/api_keys.md`, 900),
+      file("Misc/Ghost Tasks/Paper.md", 300), // files alone do not create a folder row
+      file(namedLikeFolderFile, 400),
+    ];
+    const folders = [
+      "08 Tasks", "08 Tasks/Inbox", inbox, calworks, calworks,
+      `${calworks}/2026`, `${calworks}/Empty`, duplicate,
+      "03 Areas/Parent/MyTaSkS", "Work/Task", "Work/Taskmaster",
+      "Other/Inbox/Files", ".obsidian/Tasks", "Passwords/Service Tasks",
+    ];
+    const data = await buildDashboardData(fakeApp(files, {}, false, folders), SETTINGS);
+    expect(data.taskFolders.map(({ name, path, count }) => ({ name, path, count }))).toEqual([
+      { name: "Inbox / Files", path: inbox, count: 1 },
+      { name: "08 Tasks", path: "08 Tasks", count: 1 },
+      { name: "CalWORKs Tasks", path: calworks, count: 1 },
+      { name: "CalWORKs Tasks", path: duplicate, count: 0 },
+      { name: "MyTaSkS", path: "03 Areas/Parent/MyTaSkS", count: 0 },
+    ]);
+    expect(data.taskFolders.find((root) => root.path === calworks)?.folderPaths).toEqual([
+      `${calworks}/2026`, `${calworks}/Empty`,
+    ]);
+    expect(JSON.stringify(data.taskFolders)).not.toMatch(/api_keys|Passwords|Ghost Tasks|Taskmaster/);
+  });
+
+  it("rebuilds task folders from current paths, so parent renames, moves, and deletes do not leave stale rows", async () => {
+    const initial = await buildDashboardData(
+      fakeApp([], {}, false, ["08 Tasks/Inbox/Files", "Parent/Program Tasks", "To move", "Old Tasks"]),
+      SETTINGS,
+    );
+    const next = await buildDashboardData(
+      fakeApp([], {}, false, ["Parent Renamed/Program Tasks", "Parent Renamed/More Tasks", "Destination/To move Tasks"]),
+      SETTINGS,
+    );
+    expect(initial.taskFolders.map((folder) => folder.path)).toEqual([
+      "08 Tasks/Inbox/Files", "Old Tasks", "Parent/Program Tasks",
+    ]);
+    expect(next.taskFolders.map((folder) => folder.path)).toEqual([
+      "Parent Renamed/More Tasks", "Parent Renamed/Program Tasks", "Destination/To move Tasks",
+    ]);
+  });
+
   it("builds live summaries from one vault snapshot and excludes private files", async () => {
     const files = [
       file("Programs/Alpha/About.md", 100),

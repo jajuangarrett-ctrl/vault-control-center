@@ -57,6 +57,8 @@ export interface DashboardRenderState {
   selectedAreaFolderPath: string;
   selectedProgramPath: string;
   selectedProgramFolderPath: string;
+  selectedTaskFolderPath: string;
+  selectedTaskSubfolderPath: string;
   selectedAiQueue: AiFolderKey;
   recentFilter: RecentFilter;
   bookmarkFilter: BookmarkFilter;
@@ -106,6 +108,8 @@ export interface DashboardRenderContext {
   selectAreaFolder: (path: string) => void;
   selectProgram: (path: string) => void;
   selectProgramFolder: (path: string) => void;
+  selectTaskFolder: (path: string) => void;
+  selectTaskSubfolder: (path: string) => void;
   copyFolderPath: (path: string) => void;
   selectAiQueue: (key: AiFolderKey) => void;
   setRecentFilter: (filter: RecentFilter) => void;
@@ -149,6 +153,9 @@ export function renderRoute(
       break;
     case "programs":
       renderPrograms(view, context);
+      break;
+    case "task-folders":
+      renderTaskFolders(view, context);
       break;
     case "html":
       renderHtmlGallery(view, context);
@@ -767,6 +774,7 @@ interface FolderCollectionOptions {
   singular: string;
   sourceName: string;
   listCount?: number;
+  showRootPaths?: boolean;
   selectRoot: (path: string) => void;
   selectFolder: (path: string) => void;
 }
@@ -800,58 +808,78 @@ function renderPrograms(parent: HTMLElement, context: DashboardRenderContext): v
   });
 }
 
+function renderTaskFolders(parent: HTMLElement, context: DashboardRenderContext): void {
+  renderFolderCollection(parent, context, {
+    roots: context.data.taskFolders,
+    selectedRootPath: context.state.selectedTaskFolderPath,
+    selectedFolderPath: context.state.selectedTaskSubfolderPath,
+    title: "Tasks Folders",
+    article: "a",
+    singular: "folder",
+    sourceName: "Tasks",
+    showRootPaths: true,
+    selectRoot: context.selectTaskFolder,
+    selectFolder: context.selectTaskSubfolder,
+  });
+}
+
 function renderFolderCollection(
   parent: HTMLElement,
   context: DashboardRenderContext,
   options: FolderCollectionOptions
 ): void {
   const query = context.state.query.trim();
-  if (query) {
+  if (query && !options.showRootPaths) {
     renderFolderCollectionSearch(parent, context, options, query);
     return;
   }
 
   const matches = options.roots.filter((root) =>
-    programMatchesNavigationQuery(root, context.state.query)
+    options.showRootPaths ? matchesQuery(query, root.name, root.path) : programMatchesNavigationQuery(root, query)
   );
   const selected =
-    matches.find((root) => root.path === options.selectedRootPath) ?? matches[0];
+    options.showRootPaths && query ? undefined
+      : matches.find((root) => root.path === options.selectedRootPath) ?? (options.showRootPaths ? undefined : matches[0]);
   const layout = parent.createDiv({ cls: "fjg-vcc-page-layout fjg-vcc-program-layout" });
   const listPanel = createPanel(layout, `${options.title} · ${options.listCount ?? matches.length}`, {
     className: "fjg-vcc-folder-rail",
   });
   listPanel.body.id = context.folderRailId;
-  let railCollapsed = context.folderRailCollapsed;
-  let railToggle: HTMLButtonElement;
-  const syncRailToggle = (): void => {
-    const label = `${railCollapsed ? "Show" : "Hide"} ${options.title.toLocaleLowerCase()} list`;
-    railToggle.setAttribute("aria-label", label);
-    railToggle.setAttribute("aria-expanded", String(!railCollapsed));
-    railToggle.setAttribute("title", label);
-    const icon = railToggle.querySelector<HTMLElement>(".fjg-vcc-icon");
-    if (icon) setIcon(icon, railCollapsed ? "panel-left-open" : "panel-left-close");
-    const labels = railToggle.querySelectorAll<HTMLSpanElement>("span");
-    const textLabel = labels.item(labels.length - 1);
-    if (textLabel) textLabel.textContent = label;
-  };
-  railToggle = createButton(listPanel.header, {
-    label: `${railCollapsed ? "Show" : "Hide"} ${options.title.toLocaleLowerCase()} list`,
-    icon: railCollapsed ? "panel-left-open" : "panel-left-close",
-    className: "fjg-vcc-text-action fjg-vcc-folder-rail-toggle",
-    onClick: () => {
-      railCollapsed = !railCollapsed;
-      context.setFolderRailCollapsed(railCollapsed);
-      syncRailToggle();
-    },
-  });
-  railToggle.setAttribute("aria-controls", context.folderRailId);
-  syncRailToggle();
+  if (!options.showRootPaths || selected) {
+    let railCollapsed = context.folderRailCollapsed;
+    let railToggle: HTMLButtonElement;
+    const syncRailToggle = (): void => {
+      const label = `${railCollapsed ? "Show" : "Hide"} ${options.title.toLocaleLowerCase()} list`;
+      railToggle.setAttribute("aria-label", label);
+      railToggle.setAttribute("aria-expanded", String(!railCollapsed));
+      railToggle.setAttribute("title", label);
+      const icon = railToggle.querySelector<HTMLElement>(".fjg-vcc-icon");
+      if (icon) setIcon(icon, railCollapsed ? "panel-left-open" : "panel-left-close");
+      const labels = railToggle.querySelectorAll<HTMLSpanElement>("span");
+      const textLabel = labels.item(labels.length - 1);
+      if (textLabel) textLabel.textContent = label;
+    };
+    railToggle = createButton(listPanel.header, {
+      label: `${railCollapsed ? "Show" : "Hide"} ${options.title.toLocaleLowerCase()} list`,
+      icon: railCollapsed ? "panel-left-open" : "panel-left-close",
+      className: "fjg-vcc-text-action fjg-vcc-folder-rail-toggle",
+      onClick: () => {
+        railCollapsed = !railCollapsed;
+        context.setFolderRailCollapsed(railCollapsed);
+        syncRailToggle();
+      },
+    });
+    railToggle.setAttribute("aria-controls", context.folderRailId);
+    syncRailToggle();
+  }
 
   if (!matches.length) {
     createEmptyState(
       listPanel.body,
       `No ${options.title.toLowerCase()} match`,
-      `Clear search or verify the ${options.sourceName} folder.`,
+      options.showRootPaths
+        ? (query ? "Try another folder name or path." : "Folders with Tasks in the name and Inbox / Files appear here when available.")
+        : `Clear search or verify the ${options.sourceName} folder.`,
       "folder-search"
     );
   } else {
@@ -864,8 +892,13 @@ function renderFolderCollection(
       createIcon(row, "folder", "fjg-vcc-row-icon");
       const main = row.createDiv({ cls: "fjg-vcc-row-main" });
       main.createSpan({ cls: "fjg-vcc-row-title", text: root.name });
-      main.createSpan({ cls: "fjg-vcc-row-meta", text: `${root.count} files` });
-      row.createSpan({ cls: "fjg-vcc-row-end", text: formatRelativeTime(programModifiedAt(root)) });
+      if (options.showRootPaths) {
+        main.createSpan({ cls: "fjg-vcc-row-meta fjg-vcc-task-folder-path", text: root.path });
+        row.createSpan({ cls: "fjg-vcc-row-end", text: `${root.count} file${root.count === 1 ? "" : "s"}` });
+      } else {
+        main.createSpan({ cls: "fjg-vcc-row-meta", text: `${root.count} files` });
+        row.createSpan({ cls: "fjg-vcc-row-end", text: formatRelativeTime(programModifiedAt(root)) });
+      }
       row.addEventListener("click", () => options.selectRoot(root.path));
     }
   }
@@ -906,12 +939,12 @@ function renderFolderCollection(
 
   const browser = detail.body.createDiv({ cls: "fjg-vcc-program-browser" });
   const toolbar = browser.createDiv({ cls: "fjg-vcc-folder-toolbar" });
-  if (Platform.isMobile || folderView.parentPath) {
+  if (options.showRootPaths || Platform.isMobile || folderView.parentPath) {
     createButton(toolbar, {
-      label: Platform.isMobile ? (folderView.parentPath ? "Back" : `Back to ${options.title}`) : "Up",
+      label: folderView.parentPath ? (Platform.isMobile ? "Back" : "Up") : `Back to ${options.title}`,
       icon: Platform.isMobile ? "arrow-left" : "arrow-up",
       className: "fjg-vcc-folder-up",
-      ariaLabel: !Platform.isMobile ? `Go up from ${folderView.name}` : folderView.parentPath ? `Go back from ${folderView.name}` : `Back to ${options.title} list`,
+      ariaLabel: folderView.parentPath ? (Platform.isMobile ? `Go back from ${folderView.name}` : `Go up from ${folderView.name}`) : `Back to ${options.title} list`,
       onClick: () => folderView.parentPath ? options.selectFolder(folderView.parentPath) : context.showFolderRoots(),
     });
   }

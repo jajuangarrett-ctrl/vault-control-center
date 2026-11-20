@@ -4290,3 +4290,13 @@ body.is-mobile .fjg-vcc[data-mobile-folder-roots="true"] .fjg-vcc-program-layout
 body.is-mobile .fjg-vcc[data-mobile-folder-roots="true"] .fjg-vcc-folder-rail-toggle {
   display: none;
 }
+
+
+/* The Tasks index disambiguates same-named folders without horizontal overflow. */
+.fjg-vcc [data-route="task-folders"] .fjg-vcc-task-folder-path {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.fjg-vcc [data-route="task-folders"] .fjg-vcc-select-row {
+  min-height: 44px;
+}

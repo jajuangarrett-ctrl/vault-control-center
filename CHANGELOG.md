@@ -1,3 +1,8 @@
+## 0.3.29
+
+- Add a Tasks tab after Programs for folders with “Tasks” in their names, with Inbox / Files listed first when it exists.
+- Browse subfolders and preview files in the dashboard. Search by folder name or full path; the list follows changes in the vault.
+
 ## 0.3.28
 
 - Add 00 Inbox and Wiki, including nested folders, to the Vault Control Center File Review tab. Select either folder or use the All review folders view.

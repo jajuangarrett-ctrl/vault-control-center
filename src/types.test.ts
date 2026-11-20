@@ -36,14 +36,16 @@ const EXPECTED_HTML_HOME_PAGES = [
 ] as const;
 
 describe("Areas route configuration", () => {
-  it("places Areas between Home and Programs and HTML directly after Programs", () => {
-    expect(ROUTES.slice(0, 4)).toEqual(["home", "areas", "programs", "html"]);
-    expect(ROUTE_DEFINITIONS.slice(0, 4).map(({ id }) => id)).toEqual([
+  it("places Tasks after Programs and before HTML, without removing existing tabs", () => {
+    expect(ROUTES.slice(0, 5)).toEqual(["home", "areas", "programs", "task-folders", "html"]);
+    expect(ROUTE_DEFINITIONS.slice(0, 5).map(({ id }) => id)).toEqual([
       "home",
       "areas",
       "programs",
+      "task-folders",
       "html",
     ]);
+    expect(ROUTE_DEFINITIONS.find(({ id }) => id === "task-folders")?.label).toBe("Tasks");
     expect(ROUTE_DEFINITIONS.find(({ id }) => id === "areas")?.label).toBe(
       "Areas"
     );

@@ -136,6 +136,7 @@ export interface DashboardData {
   areasRoot: DashboardArea;
   areas: DashboardArea[];
   programs: DashboardProgram[];
+  taskFolders: DashboardFolderRoot[];
   aiQueues: Record<AiFolderKey, DashboardAiQueue>;
   people: DashboardPeopleData;
   recent: DashboardFileItem[];
@@ -404,6 +405,7 @@ export async function buildDashboardData(
     .filter((file) => isVisibleFile(file.path, file.extension))
     .map((file) => ({ raw: file, item: toDashboardFile(file, context) }));
   const vaultFolderPaths = safeVaultFolderPaths(app);
+  const taskFolders = collectTaskFolders(vaultFolderPaths, vaultFiles.map(({ item }) => item));
 
   const programMap = new Map<string, DashboardFileItem[]>();
   for (const { item } of vaultFiles) {
@@ -589,6 +591,7 @@ export async function buildDashboardData(
     areasRoot,
     areas,
     programs,
+    taskFolders,
     aiQueues,
     people,
     recent,
@@ -670,6 +673,40 @@ function safeVaultFolderPaths(app: App): string[] {
   } catch {
     return [];
   }
+}
+
+const TASK_INBOX_PATH = "08 Tasks/Inbox/Files";
+
+function collectTaskFolders(folderPaths: string[], files: DashboardFileItem[]): DashboardFolderRoot[] {
+  const roots = new Map<string, DashboardFolderRoot>();
+  for (const path of folderPaths) {
+    const name = lastPathSegment(path);
+    if (path === TASK_INBOX_PATH || name.toLowerCase().includes("tasks")) {
+      roots.set(path, { name: path === TASK_INBOX_PATH ? "Inbox / Files" : name, path, count: 0, files: [], folderPaths: [] });
+    }
+  }
+
+  // Each path is assigned to matching ancestors; no scan of the full vault per root.
+  const visitAncestors = (path: string, visit: (root: DashboardFolderRoot) => void) => {
+    let slash = path.lastIndexOf("/");
+    while (slash > 0) {
+      const root = roots.get(path.slice(0, slash));
+      if (root) visit(root);
+      slash = path.lastIndexOf("/", slash - 1);
+    }
+  };
+  for (const path of folderPaths) visitAncestors(path, (root) => root.folderPaths!.push(path));
+  for (const file of files) visitAncestors(file.path, (root) => root.files.push(file));
+  for (const root of roots.values()) {
+    root.files = sortFiles(root.files);
+    root.count = root.files.length;
+  }
+
+  return [...roots.values()].sort((left, right) => {
+    if (left.path === TASK_INBOX_PATH) return -1;
+    if (right.path === TASK_INBOX_PATH) return 1;
+    return left.name.localeCompare(right.name) || left.path.localeCompare(right.path);
+  });
 }
 
 function isVisibleFile(path: string, extension: string): boolean {
