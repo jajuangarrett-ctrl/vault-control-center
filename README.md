@@ -88,7 +88,7 @@ The Automations route uses a fixed code allowlist; vault files and network clien
 
 Recent combines three sources in viewed order: files previewed inside Vault Control Center, the optional Recent Files plugin when it is enabled in file-open mode, and Obsidian's native open history. Preview history is capped at 30 safe paths in the Obsidian workspace state; no file contents are stored. If none of these sources provides usable viewed-file history, the dashboard temporarily falls back to modified-time activity under the configured recent roots.
 
-Capture buttons dispatch commands from companion capture plugins. Install and enable the corresponding Thought Capture, Email Capture, Agenda Capture, and Program Update Capture plugins for those buttons to work. Vault Control Center does not register the displayed actions as global hotkeys.
+Capture buttons dispatch commands from companion capture plugins. Install and enable the corresponding Thought Capture, Email Capture, and Agenda Capture plugins for those buttons to work. The **All Files** tile opens the vault root instead of dispatching a capture command. Vault Control Center does not register the displayed actions as global hotkeys.
 
 ## FJG Task Manager integration
 

@@ -14,6 +14,7 @@ export const ROUTES = [
   "people",
   "clipboard",
   "settings",
+  "all-files", // Home subpage, not a top-level dashboard tab.
 ] as const;
 
 export type DashboardRoute = (typeof ROUTES)[number];

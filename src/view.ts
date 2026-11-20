@@ -78,6 +78,7 @@ import {
   type RecentFilter,
 } from "./renderers";
 import { fetchTaskboardSnapshot, type TaskboardSnapshot } from "./taskboard";
+import { buildVaultFolderListing, resolveVaultBrowserFolder } from "./vault-browser";
 import { oppositeTheme } from "./theme";
 import {
   DASHBOARD_VIEW_TYPE,
@@ -96,6 +97,7 @@ interface PersistedViewState {
   selectedProgramFolderPath?: unknown;
   selectedTaskFolderPath?: unknown;
   selectedTaskSubfolderPath?: unknown;
+  allFilesFolderPath?: unknown;
   selectedAiQueue?: unknown;
   recentFilter?: unknown;
   bookmarkFilter?: unknown;
@@ -152,6 +154,8 @@ class DashboardMarkdownView extends MarkdownView implements EmbeddedMarkdownView
 export class VaultControlCenterView extends ItemView {
   navigation = false;
   private route: DashboardRoute = "home";
+  private allFilesFolderPath = "";
+  private allFilesQuery = "";
   private data: DashboardData | null = null;
   private taskboard: TaskboardSnapshot = {
     status: "disabled",
@@ -333,6 +337,7 @@ export class VaultControlCenterView extends ItemView {
       selectedProgramFolderPath: this.renderState.selectedProgramFolderPath,
       selectedTaskFolderPath: this.renderState.selectedTaskFolderPath,
       selectedTaskSubfolderPath: this.renderState.selectedTaskSubfolderPath,
+      allFilesFolderPath: this.allFilesFolderPath,
       selectedAiQueue: this.renderState.selectedAiQueue,
       recentFilter: this.renderState.recentFilter,
       bookmarkFilter: this.renderState.bookmarkFilter,
@@ -345,6 +350,7 @@ export class VaultControlCenterView extends ItemView {
   async setState(state: unknown, result: ViewStateResult): Promise<void> {
     await super.setState(state, result);
     const saved = (state && typeof state === "object" ? state : {}) as PersistedViewState;
+    const previousRoute = this.route;
     if (typeof saved.route === "string" && ROUTES.includes(saved.route as DashboardRoute)) {
       this.route = saved.route as DashboardRoute;
     }
@@ -366,6 +372,7 @@ export class VaultControlCenterView extends ItemView {
     if (typeof saved.selectedTaskSubfolderPath === "string") {
       this.renderState.selectedTaskSubfolderPath = saved.selectedTaskSubfolderPath;
     }
+    if (typeof saved.allFilesFolderPath === "string") this.allFilesFolderPath = normalizeVaultPath(saved.allFilesFolderPath);
     const savedAiQueue = saved.selectedAiQueue;
     if (typeof savedAiQueue === "string" && AI_QUEUE_KEYS.includes(savedAiQueue as AiFolderKey)) {
       this.renderState.selectedAiQueue = savedAiQueue as AiFolderKey;
@@ -405,6 +412,7 @@ export class VaultControlCenterView extends ItemView {
     }
 
     if (this.rootEl) {
+      this.syncAllFilesQuery(previousRoute);
       this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
       this.canonicalizeTaskFolderSelection(true);
@@ -575,14 +583,15 @@ export class VaultControlCenterView extends ItemView {
     this.searchInputEl = search.createEl("input", {
       attr: {
         type: "search",
-        placeholder: "Search this tab",
+        placeholder: this.route === "all-files" ? "Filter this folder" : "Search this tab",
         "aria-label": "Search the current dashboard tab",
         "aria-controls": this.browserRegionId,
       },
     });
-    this.searchInputEl.value = this.renderState.query;
+    this.searchInputEl.value = this.route === "all-files" ? this.allFilesQuery : this.renderState.query;
     this.searchInputEl.addEventListener("input", () => {
-      this.renderState.query = this.searchInputEl?.value ?? "";
+      if (this.route === "all-files") this.allFilesQuery = this.searchInputEl?.value ?? "";
+      else this.renderState.query = this.searchInputEl?.value ?? "";
       this.renderContent();
     });
 
@@ -890,7 +899,20 @@ export class VaultControlCenterView extends ItemView {
 
   private renderContext(): DashboardRenderContext {
     if (!this.data) throw new Error("Dashboard data is not ready.");
+    const allFiles = this.route === "all-files"
+      ? buildVaultFolderListing(this.app.vault, this.allFilesFolderPath, (file) => this.toDashboardFileItem(file))
+      : null;
+    if (allFiles) this.allFilesFolderPath = allFiles.path;
     return {
+      allFiles,
+      allFilesQuery: this.allFilesQuery,
+      openAllFiles: () => {
+        this.allFilesFolderPath = "";
+        this.allFilesQuery = "";
+        this.navigate("all-files");
+        this.focusAllFilesHeading();
+      },
+      selectVaultFolder: (path) => this.selectVaultFolder(path),
       data: this.data,
       taskboard: this.taskboard,
       htmlGallery: this.htmlGallery,
@@ -1277,12 +1299,36 @@ export class VaultControlCenterView extends ItemView {
       return;
     }
     void this.closePreview({ restoreFocus: false });
+    const previousRoute = this.route;
     this.route = route;
+    this.syncAllFilesQuery(previousRoute);
     this.renderRouteTabs();
     this.renderMobileDock();
     this.renderContent();
     if (Platform.isMobile) this.contentEl.scrollTo({top:0});
     else this.contentRegionEl?.scrollTo({ top: 0 });
+  }
+
+  private syncAllFilesQuery(previousRoute: DashboardRoute): void {
+    if (!this.searchInputEl || (this.route !== "all-files" && previousRoute !== "all-files")) return;
+    this.searchInputEl.value = this.route === "all-files" ? this.allFilesQuery : this.renderState.query;
+    this.searchInputEl.setAttribute("placeholder", this.route === "all-files" ? "Filter this folder" : "Search this tab");
+  }
+
+  private selectVaultFolder(path: string): void {
+    if (this.route !== "all-files") return;
+    const folder = resolveVaultBrowserFolder(this.app.vault, path);
+    this.allFilesFolderPath = folder.isRoot() ? "" : folder.path;
+    this.allFilesQuery = "";
+    this.syncAllFilesQuery("all-files");
+    this.renderContent();
+    if (Platform.isMobile) this.contentEl.scrollTo({ top: 0 });
+    else this.contentRegionEl?.scrollTo({ top: 0 });
+    this.focusAllFilesHeading();
+  }
+
+  private focusAllFilesHeading(): void {
+    this.contentRegionEl?.querySelector<HTMLElement>(".fjg-vcc-all-files .fjg-vcc-folder-heading")?.focus({ preventScroll: true });
   }
 
   private showFolderRoots(): void {

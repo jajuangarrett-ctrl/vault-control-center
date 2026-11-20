@@ -49,6 +49,8 @@ import {
   type DashboardTheme,
 } from "./types";
 
+import { vaultFolderParent, type VaultFolderListing } from "./vault-browser";
+
 export type RecentFilter = "all" | DashboardFileCategory;
 export type BookmarkFilter = "all" | DashboardBookmark["type"];
 
@@ -89,6 +91,10 @@ export interface DashboardRenderContext {
   settings: DashboardSettings;
   state: DashboardRenderState;
   activePreviewPath: string;
+  allFiles: VaultFolderListing | null;
+  allFilesQuery: string;
+  openAllFiles: () => void;
+  selectVaultFolder: (path: string) => void;
   folderRailId: string;
   folderRailCollapsed: boolean;
   setFolderRailCollapsed: (collapsed: boolean) => void;
@@ -148,6 +154,9 @@ export function renderRoute(
   switch (route) {
     case "home":
       renderHome(view, context);
+      break;
+    case "all-files":
+      renderAllFiles(view, context);
       break;
     case "areas":
       renderAreas(view, context);
@@ -616,23 +625,94 @@ function renderCaptureActions(parent: HTMLElement, context: DashboardRenderConte
     { label: "Thought", icon: "square-pen", command: "thought-capture:capture" },
     { label: "Email", icon: "mail", command: "email-capture:capture" },
     { label: "Agenda item", icon: "list", command: "agenda-capture:capture" },
-    {
-      label: "Program update",
-      icon: "megaphone",
-      command: "program-update-capture:capture",
-    },
+    { label: "All Files", icon: "folder-open", command: null },
   ];
   const grid = parent.createDiv({ cls: "fjg-vcc-capture-grid", attr: { "aria-label": "Capture" } });
 
   for (const action of actions) {
     const button = createControlButton(grid, {
       cls: "fjg-vcc-capture-action",
-      attr: { type: "button", "aria-label": `Capture ${action.label}` },
+      attr: { type: "button", "aria-label": action.command ? `Capture ${action.label}` : action.label },
     });
     createIcon(button, action.icon);
     button.createSpan({ cls: "fjg-vcc-capture-label", text: action.label });
     button.createSpan({ cls: "fjg-vcc-capture-open", text: "Open" });
-    button.addEventListener("click", () => context.capture(action.command, action.label));
+    button.addEventListener("click", () => {
+      if (action.command) context.capture(action.command, action.label);
+      else context.openAllFiles();
+    });
+  }
+}
+
+function renderAllFiles(parent: HTMLElement, context: DashboardRenderContext): void {
+  const snapshot = context.allFiles;
+  if (!snapshot) return;
+  const panel = createPanel(parent, "All Files", {
+    className: "fjg-vcc-all-files",
+    actionLabel: "Back to Home",
+    actionIcon: "arrow-left",
+    onAction: () => context.navigate("home"),
+  });
+  const toolbar = panel.body.createDiv({ cls: "fjg-vcc-folder-toolbar" });
+  if (snapshot.path) createButton(toolbar, {
+    label: "Up",
+    icon: "arrow-up",
+    ariaLabel: "Go up one folder",
+    className: "fjg-vcc-folder-up",
+    onClick: () => context.selectVaultFolder(vaultFolderParent(snapshot.path)),
+  });
+
+  const breadcrumbs = toolbar.createEl("nav", {
+    cls: "fjg-vcc-folder-breadcrumbs",
+    attr: { "aria-label": "Vault folder path" },
+  });
+  const last = snapshot.breadcrumbs[snapshot.breadcrumbs.length - 1];
+  for (const item of snapshot.breadcrumbs) {
+    if (item === last) {
+      breadcrumbs.createSpan({ cls: "fjg-vcc-folder-current", text: item.name, attr: { "aria-current": "page" } });
+    } else {
+      createButton(breadcrumbs, {
+        label: item.name,
+        className: "fjg-vcc-folder-crumb",
+        onClick: () => context.selectVaultFolder(item.path),
+      });
+      breadcrumbs.createSpan({ cls: "fjg-vcc-folder-separator", text: "/", attr: { "aria-hidden": "true" } });
+    }
+  }
+  panel.body.createEl("h3", {
+    cls: "fjg-vcc-folder-heading",
+    text: last.name,
+    attr: { tabindex: "-1" },
+  });
+
+  const query = context.allFilesQuery;
+  const folders = snapshot.folders.filter(({ name }) => matchesQuery(query, name));
+  const files = snapshot.files.filter(({ title, name }) => matchesQuery(query, title, name));
+
+  if (folders.length) {
+    panel.body.createDiv({ cls: "fjg-vcc-section-label", text: "Folders" });
+    const list = panel.body.createDiv({ cls: "fjg-vcc-folder-list", attr: { "aria-label": `Folders in ${last.name}` } });
+    for (const folder of folders) {
+      const button = createControlButton(list, {
+        cls: "fjg-vcc-folder-chip",
+        attr: { type: "button", "aria-label": `Open folder ${folder.name}` },
+      });
+      createIcon(button, "folder-closed");
+      button.createSpan({ cls: "fjg-vcc-folder-name", text: folder.name });
+      button.addEventListener("click", () => context.selectVaultFolder(folder.path));
+    }
+  }
+  if (files.length) {
+    panel.body.createDiv({ cls: "fjg-vcc-section-label fjg-vcc-files-label", text: "Files in this folder" });
+    renderFileList(panel.body, files, context);
+  }
+  if (!folders.length && !files.length) {
+    createEmptyState(
+      panel.body,
+      query.trim() ? "No items match" : snapshot.path ? "This folder is empty" : "No visible files or folders",
+      query.trim() ? "Try another name or clear the filter." : "Go up or return to Home.",
+      "folder-search"
+    );
   }
 }
 

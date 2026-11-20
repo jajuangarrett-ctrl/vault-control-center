@@ -1,3 +1,8 @@
+## 0.3.33
+
+- Replace the Home Program update tile with All Files. Browse the vault root and descend into regular folders, including empty folders. Filter the current folder and open files with the existing dashboard preview.
+- Existing top-level tabs and Clipboard templates are unchanged.
+
 ## 0.3.32
 
 - Exclude copied 08 Tasks trees, Artifacts archives, and Artifacts migration staging from the Tasks index. Inbox / Files remains first.

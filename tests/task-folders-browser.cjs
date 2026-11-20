@@ -8,7 +8,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE_PATH || "playwright-cor
 const obsidianMock = `
 export class App {}
 export class WorkspaceLeaf {}
-export class Component {}
+export class Component {
+  unload() {}
+  registerDomEvent(target,event,fn){target.addEventListener(event,fn);}
+}
 export class ItemView {
   constructor(leaf) {
     this.app=leaf.app;
@@ -18,11 +21,13 @@ export class ItemView {
   }
   registerDomEvent(target,event,fn) { target.addEventListener(event,fn); }
   registerEvent() {}
+  addChild(component){return component;}
+  removeChild() {}
   getState() {return {};}
   async setState() {}
 }
 export class MarkdownView extends ItemView {}
-export class TFolder { constructor(path){this.path=path;this.name=path.split('/').pop();this.children=[];} }
+export class TFolder { constructor(path){this.path=path;this.name=path.split('/').pop();this.children=[];} isRoot(){return this.path==='/';} }
 export class TFile {
   constructor(path) {
     this.path=path;this.name=path.split('/').pop();this.basename=this.name.replace(/\\..+$/, '');
@@ -79,7 +84,11 @@ Object.assign(HTMLElement.prototype,{
 document.body.classList.toggle('is-mobile',Platform.isMobile);
 window.notices=[];
 const entries=new Map();
-const folder=path=>{const e=new TFolder(path);entries.set(path,e);return e;};
+const folder=path=>{
+  const e=new TFolder(path);
+  Object.defineProperty(e,'children',{get:()=>[...entries.values()].filter(item=>item!==e && item.path.slice(0,Math.max(0,item.path.lastIndexOf('/'))) === (e.isRoot()?'':e.path))});
+  entries.set(path,e);return e;
+};
 const file=path=>{const e=new TFile(path);entries.set(path,e);return e;};
 const inbox='08 Tasks/Inbox/Files';
 const program='02 Programs/CalWORKs/CalWORKs Tasks';
@@ -102,6 +111,13 @@ file(inbox+'/Capture.md');
 file(child+'/Plan.md');
 file(subtasks+'/Prepare slides.md');
 file(eventFiles+'/Parent file.md');
+const fixtureRoot=folder('/');
+for(const path of ['00 Inbox','01 Daily Notes','03 Areas','Artifacts','Artifacts/Project 11','Artifacts/Project 2','Wiki','tmp','Empty','Credentials','Users','copilot','+','Artifacts/.private']) folder(path);
+file('Root note.md');
+file('api_keys.txt');
+file('Artifacts/Project 2/Report.txt');
+file('Artifacts/Project 2/Attachment.zip');
+file('Artifacts/.private/Hidden.txt');
 const handlers=new Map();
 const on=(event,fn)=>{if(!handlers.has(event))handlers.set(event,[]);handlers.get(event).push(fn);return {};};
 const emit=(event,...args)=>{for(const cb of handlers.get(event)||[])cb(...args);};
@@ -109,7 +125,7 @@ const leaves=[];
 const app={
   workspace:{on, onLayoutReady:fn=>fn(), getLeavesOfType:()=>leaves,
     getLastOpenFiles:()=>[], getActiveViewOfType:()=>null,},
-  vault:{on, getFiles:()=>[...entries.values()].filter(e=>e instanceof TFile),
+  vault:{on, getRoot:()=>fixtureRoot, getFiles:()=>[...entries.values()].filter(e=>e instanceof TFile),
     getAllLoadedFiles:()=>[...entries.values()], configDir:'.obsidian',
     getMarkdownFiles:()=>[...entries.values()].filter(e=>e instanceof TFile && e.extension==="md"),
     getAbstractFileByPath:path=>entries.get(path),
@@ -130,6 +146,7 @@ leaf.view=view;leaves.push(leaf);
     create(path){emit('create',folder(path));},
     restoreOldTaskSelection(){return view.setState({route:'task-folders',selectedTaskFolderPath:subtasks,selectedTaskSubfolderPath:subtasks},{});},
     selectedTaskPath(){return view.getState().selectedTaskSubfolderPath;},
+    setAllFilesFolder(path){return view.setState({route:'all-files',allFilesFolderPath:path},{});},
     move(oldPath,newPath){
       const root=entries.get(oldPath);
       for(const [p,e] of [...entries]) if(p===oldPath||p.startsWith(oldPath+'/')){
@@ -176,6 +193,59 @@ async function main() {
       const tabs=page.getByRole("tablist",{name:"Dashboard views"});
       const tasks=tabs.getByRole("tab",{name:"Tasks",exact:true});
       assert.deepEqual((await tabs.getByRole("tab").allTextContents()).slice(0,5),["Home","Areas","Programs","Tasks","HTML"]);
+      const capture=page.locator(".fjg-vcc-capture-grid");
+      assert.deepEqual(await capture.locator(".fjg-vcc-capture-label").allTextContents(),["Thought","Email","Agenda item","All Files"]);
+      assert.equal(await capture.getByRole("button",{name:"Capture Program update"}).count(),0);
+      assert.equal(await tabs.getByRole("tab",{name:"All Files"}).count(),0);
+      if (process.env.VCC_FIXTURE_OUTPUT_DIR) await page.screenshot({path:`${process.env.VCC_FIXTURE_OUTPUT_DIR}/all-files-home-${width}.png`});
+      const globalSearch=page.getByRole("searchbox",{name:"Search the current dashboard tab"});
+      await globalSearch.fill("old home search");
+      await activate(capture.getByRole("button",{name:"All Files",exact:true}));
+      const allFiles=page.locator(".fjg-vcc-all-files");
+      const allHeading=allFiles.locator(".fjg-vcc-folder-heading");
+      const home=allFiles.getByRole("button",{name:"Back to Home",exact:true});
+      assert.equal(await allHeading.textContent(),"Vault root");
+      assert.equal(await globalSearch.inputValue(),"");
+      assert.equal(await globalSearch.getAttribute("placeholder"),"Filter this folder");
+      const rootFolders=await allFiles.locator(".fjg-vcc-folder-chip").allTextContents();
+      assert.deepEqual(rootFolders.slice(0,4),["00 Inbox","01 Daily Notes","02 Programs","03 Areas"]);
+      for (const normal of ["Artifacts","Wiki","tmp","Empty"]) assert.ok(rootFolders.includes(normal));
+      for (const guarded of ["+","Users","copilot","Credentials"]) assert.ok(!rootFolders.includes(guarded));
+      assert.equal(await allFiles.getByRole("button",{name:"Preview Root note, in Root note.md",exact:true}).count(),1);
+      assert.equal(await allFiles.getByText("api_keys",{exact:true}).count(),0);
+      if (process.env.VCC_FIXTURE_OUTPUT_DIR) await page.screenshot({path:`${process.env.VCC_FIXTURE_OUTPUT_DIR}/all-files-root-${width}.png`});
+      await globalSearch.fill("EMPTY");
+      assert.deepEqual(await allFiles.locator(".fjg-vcc-folder-chip").allTextContents(),["Empty"]);
+      await activate(allFiles.getByRole("button",{name:"Open folder Empty",exact:true}));
+      assert.equal(await allHeading.textContent(),"Empty");
+      assert.ok(await allFiles.getByText("This folder is empty",{exact:true}).isVisible());
+      await activate(allFiles.getByRole("button",{name:"Go up one folder"}));
+      assert.equal(await allHeading.textContent(),"Vault root");
+      await activate(allFiles.getByRole("button",{name:"Open folder Artifacts",exact:true}));
+      const children=await allFiles.locator(".fjg-vcc-folder-chip").allTextContents();
+      assert.ok(children.indexOf("Project 2")<children.indexOf("Project 11"));
+      assert.ok(!children.includes(".private"));
+      await activate(allFiles.getByRole("button",{name:"Open folder Project 2",exact:true}));
+      assert.equal(await allHeading.textContent(),"Project 2");
+      const report=allFiles.getByRole("button",{name:"Preview Report, in Artifacts/Project 2/Report.txt",exact:true});
+      if (mobile) assert.ok((await report.boundingBox()).height>=44);
+      await activate(report);
+      await page.getByText("Fixture preview of Report",{exact:true}).waitFor();
+      await activate(page.getByRole("button",{name:"Close preview and return to the dashboard"}));
+      await activate(allFiles.getByRole("button",{name:"Preview Attachment, in Artifacts/Project 2/Attachment.zip",exact:true}));
+      await page.getByText("Native preview required",{exact:true}).waitFor();
+      await page.getByRole("button",{name:"Open in tab",exact:true}).waitFor();
+      await activate(page.getByRole("button",{name:"Close preview and return to the dashboard"}));
+      await activate(allFiles.getByRole("button",{name:"Vault root",exact:true}));
+      assert.equal(await allHeading.textContent(),"Vault root");
+      await page.evaluate(()=>window.fixture.setAllFilesFolder("Artifacts/Removed/Child"));
+      assert.equal(await allHeading.textContent(),"Artifacts");
+      await activate(home);
+      assert.equal(await globalSearch.inputValue(),"old home search");
+      await activate(capture.getByRole("button",{name:"All Files",exact:true}));
+      assert.equal(await allHeading.textContent(),"Vault root");
+      await activate(home);
+      await globalSearch.fill("");
       await activate(tasks);
       assert.equal(await tasks.getAttribute("aria-selected"),"true");
       if (width===320) assert.ok(await tabs.evaluate(el=>el.scrollWidth>el.clientWidth),"the folded route strip remains horizontally scrollable");

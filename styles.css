@@ -4300,3 +4300,12 @@ body.is-mobile .fjg-vcc[data-mobile-folder-roots="true"] .fjg-vcc-folder-rail-to
 .fjg-vcc [data-route="task-folders"] .fjg-vcc-select-row {
   min-height: 44px;
 }
+
+
+.fjg-vcc .fjg-vcc-all-files .fjg-vcc-folder-toolbar {
+  flex-wrap: wrap;
+}
+
+body.is-mobile .fjg-vcc .fjg-vcc-all-files :is(.fjg-vcc-panel-header button, .fjg-vcc-folder-chip, .fjg-vcc-row) {
+  min-height: 44px;
+}
