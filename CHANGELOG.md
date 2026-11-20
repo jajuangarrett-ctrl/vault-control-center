@@ -1,3 +1,8 @@
+## 0.3.30
+
+- Show Inbox / Files as the only index entry from 08 Tasks. Its contents remain browseable.
+- Label Subtasks entries by objective name, without showing vault locations on other task rows. Tapping an objective opens its exact Subtasks folder, and search still accepts full paths.
+
 ## 0.3.29
 
 - Add a Tasks tab after Programs for folders with “Tasks” in their names, with Inbox / Files listed first when it exists.

@@ -141,7 +141,6 @@ describe("buildDashboardData", () => {
     const data = await buildDashboardData(fakeApp(files, {}, false, folders), SETTINGS);
     expect(data.taskFolders.map(({ name, path, count }) => ({ name, path, count }))).toEqual([
       { name: "Inbox / Files", path: inbox, count: 1 },
-      { name: "08 Tasks", path: "08 Tasks", count: 1 },
       { name: "CalWORKs Tasks", path: calworks, count: 1 },
       { name: "CalWORKs Tasks", path: duplicate, count: 0 },
       { name: "MyTaSkS", path: "03 Areas/Parent/MyTaSkS", count: 0 },
@@ -150,6 +149,35 @@ describe("buildDashboardData", () => {
       `${calworks}/2026`, `${calworks}/Empty`,
     ]);
     expect(JSON.stringify(data.taskFolders)).not.toMatch(/api_keys|Passwords|Ghost Tasks|Taskmaster/);
+  });
+
+  it("keeps only the exact Inbox shortcut from 08 Tasks and labels real Subtasks by their context", async () => {
+    const inbox = "08 Tasks/Inbox/Files";
+    const parent = "03 Areas/Operations/Operations Tasks/Spring Workshop Campaign 2030";
+    const subtasks = `${parent}/Files/Subtasks`;
+    const siblings = `${parent}/Notes`;
+    const source = fakeApp([
+      file(`${subtasks}/Prepare slides.md`, 100),
+      file(`${siblings}/Other note.md`, 100),
+      file(`${inbox}/Inbox item.md`, 100),
+      file(`${inbox}/Later Tasks/Inbox child.md`, 100),
+    ], {}, false, [
+      "08 Tasks", "08 Tasks/Inbox", inbox, "08 Tasks/Inbox/Other Tasks",
+      "08 Tasks/Project Tasks", "08 Tasks/Archive/Older Tasks", `${inbox}/Later Tasks`,
+      "08 Tasks Supplemental", "Subtasks", "Files/Subtasks",
+      parent, subtasks, `${subtasks}/References`, siblings,
+      "Projects/Outreach/sUbTaSkS",
+    ]);
+    const data = await buildDashboardData(source, SETTINGS);
+    expect(data.taskFolders.map(({ name, path, count }) => ({name, path, count}))).toEqual([
+      {name: "Inbox / Files", path: inbox, count: 2},
+      {name: "08 Tasks Supplemental", path: "08 Tasks Supplemental", count: 0},
+      {name: "Outreach", path: "Projects/Outreach/sUbTaSkS", count: 0},
+      {name: "Spring Workshop Campaign 2030", path: subtasks, count: 1},
+    ]);
+    expect(data.taskFolders[0].folderPaths).toEqual([`${inbox}/Later Tasks`]);
+    expect(data.taskFolders[3].files.map(({path}) => path)).toEqual([`${subtasks}/Prepare slides.md`]);
+    expect(data.taskFolders[3].folderPaths).toEqual([`${subtasks}/References`]);
   });
 
   it("rebuilds task folders from current paths, so parent renames, moves, and deletes do not leave stale rows", async () => {

@@ -1,6 +1,7 @@
 import { createControlButton } from "./dom";
 import { usesMobileHtmlViewer } from "./mobile-html";
 import { Notice, Platform, setIcon } from "obsidian";
+import { TASK_INBOX_PATH } from "./data";
 import type {
   AiFolderKey,
   DashboardBookmark,
@@ -893,7 +894,9 @@ function renderFolderCollection(
       const main = row.createDiv({ cls: "fjg-vcc-row-main" });
       main.createSpan({ cls: "fjg-vcc-row-title", text: root.name });
       if (options.showRootPaths) {
-        main.createSpan({ cls: "fjg-vcc-row-meta fjg-vcc-task-folder-path", text: root.path });
+        if (root.path === TASK_INBOX_PATH) {
+          main.createSpan({ cls: "fjg-vcc-row-meta fjg-vcc-task-folder-path", text: root.path });
+        }
         row.createSpan({ cls: "fjg-vcc-row-end", text: `${root.count} file${root.count === 1 ? "" : "s"}` });
       } else {
         main.createSpan({ cls: "fjg-vcc-row-meta", text: `${root.count} files` });

@@ -675,15 +675,33 @@ function safeVaultFolderPaths(app: App): string[] {
   }
 }
 
-const TASK_INBOX_PATH = "08 Tasks/Inbox/Files";
+const TASK_ROOT_PATH = "08 Tasks";
+export const TASK_INBOX_PATH = `${TASK_ROOT_PATH}/Inbox/Files`;
+
+function isSubtasksFolderPath(path: string): boolean {
+  return lastPathSegment(path).toLowerCase() === "subtasks";
+}
+
+function taskFolderLabel(path: string): string {
+  if (path === TASK_INBOX_PATH) return "Inbox / Files";
+  if (pathIsWithin(path, TASK_ROOT_PATH)) return "";
+
+  const basename = lastPathSegment(path);
+  if (!basename.toLowerCase().includes("tasks")) return "";
+  if (!isSubtasksFolderPath(path)) return basename;
+
+  // Display the owner before generic containers, but keep the real Subtasks target.
+  const segments = path.split("/");
+  let start = segments.length - 2;
+  while (start >= 0 && /^(?:files|subtasks)$/i.test(segments[start])) start--;
+  return start >= 0 ? segments[start] : "";
+}
 
 function collectTaskFolders(folderPaths: string[], files: DashboardFileItem[]): DashboardFolderRoot[] {
   const roots = new Map<string, DashboardFolderRoot>();
   for (const path of folderPaths) {
-    const name = lastPathSegment(path);
-    if (path === TASK_INBOX_PATH || name.toLowerCase().includes("tasks")) {
-      roots.set(path, { name: path === TASK_INBOX_PATH ? "Inbox / Files" : name, path, count: 0, files: [], folderPaths: [] });
-    }
+    const label = taskFolderLabel(path);
+    if (label) roots.set(path, { name: label, path, count: 0, files: [], folderPaths: [] });
   }
 
   // Each path is assigned to matching ancestors; no scan of the full vault per root.
