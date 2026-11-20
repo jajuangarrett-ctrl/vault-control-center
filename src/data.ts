@@ -678,23 +678,13 @@ function safeVaultFolderPaths(app: App): string[] {
 const TASK_ROOT_PATH = "08 Tasks";
 export const TASK_INBOX_PATH = `${TASK_ROOT_PATH}/Inbox/Files`;
 
-function isSubtasksFolderPath(path: string): boolean {
-  return lastPathSegment(path).toLowerCase() === "subtasks";
-}
-
 function taskFolderLabel(path: string): string {
   if (path === TASK_INBOX_PATH) return "Inbox / Files";
   if (pathIsWithin(path, TASK_ROOT_PATH)) return "";
 
   const basename = lastPathSegment(path);
-  if (!basename.toLowerCase().includes("tasks")) return "";
-  if (!isSubtasksFolderPath(path)) return basename;
-
-  // Display the owner before generic containers, but keep the real Subtasks target.
-  const segments = path.split("/");
-  let start = segments.length - 2;
-  while (start >= 0 && /^(?:files|subtasks)$/i.test(segments[start])) start--;
-  return start >= 0 ? segments[start] : "";
+  const lower = basename.toLowerCase();
+  return lower !== "subtasks" && lower.includes("tasks") ? basename : "";
 }
 
 function collectTaskFolders(folderPaths: string[], files: DashboardFileItem[]): DashboardFolderRoot[] {
@@ -704,17 +694,27 @@ function collectTaskFolders(folderPaths: string[], files: DashboardFileItem[]): 
     if (label) roots.set(path, { name: label, path, count: 0, files: [], folderPaths: [] });
   }
 
-  // Each path is assigned to matching ancestors; no scan of the full vault per root.
-  const visitAncestors = (path: string, visit: (root: DashboardFolderRoot) => void) => {
-    let slash = path.lastIndexOf("/");
-    while (slash > 0) {
-      const root = roots.get(path.slice(0, slash));
-      if (root) visit(root);
-      slash = path.lastIndexOf("/", slash - 1);
+  // Match actual containers, regardless of vault iterator order. A qualifying root owns
+  // its descendants, even if their names also match; those remain browseable, not indexed.
+  const candidates = new Set(roots.keys());
+  for (const path of candidates) {
+    for (const ancestor of taskFolderAncestors(path)) {
+      if (candidates.has(ancestor)) {
+        roots.delete(path);
+        break;
+      }
+    }
+  }
+
+  // Assign each path to the closest container without scanning the vault per root.
+  const owningRoot = (path: string) => {
+    for (const ancestor of taskFolderAncestors(path)) {
+      const root = roots.get(ancestor);
+      if (root) return root;
     }
   };
-  for (const path of folderPaths) visitAncestors(path, (root) => root.folderPaths!.push(path));
-  for (const file of files) visitAncestors(file.path, (root) => root.files.push(file));
+  for (const path of folderPaths) owningRoot(path)?.folderPaths?.push(path);
+  for (const file of files) owningRoot(file.path)?.files.push(file);
   for (const root of roots.values()) {
     root.files = sortFiles(root.files);
     root.count = root.files.length;
@@ -725,6 +725,12 @@ function collectTaskFolders(folderPaths: string[], files: DashboardFileItem[]): 
     if (right.path === TASK_INBOX_PATH) return 1;
     return left.name.localeCompare(right.name) || left.path.localeCompare(right.path);
   });
+}
+
+function* taskFolderAncestors(path: string): IterableIterator<string> {
+  for (let slash = path.lastIndexOf("/"); slash > 0; slash = path.lastIndexOf("/", slash - 1)) {
+    yield path.slice(0, slash);
+  }
 }
 
 function isVisibleFile(path: string, extension: string): boolean {

@@ -84,11 +84,12 @@ const file=path=>{const e=new TFile(path);entries.set(path,e);return e;};
 const inbox='08 Tasks/Inbox/Files';
 const program='02 Programs/CalWORKs/CalWORKs Tasks';
 const child=program+'/2026';
-const event='03 Areas/Operations/Operations Tasks/Spring Workshop Campaign 2030';
+const taskContainer='03 Areas/Operations/Operations Tasks';
+const event=taskContainer+'/Spring Workshop Tasks 2030';
 const eventFiles=event+'/Files';
 const subtasks=eventFiles+'/Subtasks';
 const duplicate='03 Areas/Recruitment/CalWORKs Tasks';
-for(const path of ['08 Tasks','08 Tasks/Inbox',inbox,'08 Tasks/Inbox/New Tasks','08 Tasks/Archive/Older Tasks','Subtasks',event,eventFiles,subtasks,'02 Programs','02 Programs/CalWORKs',program,child,duplicate,'Elsewhere/MyTasks','Elsewhere/Task','.obsidian/Secret Tasks']) folder(path);
+for(const path of ['08 Tasks','08 Tasks/Inbox',inbox,'08 Tasks/Inbox/New Tasks','08 Tasks/Archive/Older Tasks','Subtasks',event,eventFiles,subtasks,taskContainer,'02 Programs','02 Programs/CalWORKs',program,child,duplicate,'Elsewhere/MyTasks','Elsewhere/Task','.obsidian/Secret Tasks']) folder(path);
 file(inbox+'/Capture.md');
 file(child+'/Plan.md');
 file(subtasks+'/Prepare slides.md');
@@ -119,6 +120,8 @@ leaf.view=view;leaves.push(leaf);
   await view.onOpen();
   window.fixture={
     create(path){emit('create',folder(path));},
+    restoreOldTaskSelection(){return view.setState({route:'task-folders',selectedTaskFolderPath:subtasks,selectedTaskSubfolderPath:subtasks},{});},
+    selectedTaskPath(){return view.getState().selectedTaskSubfolderPath;},
     move(oldPath,newPath){
       const root=entries.get(oldPath);
       for(const [p,e] of [...entries]) if(p===oldPath||p.startsWith(oldPath+'/')){
@@ -184,19 +187,30 @@ async function main() {
       assert.equal(await row.getByText("Older Tasks",{exact:true}).count(),0);
       assert.deepEqual(await row.locator(".fjg-vcc-task-folder-path").allTextContents(),["08 Tasks/Inbox/Files"]);
       assert.equal(await row.getByText("Subtasks",{exact:true}).count(),0);
-      const contextual = "Spring Workshop Campaign 2030";
+      assert.equal(await row.getByText("Spring Workshop Tasks 2030",{exact:true}).count(),0);
       await search.fill("03 Areas/Operations/Operations Tasks/Spring Workshop");
-      assert.equal(await row.count(),1,"the hidden full path still matches search");
-      assert.equal(await row.first().locator(".fjg-vcc-row-title").textContent(),contextual);
+      assert.equal(await row.count(),0,"nested objective paths are not listed as search hits");
+      await search.fill("03 Areas/Operations/Operations Tasks");
+      assert.equal(await row.count(),1,"underlying container path still matches search");
+      assert.equal(await row.first().locator(".fjg-vcc-row-title").textContent(),"Operations Tasks");
       assert.equal(await row.first().locator(".fjg-vcc-task-folder-path").count(),0);
       if (mobile) {
         const frame=await row.first().boundingBox();
         assert.ok(frame && frame.height>=44 && frame.x+frame.width<=width+1);
       }
       await activate(row.first());
-      assert.equal(await page.locator(".fjg-vcc-folder-heading").textContent(),contextual);
+      assert.equal(await page.locator(".fjg-vcc-folder-heading").textContent(),"Operations Tasks");
+      await activate(page.getByRole("button",{name:"Open folder Spring Workshop Tasks 2030, 2 files"}));
+      await activate(page.getByRole("button",{name:"Open folder Files, 2 files"}));
+      await activate(page.getByRole("button",{name:"Open folder Subtasks, 1 file"}));
+      assert.equal(await page.locator(".fjg-vcc-folder-heading").textContent(),"Subtasks");
       assert.equal(await page.locator("[data-route='task-folders'] .fjg-vcc-row").filter({hasText:"Prepare slides"}).count(),1);
       assert.equal(await page.locator("[data-route='task-folders'] .fjg-vcc-row").filter({hasText:"Parent file"}).count(),0);
+      await activate(page.getByRole("button",{name:mobile?"Go back from Subtasks":"Go up from Subtasks"}));
+      assert.equal(await page.locator(".fjg-vcc-folder-heading").textContent(),"Files");
+      await page.evaluate(()=>window.fixture.restoreOldTaskSelection());
+      assert.equal(await page.locator(".fjg-vcc-folder-heading").textContent(),"Operations Tasks");
+      assert.equal(await page.evaluate(()=>window.fixture.selectedTaskPath()),"03 Areas/Operations/Operations Tasks");
       await activate(page.getByRole("button",{name:"Back to Tasks Folders list"}));
       await search.fill("recruitment");
       assert.equal(await row.count(),1);
@@ -226,8 +240,11 @@ async function main() {
       await search.fill("02 Programs/CalWORKs Renamed/CalWORKs Tasks");
       assert.equal(await row.count(),1);
       await search.fill("");
+      await activate(row.filter({hasText:"New Tasks"}));
+      assert.equal(await page.locator(".fjg-vcc-folder-heading").textContent(),"New Tasks");
       await page.evaluate(()=>window.fixture.move("Elsewhere/New Tasks","Elsewhere/No longer a match"));
       await row.getByText("New Tasks",{exact:true}).waitFor({state:"detached"});
+      assert.equal(await page.evaluate(()=>window.fixture.selectedTaskPath()),"");
       await page.evaluate(()=>window.fixture.delete("08 Tasks/Inbox/Files"));
       await row.filter({hasText:"Inbox / Files"}).waitFor({state:"detached"});
       const review=tabs.getByRole("tab",{name:"File Review",exact:true});

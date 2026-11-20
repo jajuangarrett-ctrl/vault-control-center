@@ -407,7 +407,7 @@ export class VaultControlCenterView extends ItemView {
     if (this.rootEl) {
       this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
-      this.canonicalizeTaskFolderSelection();
+      this.canonicalizeTaskFolderSelection(true);
       this.renderRouteTabs();
       this.renderContent();
       this.renderMobileDock();
@@ -501,6 +501,7 @@ export class VaultControlCenterView extends ItemView {
         operationsPromise,
       ]);
       await this.plugin.fileReview.refresh();
+      const restoreTaskSelection = !this.data;
       this.data = data;
       this.taskboard = taskboard;
       if (htmlGeneration === this.htmlSnapshotGeneration) {
@@ -523,7 +524,7 @@ export class VaultControlCenterView extends ItemView {
       }
       this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
-      this.canonicalizeTaskFolderSelection();
+      this.canonicalizeTaskFolderSelection(restoreTaskSelection);
       this.renderContent();
       if (this.activePreviewFile || this.pendingPreviewPath) {
         const activePath = this.activePreviewFile?.path || this.pendingPreviewPath;
@@ -827,13 +828,19 @@ export class VaultControlCenterView extends ItemView {
     );
   }
 
-  private canonicalizeTaskFolderSelection(): void {
+  private canonicalizeTaskFolderSelection(restoring = false): void {
     if (!this.data || !this.renderState.selectedTaskFolderPath) return;
-    const root = this.data.taskFolders.find((folder) => folder.path === this.renderState.selectedTaskFolderPath);
-    this.renderState.selectedTaskFolderPath = root?.path ?? "";
+    const path = normalizeVaultPath(this.renderState.selectedTaskFolderPath);
+    const root = this.data.taskFolders.find((folder) => folder.path === path);
+    // A selection restored from a previous version may have indexed a deep folder.
+    // Recover it to its live owning container, but never do this on a live delete/rename.
+    const restoredRoot = !root && restoring
+      ? this.data.taskFolders.find((folder) => folder.folderPaths?.includes(path))
+      : undefined;
+    this.renderState.selectedTaskFolderPath = root?.path ?? restoredRoot?.path ?? "";
     this.renderState.selectedTaskSubfolderPath = root
       ? resolveProgramFolderPath(root, this.renderState.selectedTaskSubfolderPath || root.path)
-      : "";
+      : restoredRoot?.path ?? "";
   }
 
   currentFolderPath(): string {

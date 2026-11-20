@@ -151,9 +151,10 @@ describe("buildDashboardData", () => {
     expect(JSON.stringify(data.taskFolders)).not.toMatch(/api_keys|Passwords|Ghost Tasks|Taskmaster/);
   });
 
-  it("keeps only the exact Inbox shortcut from 08 Tasks and labels real Subtasks by their context", async () => {
+  it("indexes only the outer task containers and preserves nested contents to browse", async () => {
     const inbox = "08 Tasks/Inbox/Files";
-    const parent = "03 Areas/Operations/Operations Tasks/Spring Workshop Campaign 2030";
+    const container = "03 Areas/Operations/Operations Tasks";
+    const parent = `${container}/Spring Workshop Tasks 2030`;
     const subtasks = `${parent}/Files/Subtasks`;
     const siblings = `${parent}/Notes`;
     const source = fakeApp([
@@ -165,19 +166,18 @@ describe("buildDashboardData", () => {
       "08 Tasks", "08 Tasks/Inbox", inbox, "08 Tasks/Inbox/Other Tasks",
       "08 Tasks/Project Tasks", "08 Tasks/Archive/Older Tasks", `${inbox}/Later Tasks`,
       "08 Tasks Supplemental", "Subtasks", "Files/Subtasks",
-      parent, subtasks, `${subtasks}/References`, siblings,
+      parent, subtasks, `${subtasks}/References`, siblings, container,
       "Projects/Outreach/sUbTaSkS",
     ]);
     const data = await buildDashboardData(source, SETTINGS);
     expect(data.taskFolders.map(({ name, path, count }) => ({name, path, count}))).toEqual([
       {name: "Inbox / Files", path: inbox, count: 2},
       {name: "08 Tasks Supplemental", path: "08 Tasks Supplemental", count: 0},
-      {name: "Outreach", path: "Projects/Outreach/sUbTaSkS", count: 0},
-      {name: "Spring Workshop Campaign 2030", path: subtasks, count: 1},
+      {name: "Operations Tasks", path: container, count: 2},
     ]);
     expect(data.taskFolders[0].folderPaths).toEqual([`${inbox}/Later Tasks`]);
-    expect(data.taskFolders[3].files.map(({path}) => path)).toEqual([`${subtasks}/Prepare slides.md`]);
-    expect(data.taskFolders[3].folderPaths).toEqual([`${subtasks}/References`]);
+    expect(data.taskFolders[2].files.map(({path}) => path).sort()).toEqual([`${subtasks}/Prepare slides.md`, `${siblings}/Other note.md`].sort());
+    expect(data.taskFolders[2].folderPaths).toEqual([parent, subtasks, `${subtasks}/References`, siblings]);
   });
 
   it("rebuilds task folders from current paths, so parent renames, moves, and deletes do not leave stale rows", async () => {

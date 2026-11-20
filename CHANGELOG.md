@@ -1,3 +1,8 @@
+## 0.3.31
+
+- List top-level matching task containers, not the objectives or Subtasks folders inside them. Browse deeper folders from their container.
+- Keep Inbox / Files as the only shortcut from 08 Tasks and the only row showing its vault path.
+
 ## 0.3.30
 
 - Show Inbox / Files as the only index entry from 08 Tasks. Its contents remain browseable.
