@@ -680,11 +680,21 @@ export const TASK_INBOX_PATH = `${TASK_ROOT_PATH}/Inbox/Files`;
 
 function taskFolderLabel(path: string): string {
   if (path === TASK_INBOX_PATH) return "Inbox / Files";
-  if (pathIsWithin(path, TASK_ROOT_PATH)) return "";
-
-  const basename = lastPathSegment(path);
+  const segments = path.split("/");
+  const basename = segments[segments.length - 1];
   const lower = basename.toLowerCase();
-  return lower !== "subtasks" && lower.includes("tasks") ? basename : "";
+  if (lower === "subtasks" || !lower.includes("tasks")) return "";
+
+  const folded = segments.map((segment) => segment.toLowerCase());
+  if (folded.includes(TASK_ROOT_PATH.toLowerCase())) return "";
+  if (folded[0] === "artifacts") {
+    // Exclude stored copies from this index only; browsing and other tabs keep them.
+    const migrationIndex = folded.indexOf("migration");
+    if (folded.includes("archive") || (migrationIndex > 0 && folded.indexOf("staging", migrationIndex + 1) !== -1)) return "";
+  }
+
+  const parent = segments[segments.length - 2];
+  return lower === "tasks" && parent ? `${parent} · ${basename}` : basename;
 }
 
 function collectTaskFolders(folderPaths: string[], files: DashboardFileItem[]): DashboardFolderRoot[] {

@@ -1,3 +1,8 @@
+## 0.3.32
+
+- Exclude copied 08 Tasks trees, Artifacts archives, and Artifacts migration staging from the Tasks index. Inbox / Files remains first.
+- Add the parent folder name to generic Tasks labels so active folders are easier to recognize. Vault contents and other tabs are unchanged.
+
 ## 0.3.31
 
 - List top-level matching task containers, not the objectives or Subtasks folders inside them. Browse deeper folders from their container.

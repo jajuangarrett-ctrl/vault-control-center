@@ -180,6 +180,36 @@ describe("buildDashboardData", () => {
     expect(data.taskFolders[2].folderPaths).toEqual([parent, subtasks, `${subtasks}/References`, siblings]);
   });
 
+  it("does not index copied 08 Tasks trees or Artifacts archive and staging containers", async () => {
+    const live = "Programs/Example/Outreach/Tasks";
+    const other = "Programs/Example/Outreach Tasks";
+    const retired = "Artifacts/Old Viewer/Archive/Retired Export/Tasks";
+    const staging = "Artifacts/Old Viewer/Migration/2030-06-01/staging";
+    const copied = `${staging}/08 Tasks`;
+    const mirror = "Copies/Example Vault/08 tasks";
+    const archiveOutsideArtifacts = "Programs/Example/Archive/Planning Tasks";
+    const migrationOutsideStaging = "Artifacts/Tools/Migration/Active Tasks";
+    const notes = [
+      file(`${live}/Current.md`, 100),
+      file(`${other}/Another.md`, 200),
+      file(`${retired}/Still preserved.md`, 900),
+    ];
+    const data = await buildDashboardData(fakeApp(notes, {}, false, [
+      "08 Tasks/Inbox/Files", live, other, retired, `${staging}/Staged Tasks`,
+      copied, `${copied}/Inbox/Files`, `${copied}/Nested Tasks`, mirror, `${mirror}/Nested Tasks`,
+      "Archive/Backup/08 Tasks", archiveOutsideArtifacts, migrationOutsideStaging,
+    ]), {...SETTINGS, recentRoots: ["Artifacts", "Programs"]});
+    const rows = data.taskFolders.map(({name,path,count}) => ({name,path,count}));
+    expect(rows).toEqual([
+      {name: "Inbox / Files", path: "08 Tasks/Inbox/Files", count: 0},
+      {name: "Active Tasks", path: migrationOutsideStaging, count: 0},
+      {name: "Outreach · Tasks", path: live, count: 1},
+      {name: "Outreach Tasks", path: other, count: 1},
+      {name: "Planning Tasks", path: archiveOutsideArtifacts, count: 0},
+    ]);
+    expect(data.recent.map(({path}) => path)).toContain(`${retired}/Still preserved.md`);
+  });
+
   it("rebuilds task folders from current paths, so parent renames, moves, and deletes do not leave stale rows", async () => {
     const initial = await buildDashboardData(
       fakeApp([], {}, false, ["08 Tasks/Inbox/Files", "Parent/Program Tasks", "To move", "Old Tasks"]),
