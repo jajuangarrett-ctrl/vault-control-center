@@ -3,6 +3,8 @@
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const esbuild = require("esbuild");
+const { resolve } = require("node:path");
+const duoSource = process.env.VCC_DUO_SOURCE;
 const { chromium } = require(process.env.PLAYWRIGHT_CORE_PATH || "playwright-core");
 
 const obsidianMock = `
@@ -27,6 +29,14 @@ export class ItemView {
   async setState() {}
 }
 export class MarkdownView extends ItemView {}
+export class FileView extends ItemView {}
+export class WorkspaceMobileDrawer { collapsed=true; collapse(){this.collapsed=true;} }
+export class Modal {
+ constructor(app){this.app=app;this.containerEl=document.createElement('div');this.containerEl.className='modal-container';
+ this.modalEl=this.containerEl.createDiv({cls:'modal'});this.titleEl=this.modalEl.createEl('h2');this.contentEl=this.modalEl.createDiv();}
+ open(){document.body.append(this.containerEl);this.onOpen?.();}
+ close(){this.containerEl.remove();this.onClose?.();}
+}
 export class TFolder { constructor(path){this.path=path;this.name=path.split('/').pop();this.children=[];} isRoot(){return this.path==='/';} }
 export class TFile {
   constructor(path) {
@@ -60,9 +70,11 @@ export const requestUrl=async()=>{throw new Error('Network disabled in fixture')
 `;
 
 const harness = `
+${duoSource ? `import { VaultVoiceModal as RealDuoVoice } from ${JSON.stringify(resolve(duoSource, "src/live/modal.ts"))};` : ""}
 import VaultControlCenterPlugin from './src/plugin';
 import {VaultControlCenterView} from './src/view';
-import {TFile,TFolder,Platform} from 'obsidian';
+import {TFile,TFolder,Platform, WorkspaceMobileDrawer} from 'obsidian';
+const duoVoiceClass = ${duoSource ? "RealDuoVoice" : "undefined"};
 const create=(parent,tag,{cls,text,attr}={})=>{
   const el=document.createElement(tag);
   if (cls) el.className=cls;
@@ -85,7 +97,10 @@ document.body.classList.toggle('is-mobile',Platform.isMobile);
 window.notices=[];
 const commandInvocations=[];
 const enabledVoiceProviders=new Set();
-let commandFailure='';
+const providerVersions=new Map();
+const voiceLaunches=[],revealInvocations=[];
+let commandFailure='', realDuoVoice, pendingReveal, delayNativeReveal=false;
+let useRealDuo = false;
 
 const entries=new Map();
 const folder=path=>{
@@ -126,15 +141,59 @@ const handlers=new Map();
 const on=(event,fn)=>{if(!handlers.has(event))handlers.set(event,[]);handlers.get(event).push(fn);return {};};
 const emit=(event,...args)=>{for(const cb of handlers.get(event)||[])cb(...args);};
 const leaves=[];
+const nativeRoot={};
+const nativeCanvas=document.querySelector('#native-note');
+const noteLeaf=path=>({getRoot:()=>nativeRoot,getViewState:()=>({type:'markdown',state:{file:path}})});
+const nativeNote=noteLeaf('Root note.md');
+const differentNote=noteLeaf('Different fixture.md');
+const workspace={
+  on,onLayoutReady:fn=>fn(),rootSplit:nativeRoot,containerEl:document.querySelector('#workspace'),
+  leftSplit:new WorkspaceMobileDrawer(),rightSplit:new WorkspaceMobileDrawer(),
+  getLeavesOfType:type=>leaves.filter(leaf=>leaf.getViewState().type===type),
+  iterateRootLeaves:visit=>leaves.filter(leaf=>leaf.getRoot()===nativeRoot).forEach(visit),
+  getLastOpenFiles:()=>{throw Error('Talk to Vault must not use recent history to pick a note');},
+  getActiveViewOfType:()=>null,
+  getActiveFile:()=>entries.get(workspace.activeLeaf?.getViewState().state?.file),
+  getLeaf:()=>{throw Error('Talk to Vault must not create a new native leaf');},
+  async revealLeaf(leaf){
+    revealInvocations.push(leaf.getViewState().state?.file ?? 'home');
+    if(delayNativeReveal && leaf===nativeNote){
+      delayNativeReveal=false;
+      await new Promise(resolve=>{pendingReveal=resolve;});
+      pendingReveal=undefined;
+      return;
+    }
+    workspace.setActiveLeaf(leaf,{focus:false});
+  },
+  setActiveLeaf(leaf,options){
+    if(options?.focus)throw Error('Talk to Vault must not force editor focus');
+    workspace.activeLeaf=leaf;
+    const path=leaf.getViewState().state?.file;
+    document.querySelector('#host').hidden=!!path;
+    nativeCanvas.hidden=!path;
+    nativeCanvas.textContent=path||'';
+    emit('active-leaf-change',leaf);
+  },
+};
 const app={
-  commands:{executeCommandById(id){
+  commands:{commands:{},executeCommandById(id){
     commandInvocations.push(id);
     if(id===commandFailure)throw new Error('Provider launch error');
-    return enabledVoiceProviders.has(id);
+    if(!enabledVoiceProviders.has(id))return false;
+    voiceLaunches.push({id,active:workspace.activeLeaf?.getViewState().state?.file || 'home'});
+    if(useRealDuo && duoVoiceClass && id==='fjg-file-focus-duo:talk-to-vault'){
+      const provider={
+        settings:{liveApiKey:'',liveBackendModel:'fixture'},
+        resolveVoiceApiKey:()=>{throw Error('Opening Talk to Vault must not read credentials');}
+      };
+      realDuoVoice=new duoVoiceClass(app,provider,{folder:'',note:''},()=>{realDuoVoice=undefined;});
+      realDuoVoice.openResponsive();
+    }
+    return true;
   }},
-  workspace:{on, onLayoutReady:fn=>fn(), getLeavesOfType:()=>leaves,
-    getLastOpenFiles:()=>[], getActiveViewOfType:()=>null,},
-  vault:{on, getRoot:()=>fixtureRoot, getFiles:()=>[...entries.values()].filter(e=>e instanceof TFile),
+  plugins:{getPlugin(id){return providerVersions.has(id)?{manifest:{version:providerVersions.get(id)}}:null;}},
+  workspace,
+  vault:{on,getName:()=> 'Synthetic vault', getRoot:()=>fixtureRoot, getFiles:()=>[...entries.values()].filter(e=>e instanceof TFile),
     getAllLoadedFiles:()=>[...entries.values()], configDir:'.obsidian',
     getMarkdownFiles:()=>[...entries.values()].filter(e=>e instanceof TFile && e.extension==="md"),
     getAbstractFileByPath:path=>entries.get(path),
@@ -145,19 +204,34 @@ const app={
   },
 };
 const plugin=new VaultControlCenterPlugin(app);
-const leaf={app,contentEl:document.querySelector('#host')};
+const leaf={
+  app,contentEl:document.querySelector('#host'),getRoot:()=>nativeRoot,
+  getViewState:()=>({type:leaf.view.getViewType(),state:{}})
+};
 const view=new VaultControlCenterView(leaf,plugin);
-leaf.view=view;leaves.push(leaf);
+leaf.view=view;leaves.push(leaf,nativeNote,differentNote);workspace.activeLeaf=leaf;
 (async()=>{
   await plugin.onload();
   await view.onOpen();
   window.fixture={
     create(path){emit('create',folder(path));},
-    voiceProviders(ids,failure=''){
+    voiceProviders(ids,failure='',versions={}){
       enabledVoiceProviders.clear();ids.forEach(id=>enabledVoiceProviders.add(id));
+      app.commands.commands=Object.fromEntries(ids.map(id=>[id,{}]));
+      providerVersions.clear();Object.entries(versions).forEach(([id,version])=>providerVersions.set(id,version));
       commandFailure=failure;commandInvocations.length=0;window.notices.length=0;
+      voiceLaunches.length=0;revealInvocations.length=0;useRealDuo=false;
     },
     voiceResult(){return {calls:[...commandInvocations], notices:[...window.notices]};},
+    voiceHandoff(){return {launches:[...voiceLaunches],reveals:[...revealInvocations],active:workspace.activeLeaf?.getViewState().state?.file || 'home'};},
+    async visitPriorNoteThenHome(){workspace.setActiveLeaf(nativeNote,{focus:false});await plugin.openDashboard();revealInvocations.length=0;},
+    returnHome(){workspace.setActiveLeaf(leaf,{focus:false});},
+    visitOther(){workspace.setActiveLeaf(differentNote,{focus:false});},
+    delayVoiceReveal(){delayNativeReveal=true;},
+    hasPendingReveal(){return Boolean(pendingReveal);},
+    finishReveal(){pendingReveal?.();},
+    narrowVoiceRoot(width){document.querySelector('.workspace-split').style.maxWidth=width?width+'px':'';},
+    enableRealDuo(){useRealDuo=true;},
     restoreOldTaskSelection(){return view.setState({route:'task-folders',selectedTaskFolderPath:subtasks,selectedTaskSubfolderPath:subtasks},{});},
     selectedTaskPath(){return view.getState().selectedTaskSubfolderPath;},
     setAllFilesFolder(path){return view.setState({route:'all-files',allFilesFolderPath:path},{});},
@@ -193,14 +267,15 @@ async function main() {
     for (const [width,mobile] of [[320,true],[386,true],[867,true],[1050,false]]) {
       const page = await browser.newPage({viewport:{width,height:700},hasTouch:mobile});
       await page.route("**/*",route=>route.request().url().startsWith("http://vcc-task-folders.test")
-        ? route.fulfill({contentType:"text/html",body:"<!doctype html><html><body><div id='host' class='view-content'></div></body></html>"})
+        ? route.fulfill({contentType:"text/html",body:"<!doctype html><html><body><div id='workspace'><div class='workspace-split mod-root'><div id='host' class='view-content'></div><article id='native-note' hidden></article></div></div></body></html>"})
         : route.abort());
       await page.goto(`http://vcc-task-folders.test/${mobile?"#mobile":""}`);
       page.setDefaultTimeout(5000);
       const errors=[];
       page.on("pageerror",error=>errors.push(error.message));
       await page.addStyleTag({content:readFileSync("styles.css","utf8")});
-      await page.addStyleTag({content:"html,body{margin:0;height:100%;width:100%;}#host{height:100%;width:100%;}"});
+      if(duoSource)await page.addStyleTag({content:readFileSync(resolve(duoSource,"styles.css"),"utf8")});
+      await page.addStyleTag({content:"html,body{margin:0;height:100%;width:100%;}#workspace,.workspace-split,#host{height:100%;width:100%;}.workspace-split{display:flex;box-sizing:border-box;}#native-note{flex:1 1 auto;min-width:0;}#host[hidden],#native-note[hidden]{display:none!important;}"});
       await page.addScriptTag({content:bundle});
       await page.waitForFunction(()=>Boolean(window.fixture));
       const activate=locator=>mobile?locator.tap():locator.click();
@@ -236,6 +311,75 @@ async function main() {
       assert.deepEqual(providerFailure.calls,[duo]);
       assert.match(providerFailure.notices[0],/could not open/);
       assert.equal(await tabs.getByRole("tab",{name:"Home",exact:true}).getAttribute("aria-selected"),"true");
+      await page.evaluate(duo=>fixture.voiceProviders([duo],'',{'fjg-file-focus-duo':'0.1.20'}),duo);
+      await activate(voice);
+      await page.waitForFunction(()=>fixture.voiceHandoff().launches.length===1);
+      assert.deepEqual(await page.evaluate(()=>fixture.voiceHandoff()),{launches:[{id:duo,active:"home"}],reveals:[],active:"home"});
+      await page.evaluate(async ({duo,objectives})=>{
+        await fixture.visitPriorNoteThenHome();
+        fixture.voiceProviders([duo,objectives],'',{'fjg-file-focus-duo':'0.1.20','fjg-task-manager':'0.30.18'});
+      },{duo,objectives});
+      await activate(voice);
+      await page.waitForFunction(()=>fixture.voiceHandoff().launches.length===1);
+      const wide = mobile && width >= 720;
+      assert.deepEqual(await page.evaluate(()=>fixture.voiceHandoff()),{
+        launches:[{id:duo,active:wide?"Root note.md":"home"}],
+        reveals:wide?["Root note.md"]:[],
+        active:wide?"Root note.md":"home",
+      });
+      await page.evaluate(()=>fixture.returnHome());
+      if(wide){
+        await page.evaluate(duo=>fixture.voiceProviders([duo],'',{'fjg-file-focus-duo':'0.1.19'}),duo);
+        await activate(voice);
+        await page.waitForFunction(()=>fixture.voiceResult().notices.length===1);
+        assert.match((await page.evaluate(()=>fixture.voiceResult())).notices[0],/update FJG File Focus Duo to 0.1.20/);
+        assert.deepEqual(await page.evaluate(()=>fixture.voiceHandoff()),{launches:[{id:duo,active:"home"}],reveals:[],active:"home"});
+        await page.evaluate(async ({duo,objectives})=>{
+          await fixture.visitPriorNoteThenHome();
+          fixture.narrowVoiceRoot(670);
+          fixture.voiceProviders([duo,objectives],'',{'fjg-file-focus-duo':'0.1.20','fjg-task-manager':'0.30.18'});
+        },{duo,objectives});
+        await activate(voice);
+        await page.waitForFunction(()=>fixture.voiceHandoff().launches.length===1);
+        assert.deepEqual(await page.evaluate(()=>fixture.voiceHandoff()),{launches:[{id:duo,active:"home"}],reveals:[],active:"home"});
+        await page.evaluate(async ({duo,objectives})=>{
+          fixture.narrowVoiceRoot(0);
+          await fixture.visitPriorNoteThenHome();
+          fixture.voiceProviders([duo,objectives],'',{'fjg-file-focus-duo':'0.1.19','fjg-task-manager':'v0.30.18'});
+          fixture.delayVoiceReveal();
+        },{duo,objectives});
+        await activate(voice);
+        await page.waitForFunction(()=>fixture.hasPendingReveal());
+        await activate(voice);
+        assert.deepEqual(await page.evaluate(()=>fixture.voiceHandoff()),{launches:[],reveals:["Root note.md"],active:"home"});
+        await page.evaluate(()=>fixture.finishReveal());
+        await page.waitForFunction(()=>fixture.voiceHandoff().launches.length===1);
+        assert.deepEqual(await page.evaluate(()=>fixture.voiceHandoff()),{launches:[{id:objectives,active:"Root note.md"}],reveals:["Root note.md"],active:"Root note.md"});
+        await page.evaluate(async duo=>{
+          await fixture.visitPriorNoteThenHome();fixture.voiceProviders([duo],'',{'fjg-file-focus-duo':'0.1.20'});fixture.delayVoiceReveal();
+        },duo);
+        await activate(voice);
+        await page.waitForFunction(()=>fixture.hasPendingReveal());
+        await page.evaluate(()=>{fixture.visitOther();fixture.finishReveal();});
+        await page.waitForFunction(()=>!fixture.hasPendingReveal());
+        assert.deepEqual(await page.evaluate(()=>fixture.voiceHandoff()),{launches:[],reveals:["Root note.md"],active:"Different fixture.md"});
+        if(duoSource){
+          await page.evaluate(async duo=>{
+            await fixture.visitPriorNoteThenHome();fixture.voiceProviders([duo],'',{'fjg-file-focus-duo':'0.1.20'});fixture.enableRealDuo();
+          },duo);
+          await activate(voice);
+          const chat=page.locator(".fjgduo-vault-live-split-pane");
+          await chat.waitFor();
+          const lane=await chat.boundingBox(), note=await page.locator("#native-note").boundingBox();
+          assert.ok(lane && note && lane.x+lane.width<=note.x+1, `Expected real provider chat left of native note: ${JSON.stringify({lane,note})}`);
+          assert.equal(await page.locator("#native-note").textContent(),"Root note.md");
+          assert.equal(await page.locator(".modal-container").count(),0);
+          assert.deepEqual(await page.evaluate(()=>fixture.voiceHandoff()),{launches:[{id:duo,active:"Root note.md"}],reveals:["Root note.md"],active:"Root note.md"});
+          await activate(chat.getByRole("button",{name:"Close conversation"}));
+          assert.equal(await chat.count(),0);
+        }
+        await page.evaluate(()=>fixture.returnHome());
+      }
       const globalSearch=page.getByRole("searchbox",{name:"Search the current dashboard tab"});
       await globalSearch.fill("old home search");
       await activate(capture.getByRole("button",{name:"All Files",exact:true}));

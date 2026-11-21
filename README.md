@@ -27,7 +27,7 @@ The dashboard keeps eleven views in one consistent throwback navy, gold, orange,
 Additional features:
 
 - Native ribbon icon and command-palette actions
-- **Home → Talk to Vault** opens the existing voice experience in FJG File Focus Duo, or FJG Objective Manager if Duo is unavailable. Enable at least one of those community plugins and complete its voice setup. Vault Control Center does not manage additional credentials, capture audio, or start a separate voice session.
+- **Home → Talk to Vault** opens the existing voice experience in FJG File Focus Duo, or FJG Objective Manager if Duo is unavailable. Enable at least one of those community plugins and complete its voice setup. Vault Control Center does not manage additional credentials, capture audio, or start a separate voice session. On a wide mobile workspace, Home can return to the same still-open native note you viewed before Home so chat opens beside it. Side-by-side handoff uses File Focus Duo 0.1.20+ or Objective Manager 0.30.18+; a compact or older-provider launch still works as before.
 - A visible **Copy path** action in the Areas and Programs folder browser that follows drill-down, **Up**, and breadcrumb navigation and copies the current vault-relative folder path for Obsidian Clipper
 - Searchable active HTML home-page cards with title, description, category, folder, modified time, and a reusable native-tab opening flow
 - Explicit **Update previews** regeneration for HTML thumbnails through macOS Quick Look; generated PNGs use stable names in a configurable vault-relative runtime folder

@@ -4,7 +4,7 @@ import {
   ReusableFileLeafController,
   type ReusableFileLeafOpenResult,
 } from "./reusable-file-leaf";
-import { launchTalkToVault } from "./talk-to-vault";
+import { hasWideTalkToVaultWorkspace, TalkToVaultHome } from "./talk-to-vault";
 import { VaultControlCenterSettingTab } from "./settings";
 import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
@@ -15,6 +15,10 @@ import { FileReviewStore, affectsFileReview, getLiveReviewFile, type ReviewRow }
 type CommandHost = {
   commands?: {
     executeCommandById?: (id: string) => boolean;
+    commands?: Record<string, unknown>;
+  };
+  plugins?: {
+    getPlugin?: (id: string) => { manifest?: { version?: string } } | null;
   };
 };
 
@@ -31,10 +35,12 @@ export default class VaultControlCenterPlugin extends Plugin {
   settings: DashboardSettings = structuredClone(DEFAULT_SETTINGS);
   private refreshTimer: number | null = null;
   private reusableFileLeafController: ReusableFileLeafController | null = null;
+  private talkToVault!: TalkToVaultHome<WorkspaceLeaf>;
 
   async onload(): Promise<void> {
     await this.loadSettings();
     this.fileReview = new FileReviewStore(this.app);
+    this.talkToVault = new TalkToVaultHome(this.app.workspace);
     this.applyTheme();
 
     this.registerView(
@@ -70,6 +76,8 @@ export default class VaultControlCenterPlugin extends Plugin {
     this.addSettingTab(new VaultControlCenterSettingTab(this.app, this));
 
     this.app.workspace.onLayoutReady(() => {
+      this.talkToVault.rememberActiveLeaf(this.app.workspace.activeLeaf);
+      this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => this.talkToVault.rememberActiveLeaf(leaf)));
       const updateReview = (file: { path: string }, oldPath?: string) => {
         this.scheduleRefresh();
         if (!affectsFileReview(file.path) && !(oldPath && affectsFileReview(oldPath))) return;
@@ -91,6 +99,7 @@ export default class VaultControlCenterPlugin extends Plugin {
 
   onunload(): void {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
+    this.talkToVault?.dispose();
     this.reusableFileLeafController?.reset();
     this.reusableFileLeafController = null;
     clearDashboardTheme();
@@ -213,6 +222,7 @@ export default class VaultControlCenterPlugin extends Plugin {
   }
 
   async openDashboard(): Promise<void> {
+    this.talkToVault.rememberActiveLeaf(this.app.workspace.activeLeaf);
     const existing = this.app.workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE)[0];
     if (existing) {
       await this.app.workspace.revealLeaf(existing);
@@ -224,14 +234,24 @@ export default class VaultControlCenterPlugin extends Plugin {
     await this.app.workspace.revealLeaf(leaf);
   }
 
-  openTalkToVault(): void {
+  async openTalkToVault(origin: WorkspaceLeaf): Promise<void> {
     const host = this.app as unknown as CommandHost;
+    const workspace = this.app.workspace;
     const commands = host.commands;
-    const outcome = launchTalkToVault((id) => commands?.executeCommandById?.(id) ?? false);
-    if (outcome === "unavailable") {
+    const outcome = await this.talkToVault.launch(origin, {
+      wide: () => Platform.isMobile && hasWideTalkToVaultWorkspace(workspace.containerEl),
+      providerInfo: ({ pluginId, command }) => ({
+        version: host.plugins?.getPlugin?.(pluginId)?.manifest?.version,
+        registered: commands?.commands ? Object.prototype.hasOwnProperty.call(commands.commands, command) : undefined,
+      }),
+      execute: (id) => commands?.executeCommandById?.(id) ?? false,
+    });
+    if (outcome.outcome === "unavailable") {
       new Notice("To use Talk to Vault, enable FJG File Focus Duo or FJG Objective Manager in Community plugins.");
-    } else if (outcome === "failed") {
+    } else if (outcome.outcome === "failed") {
       new Notice("Talk to Vault could not open. Try opening it directly from its provider plugin.");
+    } else if (outcome.outcome === "opened" && outcome.suggestUpdate) {
+      new Notice(`For side-by-side chat, update ${outcome.provider.name} to ${outcome.provider.wideSince} or later.`);
     }
   }
 

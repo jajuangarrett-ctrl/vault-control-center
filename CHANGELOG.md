@@ -1,3 +1,8 @@
+## 0.3.35
+
+- Home → Talk to Vault returns to your exact previously active native Markdown tab on a wide mobile workspace when that tab is still open and a compatible provider is enabled. It does not choose a note from history, create another editor, or start a second session.
+- Prefer File Focus Duo 0.1.20+ or Objective Manager 0.30.18+ for side-by-side launches. Compact, desktop, and older-provider launches still work as before.
+
 ## 0.3.34
 
 - Add Home → Talk to Vault, a mobile-friendly shortcut to the existing FJG File Focus Duo or FJG Objective Manager voice experience. Leave all Home capture tiles in place.
