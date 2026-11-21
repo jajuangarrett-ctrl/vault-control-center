@@ -2490,6 +2490,73 @@ a.fjg-vcc-row {
   white-space: nowrap;
 }
 
+.fjg-vcc-html-toolbar-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fjg-vcc-html-catalog-status,
+.fjg-vcc-html-pager {
+  color: var(--vcc-text-muted);
+  font-size: 12px;
+}
+.fjg-vcc-html-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-block: 12px;
+}
+.fjg-vcc-html-thumbnail img {
+  position: absolute;
+  inset: 0;
+}
+.fjg-vcc-html-grid.is-compact {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
+  gap: 8px;
+}
+.fjg-vcc-html-grid.is-compact .fjg-vcc-html-card {
+  display: grid;
+  grid-template-columns: clamp(84px, 26%, 118px) minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 72px;
+}
+.fjg-vcc-html-grid.is-compact .fjg-vcc-html-thumbnail {
+  align-self: stretch;
+  min-height: 72px;
+  height: 100%;
+  aspect-ratio: auto;
+  border-bottom: 0;
+  border-right: 1px solid var(--vcc-border);
+}
+.fjg-vcc-html-grid.is-compact .fjg-vcc-html-thumbnail img {
+  object-fit: contain;
+  object-position: center;
+}
+.fjg-vcc-html-grid.is-compact .fjg-vcc-html-thumbnail-placeholder {
+  gap: 2px;
+  padding: 4px;
+}
+.fjg-vcc-html-grid.is-compact .fjg-vcc-html-thumbnail-placeholder .fjg-vcc-icon {
+  font-size: 22px;
+}
+.fjg-vcc-html-grid.is-compact .fjg-vcc-html-card-copy {
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+}
+.fjg-vcc-html-grid.is-compact .fjg-vcc-html-card-meta {
+  margin-top: 0;
+}
+.fjg-vcc-html-grid.is-compact .fjg-vcc-html-card:hover {
+  transform: none;
+}
+.fjg-vcc-html-toolbar-actions button,
+.fjg-vcc-html-pager button {
+  min-height: 44px;
+}
+
 .fjg-vcc-memory-card {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(180px, 0.65fr);

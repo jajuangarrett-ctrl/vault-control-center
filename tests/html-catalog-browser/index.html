@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:">
+<title>Synthetic VCC and HTML Viewer catalog</title>
+<link rel="stylesheet" href="plugin.css">
+<style>
+body {background:#edf2fb;color:#202840;font:15px system-ui;margin:16px}
+nav {display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+nav button,input {font:inherit;min-height:37px;box-sizing:border-box}
+#fixture .fjg-vcc-route-view {height:440px;overflow:auto;padding:10px}
+#fixture {--vcc-canvas:#142137;--vcc-surface:#18263d;--vcc-text:#edf3ff;--vcc-text-muted:#c5d2e6;--vcc-border:#506782;--vcc-gold:#ffd488;--vcc-gold-rgb:255 212 136;--vcc-blue-rgb:70 130 240;--vcc-orange-rgb:255 140 60;--vcc-radius-lg:10px;--vcc-space-4:14px; --vcc-link:#abe5ff; color:var(--vcc-text);background:var(--vcc-canvas);max-width:min(100%, 390px)}
+#fixture[data-wide="true"] {max-width:min(100%, 930px)}
+</style>
+<nav aria-label="Fixture controls">
+<button id="fold">Fold</button><button id="unfold">Unfold</button>
+<button id="exclude">Exclude first page in Viewer</button><button id="disable">Disable Viewer</button><button id="enable">Enable Viewer</button>
+<input aria-label="Search catalog" placeholder="Search catalog">
+</nav>
+<p><output id="status" aria-label="Fixture observations"></output></p>
+<main id="fixture"><div class="fjg-vcc-route-view"></div></main>
+<script src="./app.js"></script>
+</html>

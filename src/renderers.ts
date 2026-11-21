@@ -1,5 +1,4 @@
 import { createControlButton } from "./dom";
-import { usesMobileHtmlViewer } from "./mobile-html";
 import { Notice, Platform, setIcon } from "obsidian";
 import { TASK_INBOX_PATH } from "./data";
 import type {
@@ -26,11 +25,7 @@ import {
   programMatchesNavigationQuery,
   searchProgramFiles,
 } from "./program-navigation";
-import {
-  filterHtmlGalleryItems,
-  MIN_USABLE_HTML_THUMBNAIL_BYTES,
-  type HtmlGallerySnapshot,
-} from "./html-gallery";
+import { renderHtmlCatalog, type HtmlCatalogControls } from "./html-catalog-renderer";
 import type {
   AutomationGroup,
   AutomationItemSnapshot,
@@ -70,8 +65,7 @@ export interface DashboardRenderState {
 export interface DashboardRenderContext {
   data: DashboardData;
   taskboard: TaskboardSnapshot;
-  htmlGallery: HtmlGallerySnapshot;
-  htmlThumbnailsGenerating: boolean;
+  htmlCatalog: HtmlCatalogControls;
   automations: AutomationSnapshot;
   fileReview: FileReviewSnapshot;
   reviewFilters: { query: string; folder: string };
@@ -102,9 +96,6 @@ export interface DashboardRenderContext {
   clearSearch: () => void;
   navigate: (route: DashboardRoute) => void;
   openFile: (path: string) => void;
-  openHtml: (path: string) => void;
-  resourceUrl: (path: string) => string;
-  refreshHtmlThumbnails: () => void;
   refreshOperations: () => void;
   runAutomation: (id: string) => void;
   reloadRemoteObsidian: () => void;
@@ -148,7 +139,7 @@ export function renderRoute(
   route: DashboardRoute,
   parent: HTMLElement,
   context: DashboardRenderContext
-): void {
+): (() => void) | undefined {
   parent.empty();
   const view = parent.createDiv({ cls: "fjg-vcc-route-view", attr: { "data-route": route } });
 
@@ -169,8 +160,7 @@ export function renderRoute(
       renderTaskFolders(view, context);
       break;
     case "html":
-      renderHtmlGallery(view, context);
-      break;
+      return renderHtmlCatalog(view, context.htmlCatalog);
     case "ai-team":
       renderAiTeam(view, context);
       break;
@@ -195,104 +185,6 @@ export function renderRoute(
     case "settings":
       renderSettings(view, context);
       break;
-  }
-}
-
-function renderHtmlGallery(parent: HTMLElement, context: DashboardRenderContext): void {
-  const items = filterHtmlGalleryItems(
-    context.htmlGallery.items,
-    context.state.query
-  );
-  const toolbar = parent.createDiv({ cls: "fjg-vcc-html-toolbar" });
-  const copy = toolbar.createDiv({ cls: "fjg-vcc-html-toolbar-copy" });
-  copy.createEl("h2", {
-    text: usesMobileHtmlViewer(Platform)
-      ? `${items.length} HTML file${items.length === 1 ? "" : "s"}`
-      : `${items.length} active home page${items.length === 1 ? "" : "s"}`,
-  });
-  copy.createEl("p", {
-    text: usesMobileHtmlViewer(Platform)
-      ? "All synced HTML pages. Tap a page to view it here with supported interactive features."
-      : "Clickable previews for the active HTML dashboard and tool home pages selected in plugin settings.",
-  });
-  if (!usesMobileHtmlViewer(Platform)) createButton(toolbar, {
-    label: context.htmlThumbnailsGenerating
-      ? "Updating previews…"
-      : "Update previews",
-    icon: context.htmlThumbnailsGenerating ? "loader-circle" : "images",
-    className: "fjg-vcc-button is-primary",
-    disabled: context.htmlThumbnailsGenerating,
-    onClick: context.refreshHtmlThumbnails,
-  });
-
-  if (!items.length) {
-    createEmptyState(
-      parent,
-      usesMobileHtmlViewer(Platform)
-        ? (context.state.query ? "No HTML pages match" : "No HTML pages found")
-        : (context.state.query ? "No active home pages match" : "No active home pages found"),
-      context.state.query
-        ? "Try another search or clear the current query."
-        : usesMobileHtmlViewer(Platform)
-          ? "Enable Sync all other types on both devices, let HTML and support files finish syncing, then refresh."
-          : "Check the HTML home pages and gallery roots in plugin settings, then refresh.",
-      "panels-top-left"
-    );
-    return;
-  }
-
-  const grid = parent.createDiv({
-    cls: "fjg-vcc-html-grid",
-    attr: { "aria-label": usesMobileHtmlViewer(Platform) ? "Mobile HTML file gallery" : "Active HTML home page gallery" },
-  });
-  for (const item of items) {
-    const card = createControlButton(grid, {
-      cls: "fjg-vcc-html-card",
-      attr: {
-        type: "button",
-        "aria-label": `Open ${item.title} in Obsidian`,
-        "data-file-path": item.path,
-      },
-    });
-    const thumbnail = card.createDiv({ cls: "fjg-vcc-html-thumbnail" });
-    const hasUsableThumbnail =
-      item.thumbnailFile && item.thumbnailFile.stat.size >= MIN_USABLE_HTML_THUMBNAIL_BYTES;
-    if (hasUsableThumbnail) {
-      const placeholder = thumbnail.createDiv({
-        cls: "fjg-vcc-html-thumbnail-placeholder",
-        attr: { hidden: "" },
-      });
-      createIcon(placeholder, "panels-top-left");
-      placeholder.createSpan({ text: "Preview unavailable" });
-      const image = thumbnail.createEl("img", {
-        attr: {
-          src: context.resourceUrl(item.thumbnailPath),
-          alt: `Preview of ${item.title}`,
-          loading: "lazy",
-        },
-      });
-      image.addEventListener("error", () => {
-        image.remove();
-        placeholder.removeAttribute("hidden");
-      });
-    } else {
-      const placeholder = thumbnail.createDiv({
-        cls: "fjg-vcc-html-thumbnail-placeholder",
-      });
-      createIcon(placeholder, "panels-top-left");
-      placeholder.createSpan({ text: item.title });
-      placeholder.createEl("small", { text: usesMobileHtmlViewer(Platform) ? "Tap to open" : "Local preview needs refresh" });
-    }
-    const cardCopy = card.createDiv({ cls: "fjg-vcc-html-card-copy" });
-    cardCopy.createSpan({ cls: "fjg-vcc-html-card-title", text: item.title });
-    cardCopy.createEl("p", {
-      cls: "fjg-vcc-html-card-description",
-      text: item.description || "Interactive HTML home page",
-    });
-    const meta = cardCopy.createDiv({ cls: "fjg-vcc-html-card-meta" });
-    meta.createSpan({ text: `${item.category} · ${item.folder}` });
-    meta.createSpan({ text: formatRelativeTime(item.modifiedAt) });
-    card.addEventListener("click", () => context.openHtml(item.path));
   }
 }
 

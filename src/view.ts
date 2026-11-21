@@ -33,8 +33,8 @@ import {
 import {
   buildHtmlGallerySnapshot,
   generateHtmlThumbnails,
-  type HtmlGallerySnapshot,
 } from "./html-gallery";
+import { emptyCatalog, HtmlViewerCatalogFeed, readLocalCatalogThumbnail } from "./html-viewer-catalog";
 import {
   buildAutomationSnapshot,
   runAutomation,
@@ -167,16 +167,10 @@ export class VaultControlCenterView extends ItemView {
     sourceUrl: "",
     error: "",
   };
-  private htmlGallery: HtmlGallerySnapshot = {
-    generatedAt: "",
-    roots: [],
-    thumbnailFolder: "",
-    scannedCount: 0,
-    excludedCount: 0,
-    errorCount: 0,
-    errors: [],
-    items: [],
-  };
+  private htmlCatalog = emptyCatalog("loading");
+  private readonly htmlCatalogFeed: HtmlViewerCatalogFeed;
+  private htmlCatalogPage = 0;
+  private disposeCatalogThumbnails?: () => void;
   private htmlThumbnailsGenerating = false;
   private fileReviewRefreshing = false;
   private reviewOrder: string[] = [];
@@ -246,7 +240,6 @@ export class VaultControlCenterView extends ItemView {
   private refreshQueued = false;
   private refreshQueuedForce = false;
   private backgroundRefreshPending = false;
-  private htmlSnapshotGeneration = 0;
   private automationSnapshotGeneration = 0;
   private automationSnapshotAppliedGeneration = 0;
   private memorySnapshotGeneration = 0;
@@ -258,6 +251,10 @@ export class VaultControlCenterView extends ItemView {
 
   constructor(leaf: WorkspaceLeaf, readonly plugin: VaultControlCenterPlugin) {
     super(leaf);
+    this.htmlCatalogFeed = new HtmlViewerCatalogFeed(this.app, (catalog) => {
+      this.htmlCatalog = catalog;
+      if (this.route === "html") this.renderContent();
+    });
     this.nativeMarkdownEditor = new NativeMarkdownEditorSession(
       () => new DashboardMarkdownView(leaf)
     );
@@ -279,12 +276,14 @@ export class VaultControlCenterView extends ItemView {
     this.contentEl.empty();
     this.contentEl.addClass("fjg-vcc-host");
     this.renderShell();
+    this.syncHtmlCatalog();
     const ownerDocument = this.contentEl.ownerDocument;
     this.registerDomEvent(ownerDocument, "keydown", (event: KeyboardEvent) => this.handleKeyboard(event));
     if (this.pendingPreviewPath) {
       void this.openPreview(this.pendingPreviewPath, { focus: false, recordHistory: false });
     }
     const refreshWhenShown = () => {
+      if (this.route === "html") this.htmlCatalogFeed.reconcile();
       if (this.backgroundRefreshPending && this.contentEl.isShown()) void this.refreshWhenVisible();
     };
     this.registerEvent(this.app.workspace.on("active-leaf-change", refreshWhenShown));
@@ -296,6 +295,9 @@ export class VaultControlCenterView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    this.htmlCatalogFeed.stop();
+    this.disposeCatalogThumbnails?.();
+    this.disposeCatalogThumbnails = undefined;
     this.backgroundRefreshPending = false;
     if (this.templateSaveTimer !== null) {
       window.clearTimeout(this.templateSaveTimer);
@@ -413,6 +415,7 @@ export class VaultControlCenterView extends ItemView {
 
     if (this.rootEl) {
       this.syncAllFilesQuery(previousRoute);
+      if (this.route !== previousRoute) this.syncHtmlCatalog();
       this.canonicalizeAreaSelection();
       this.canonicalizeProgramSelection();
       this.canonicalizeTaskFolderSelection(true);
@@ -482,7 +485,6 @@ export class VaultControlCenterView extends ItemView {
         !this.operationsFetchedAt ||
         Date.now() - this.operationsFetchedAt >= OPERATIONS_CACHE_TTL_MS;
       const isDesktopMac = Platform.isDesktopApp && Platform.isMacOS;
-      const htmlGeneration = ++this.htmlSnapshotGeneration;
       const automationGeneration = shouldRefreshOperations
         ? ++this.automationSnapshotGeneration
         : 0;
@@ -492,29 +494,19 @@ export class VaultControlCenterView extends ItemView {
       const operationsPromise = shouldRefreshOperations
         ? this.buildOperationsState(isDesktopMac)
         : Promise.resolve(null);
-      const [data, taskboard, htmlGallery, operations] = await Promise.all([
+      const [data, taskboard, operations] = await Promise.all([
         buildDashboardData(this.app, this.plugin.settings, {
           recentFilePaths: this.previewHistory,
         }),
         shouldRefreshTaskboard
           ? fetchTaskboardSnapshot(this.app, this.plugin.settings)
           : Promise.resolve(this.taskboard),
-        buildHtmlGallerySnapshot(
-          this.app,
-          this.plugin.settings.htmlRoots,
-          this.plugin.settings.htmlThumbnailFolder,
-          this.plugin.settings.htmlHomePages,
-          usesMobileHtmlViewer(Platform)
-        ),
         operationsPromise,
       ]);
       await this.plugin.fileReview.refresh();
       const restoreTaskSelection = !this.data;
       this.data = data;
       this.taskboard = taskboard;
-      if (htmlGeneration === this.htmlSnapshotGeneration) {
-        this.htmlGallery = htmlGallery;
-      }
       if (
         operations &&
         automationGeneration === this.automationSnapshotGeneration
@@ -591,7 +583,10 @@ export class VaultControlCenterView extends ItemView {
     this.searchInputEl.value = this.route === "all-files" ? this.allFilesQuery : this.renderState.query;
     this.searchInputEl.addEventListener("input", () => {
       if (this.route === "all-files") this.allFilesQuery = this.searchInputEl?.value ?? "";
-      else this.renderState.query = this.searchInputEl?.value ?? "";
+      else {
+        this.renderState.query = this.searchInputEl?.value ?? "";
+        this.htmlCatalogPage = 0;
+      }
       this.renderContent();
     });
 
@@ -805,7 +800,8 @@ export class VaultControlCenterView extends ItemView {
       return;
     }
     this.syncFolderRailAttribute();
-    renderRoute(this.route, this.contentRegionEl, this.renderContext());
+    this.disposeCatalogThumbnails?.();
+    this.disposeCatalogThumbnails = renderRoute(this.route, this.contentRegionEl, this.renderContext());
     this.syncPreviewSelection();
   }
 
@@ -915,8 +911,24 @@ export class VaultControlCenterView extends ItemView {
       selectVaultFolder: (path) => this.selectVaultFolder(path),
       data: this.data,
       taskboard: this.taskboard,
-      htmlGallery: this.htmlGallery,
-      htmlThumbnailsGenerating: this.htmlThumbnailsGenerating,
+      htmlCatalog: {
+        catalog: this.htmlCatalog,
+        query: this.renderState.query,
+        page: this.htmlCatalogPage,
+        mobile: usesMobileHtmlViewer(Platform),
+        generating: this.htmlThumbnailsGenerating,
+        onPage: (page) => {
+          this.htmlCatalogPage = page;
+          this.renderContent();
+          this.contentRegionEl?.querySelector<HTMLElement>(".fjg-vcc-html-toolbar h2")?.focus();
+        },
+        refresh: () => void this.htmlCatalogFeed.refresh(),
+        generate: () => void this.refreshHtmlThumbnails(),
+        open: (path) => {
+          if (this.route === "html" && this.htmlCatalog.items.some((item) => item.path === path)) void this.openHtml(path);
+        },
+        thumbnail: (path) => readLocalCatalogThumbnail(this.app, path, this.plugin.settings.htmlThumbnailFolder),
+      },
       automations: this.automations,
       fileReview: this.plugin.fileReview.snapshot,
       reviewFilters: this.reviewFilters,
@@ -958,15 +970,13 @@ export class VaultControlCenterView extends ItemView {
       showFolderRoots: () => this.showFolderRoots(),
       clearSearch: () => {
         this.renderState.query = "";
+        this.htmlCatalogPage = 0;
         if (this.searchInputEl) this.searchInputEl.value = "";
         this.renderContent();
         this.searchInputEl?.focus({ preventScroll: true });
       },
       navigate: (route) => this.navigate(route),
       openFile: (path) => void this.openPreview(path),
-      openHtml: (path) => void this.openHtml(path),
-      resourceUrl: (path) => this.resourceUrl(path),
-      refreshHtmlThumbnails: () => void this.refreshHtmlThumbnails(),
       refreshOperations: () => void this.refreshOperations(true),
       runAutomation: (id) => void this.runAutomationNow(id),
       reloadRemoteObsidian: () => void this.reloadRemoteObsidian(),
@@ -1022,6 +1032,7 @@ export class VaultControlCenterView extends ItemView {
         this.renderState.selectedTaskFolderPath = root.path;
         this.renderState.selectedTaskSubfolderPath = root.path;
         this.renderState.query = "";
+        this.htmlCatalogPage = 0;
         if (this.searchInputEl) this.searchInputEl.value = "";
         this.taskFoldersRailCollapsed = null;
         this.renderContent();
@@ -1054,19 +1065,6 @@ export class VaultControlCenterView extends ItemView {
       setShellTheme: (enabled) => void this.setShellTheme(enabled),
       openNativeSettings: () => this.openNativeSettings(),
     };
-  }
-
-  private resourceUrl(path: string): string {
-    const normalizedPath = normalizeVaultPath(path);
-    if (
-      !normalizedPath ||
-      (isExcludedPath(normalizedPath) && !(usesMobileHtmlViewer(Platform) && isMobileHtmlPath(normalizedPath))) ||
-      isSensitivePath(normalizedPath)
-    ) {
-      return "";
-    }
-    const file = this.app.vault.getAbstractFileByPath(normalizePath(normalizedPath));
-    return file instanceof TFile ? this.app.vault.getResourcePath(file) : "";
   }
 
   private async openHtml(path: string): Promise<void> {
@@ -1104,25 +1102,22 @@ export class VaultControlCenterView extends ItemView {
     this.htmlThumbnailsGenerating = true;
     this.renderContent();
     try {
-      const result = await generateHtmlThumbnails(
-        this.app,
-        this.htmlGallery.items,
-        {
-          isDesktopMac: Platform.isDesktopApp && Platform.isMacOS,
-          force: true,
-        }
-      );
-      const htmlGeneration = ++this.htmlSnapshotGeneration;
-      const htmlGallery = await buildHtmlGallerySnapshot(
-        this.app,
-        this.plugin.settings.htmlRoots,
-        this.plugin.settings.htmlThumbnailFolder,
-        this.plugin.settings.htmlHomePages,
-        usesMobileHtmlViewer(Platform)
-      );
-      if (htmlGeneration === this.htmlSnapshotGeneration) {
-        this.htmlGallery = htmlGallery;
+      if (!(Platform.isDesktopApp && Platform.isMacOS)) {
+        new Notice("Thumbnail generation is available on the desktop Mac only.");
+        return;
       }
+      // Preserve the existing explicitly configured generation boundary. Never run
+      // Quick Look on every entry just because the Viewer chooser now lists it.
+      const catalogPaths = new Set(this.htmlCatalog.items.map(({ path }) => path));
+      const configured = this.plugin.settings.htmlHomePages.filter((path) => catalogPaths.has(normalizeVaultPath(path)));
+      const source = await buildHtmlGallerySnapshot(
+        this.app, this.plugin.settings.htmlRoots, this.plugin.settings.htmlThumbnailFolder, configured
+      );
+      if (this.route !== "html") return;
+      const result = await generateHtmlThumbnails(this.app,
+        source.items.filter((item) => this.htmlCatalog.items.some(({ path }) => path === item.path)),
+        { isDesktopMac: true, force: true });
+      await this.htmlCatalogFeed.refresh();
       if (result.status === "unavailable") {
         new Notice(result.reason || "HTML preview generation is unavailable on this device.");
       } else if (result.failed > 0) {
@@ -1302,12 +1297,20 @@ export class VaultControlCenterView extends ItemView {
     void this.closePreview({ restoreFocus: false });
     const previousRoute = this.route;
     this.route = route;
+    this.syncHtmlCatalog();
     this.syncAllFilesQuery(previousRoute);
     this.renderRouteTabs();
     this.renderMobileDock();
     this.renderContent();
     if (Platform.isMobile) this.contentEl.scrollTo({top:0});
     else this.contentRegionEl?.scrollTo({ top: 0 });
+  }
+
+  private syncHtmlCatalog(): void {
+    this.htmlCatalogPage = 0;
+    this.htmlCatalog = emptyCatalog("loading");
+    if (this.route === "html") this.htmlCatalogFeed.start();
+    else this.htmlCatalogFeed.stop();
   }
 
   private syncAllFilesQuery(previousRoute: DashboardRoute): void {

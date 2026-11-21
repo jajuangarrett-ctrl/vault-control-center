@@ -313,7 +313,7 @@ export default class VaultControlCenterPlugin extends Plugin {
       return "fallback";
     }
     const file = this.app.vault.getAbstractFileByPath(normalizePath(normalizedPath));
-    if (!(file instanceof TFile) || file.extension.toLocaleLowerCase() !== "html") {
+    if (!(file instanceof TFile) || !/^html?$/i.test(file.extension)) {
       return "fallback";
     }
 

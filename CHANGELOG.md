@@ -1,3 +1,9 @@
+## 0.3.36
+
+- Source the HTML tab from HTML Viewer 0.2.3+ rather than maintaining a separate vault-wide list. Viewer exclusions and updates carry through; if the plugin is disabled or too old, the tab explains what to do.
+- Show compact mobile/Duo cards with lazy local PNG thumbnails, a clear placeholder when no saved preview matches, and paged search. Browsing the catalog does not open, execute or send HTML.
+- Keep the existing click-to-open routing and explicit desktop preview generation for configured catalog home pages.
+
 ## 0.3.35
 
 - Home → Talk to Vault returns to your exact previously active native Markdown tab on a wide mobile workspace when that tab is still open and a compatible provider is enabled. It does not choose a note from history, create another editor, or start a second session.

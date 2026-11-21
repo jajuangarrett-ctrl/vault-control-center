@@ -52,10 +52,10 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
     this.addPathSetting("Contact list", "Opened by the dashboard contact action.", "contactListPath");
     this.addPathSetting("Tasks file", "Used for local open and total task counts.", "tasksFilePath");
 
-    new Setting(containerEl).setName("HTML gallery").setHeading();
+    new Setting(containerEl).setName("HTML catalog previews").setHeading();
     new Setting(containerEl)
-      .setName("HTML gallery roots")
-      .setDesc("One vault-relative folder per line. These roots remain the safety boundary for every HTML home page.")
+      .setName("Preview generation roots")
+      .setDesc("One vault-relative folder per line. These roots limit the desktop Update previews action, not the HTML Viewer catalog.")
       .addTextArea((text) => {
         text.inputEl.rows = 5;
         text
@@ -71,8 +71,8 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
           });
       });
     new Setting(containerEl)
-      .setName("HTML home pages")
-      .setDesc("One exact vault-relative HTML page per line. Only listed pages inside the gallery roots appear as cards; leave blank to show none.")
+      .setName("HTML home pages for preview generation")
+      .setDesc("One exact vault-relative HTML page per line. Update previews generates only previews for these catalog pages inside the configured roots. A blank list generates none.")
       .addTextArea((text) => {
         text.inputEl.rows = 10;
         text

@@ -15,7 +15,7 @@ The dashboard keeps eleven views in one consistent throwback navy, gold, orange,
 | Home | Talk to Vault, capture actions, live signals, current programs, recent files, people, and local FJG Task Manager status |
 | Areas | The complete safe folder tree, including empty folders, plus every supported file under the configured Areas source, with a collapsible root rail, recursive drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
 | Programs | Program folders, activity groups, a collapsible root rail, recursive subfolder drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
-| HTML | A searchable card gallery of explicitly selected active HTML home pages inside configurable vault roots, with optional Quick Look thumbnails |
+| HTML | HTML Viewer’s live, filtered catalog with compact mobile thumbnail cards. Saved local previews appear where available. |
 | AI Team | Four configurable operational queues; Owner and Team inboxes use complete direct-file counts and lists |
 | Automations | Scheduled vault processors and external jobs, plus executor-Mac RAM status |
 | Recent | Searchable, vault-wide Obsidian file-open history with category filters |
@@ -63,7 +63,7 @@ Additional features:
 
 Download `main.js`, `manifest.json`, and `styles.css` from the latest release. Place them together in `<vault>/.obsidian/plugins/vault-control-center/`, then reload Obsidian and enable the plugin.
 
-Vault Control Center requires Obsidian 1.12.7 or newer and is not desktop-only. HTML catalog browsing, synchronized automation results, and the other vault views remain useful across devices. Quick Look thumbnail generation requires desktop Obsidian on macOS; launchd controls and RAM status additionally require the Mac that owns the loaded routine automation jobs.
+Vault Control Center requires Obsidian 1.12.7 or newer and is not desktop-only. The HTML tab requires enabled HTML Viewer 0.2.3 or newer; otherwise it explains how to enable or update it instead of scanning for a replacement list. Quick Look thumbnail generation requires desktop Obsidian on macOS; launchd controls and RAM status additionally require the Mac that owns the loaded routine automation jobs.
 
 ## First-run setup
 
@@ -71,7 +71,7 @@ Open **Settings → Community plugins → Vault Control Center** and configure t
 
 - Areas
 - Programs
-- HTML gallery roots, exact active home-page paths, and the vault-relative thumbnail folder
+- Desktop preview generation roots, exact home-page allowlist, and the vault-relative thumbnail folder
 - People agendas and contacts
 - Tasks
 - Four operational queues
@@ -107,7 +107,7 @@ Path settings, interface preferences, and clipboard templates are stored in the 
 
 ## Replacing the legacy launcher
 
-The native plugin and an older HTML-launcher plugin can coexist during migration. Once the native dashboard is configured and verified, disable the legacy launcher to avoid two ribbon buttons with similar names. No HTML Viewer plugin or local web server is required by Vault Control Center.
+The native plugin and an older HTML-launcher plugin can coexist during migration. Once the native dashboard is configured and verified, disable the legacy launcher to avoid two ribbon buttons with similar names. Only the HTML tab needs the HTML Viewer plugin. No local web server is required.
 
 ## Development
 
