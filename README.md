@@ -17,7 +17,7 @@ The dashboard keeps eleven views in one consistent throwback navy, gold, orange,
 | Programs | Program folders, activity groups, a collapsible root rail, recursive subfolder drill-down, route-wide file search, breadcrumbs, and in-dashboard previews |
 | HTML | HTML Viewer’s live, filtered catalog with compact mobile thumbnail cards. Saved local previews appear where available. |
 | AI Team | Four configurable operational queues; Owner and Team inboxes use complete direct-file counts and lists |
-| Automations | Scheduled vault processors and external jobs, plus executor-Mac RAM status |
+| Automations | Mail Cache Bridge Inbox sync status and **Sync Now** on the Mac running the bridge |
 | Recent | Searchable, vault-wide Obsidian file-open history with category filters |
 | Bookmarks | Filtered Obsidian bookmarks; vault targets preview inside the dashboard and HTTP(S) links open externally |
 | People | Agenda files, recency, and contact-list access |
@@ -31,8 +31,7 @@ Additional features:
 - A visible **Copy path** action in the Areas and Programs folder browser that follows drill-down, **Up**, and breadcrumb navigation and copies the current vault-relative folder path for Obsidian Clipper
 - Searchable active HTML home-page cards with title, description, category, folder, modified time, and a reusable native-tab opening flow
 - Explicit **Update previews** regeneration for HTML thumbnails through macOS Quick Look; generated PNGs use stable names in a configurable vault-relative runtime folder
-- Cross-device automation results from synchronized status notes, with local launchd controls on the confirmed executor or an optional isolated fixed-ID Netlify broker for the always-on Mac
-- RAM pressure and usage for the confirmed local or authenticated remote executor; unavailable devices fail closed instead of reporting their own RAM
+- **Automations → Mail Cache Bridge** shows local Inbox sync status, last sync and indexed count, and sends an explicit **Sync Now** request to the opt-in companion app on this Mac. Mobile explains where the controls are available.
 - Local FJG Task Manager workspace counts and due-sorted **Do First** items, with task-note preview and a direct **Task Manager** action
 - Shared preview pane across ordinary file-bearing routes; normal clicks keep the dashboard active, and Markdown notes can switch into Obsidian's native editor in place
 - Near-even desktop workspace with a slightly larger right-side preview, plus an independently retractable Areas and Programs root rail for additional folder-detail and note space
@@ -63,7 +62,7 @@ Additional features:
 
 Download `main.js`, `manifest.json`, and `styles.css` from the latest release. Place them together in `<vault>/.obsidian/plugins/vault-control-center/`, then reload Obsidian and enable the plugin.
 
-Vault Control Center requires Obsidian 1.12.7 or newer and is not desktop-only. The HTML tab requires enabled HTML Viewer 0.2.3 or newer; otherwise it explains how to enable or update it instead of scanning for a replacement list. Quick Look thumbnail generation requires desktop Obsidian on macOS; launchd controls and RAM status additionally require the Mac that owns the loaded routine automation jobs.
+Vault Control Center requires Obsidian 1.12.7 or newer and is not desktop-only. The HTML tab requires enabled HTML Viewer 0.2.3 or newer; otherwise it explains how to enable or update it instead of scanning for a replacement list. Quick Look thumbnail generation and Mail Cache Bridge controls require desktop Obsidian on macOS. Mail Cache Bridge must be open on the same Mac.
 
 ## First-run setup
 
@@ -85,7 +84,11 @@ When the folder browser is visible, **Copy path** copies the exact current folde
 
 The HTML route shows only exact paths listed under **HTML home pages** that also sit inside the configured **HTML gallery roots**. The path list chooses the canonical launch page for each active dashboard or tool; the roots remain the outer safety boundary. Leaving the home-page list blank intentionally shows no cards. Hidden, archived, sensitive, inbox/queue, source/build/test, and reusable-template paths remain excluded even when listed. Metadata parsing is capped, unchanged results are cached, and reads use bounded concurrency. **Update previews** is an explicit action: on desktop macOS it asks Quick Look to regenerate the current gallery, stores the results in the configured vault-relative folder, and isolates individual failures so one bad home page does not stop the rest. Clicking a card uses the registered desktop HTML viewer in the same reusable native tab when available; mobile, a missing viewer, or an opening failure falls back to the safe in-dashboard HTML source preview.
 
-The Automations route uses a fixed code allowlist; vault files and network clients cannot introduce commands or change launchd labels. The visible control center focuses on scheduled vault processors and external/cloud jobs; background services and repository-sync jobs are intentionally omitted. Synchronized status notes can be read on any device. Desktop Obsidian on macOS first checks the local labels. When that Mac is not the executor, an opt-in dedicated broker can expose only the ten routine IDs to the always-on Mac. The runner rechecks its harmless sentinel, the exact mapped target, and the target's running state for every claimed request before a no-shell `launchctl kickstart` without `-k`. Unknown, expired, replayed, concurrent, unloaded, status-only, service, high-impact, disabled, missing, and external requests fail closed. Remote RAM is accepted only from a fresh authenticated executor heartbeat.
+### Mail Cache Bridge
+
+In the native **Mail Cache Bridge** app on your Mac, enable exports and **Allow Vault Control Center**, then keep the app open. In desktop Obsidian on that same Mac, open **Vault Control Center → Automations** to see the current Inbox sync status and use **Sync Now**. The app controls Mail access, export location, schedule, and whether the request can run. A request is not a completion; check for **Sync complete**. iPhone, iPad, Windows, and Linux do not read or trigger the local bridge from Obsidian.
+
+This tab no longer shows the scheduled processors, RAM monitor, or remote Obsidian reload. Removing those controls does not stop or reconfigure existing automations.
 
 Recent combines three sources in viewed order: files previewed inside Vault Control Center, the optional Recent Files plugin when it is enabled in file-open mode, and Obsidian's native open history. Preview history is capped at 30 safe paths in the Obsidian workspace state; no file contents are stored. If none of these sources provides usable viewed-file history, the dashboard temporarily falls back to modified-time activity under the configured recent roots.
 
@@ -99,11 +102,11 @@ This v0.2.0 integration does not make a taskboard network request. Legacy remote
 
 ## Privacy and external-access disclosure
 
-Vault Control Center reads the vault-relative folders and files configured in its settings plus Obsidian's bookmarks configuration file. Vault content discovery stays within the vault. On desktop macOS, the explicit HTML thumbnail action uses `/usr/bin/qlmanage` and a temporary operating-system folder; the Automations route uses `/bin/launchctl` for allowlisted status/start operations and local operating-system memory counters after its executor checks.
+Vault Control Center reads the vault-relative folders and files configured in its settings plus Obsidian's bookmarks configuration file. Vault content discovery stays within the vault. On desktop macOS, the explicit HTML thumbnail action uses `/usr/bin/qlmanage` and a temporary operating-system folder; the Automations tab reads a small aggregate status from the local Mail Cache Bridge control directory and writes a one-time request only when you click **Sync Now**. It does not open Mail, read exported messages, send a network request, or write status to the vault.
 
 Before display, the index excludes hidden/internal folders, archived paths, and names that look like passwords, API keys, secrets, credentials, tokens, or private keys. Bookmark URLs containing basic-auth credentials or obvious sensitive query keys are withheld; visible URL metadata is reduced to the origin while the original URL is retained only for opening.
 
-Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, file contents, task records, automation results, and RAM readings are not saved there. Obsidian workspace state may contain the currently previewed safe path, a capped safe-path preview history, and the Areas/Programs root-rail disclosure state so the dashboard survives workspace restoration. Generated HTML thumbnails are the one intentional derived-file exception: they are written to the configured vault-relative runtime folder when **Update previews** is selected.
+Path settings, interface preferences, and clipboard templates are stored in the plugin's local settings. Live file indexes, file contents, task records, and Mail Cache Bridge status are not saved there. Obsidian workspace state may contain the currently previewed safe path, a capped safe-path preview history, and the Areas/Programs root-rail disclosure state so the dashboard survives workspace restoration. Generated HTML thumbnails are the one intentional derived-file exception: they are written to the configured vault-relative runtime folder when **Update previews** is selected.
 
 ## Replacing the legacy launcher
 

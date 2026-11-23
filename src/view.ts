@@ -35,23 +35,7 @@ import {
   generateHtmlThumbnails,
 } from "./html-gallery";
 import { emptyCatalog, HtmlViewerCatalogFeed, readLocalCatalogThumbnail } from "./html-viewer-catalog";
-import {
-  buildAutomationSnapshot,
-  runAutomation,
-  type AutomationSnapshot,
-} from "./automations";
-import {
-  applyRemoteAutomationAvailability,
-  emptyRemoteAutomationSnapshot,
-  fetchRemoteAutomationSnapshot,
-  submitRemoteAutomation,
-  submitRemoteObsidianReload,
-  type RemoteAutomationSnapshot,
-} from "./remote-automation";
-import {
-  buildSystemMemorySnapshot,
-  type SystemMemorySnapshot,
-} from "./system-memory";
+import { desktopMailCacheBridge } from "./mail-cache-bridge";
 import { FileReviewFolderModal } from "./file-review-modal";
 import { createButton, createIcon } from "./dom";
 import type VaultControlCenterPlugin from "./plugin";
@@ -117,7 +101,6 @@ const AI_QUEUE_KEYS: AiFolderKey[] = ["emailQueue", "formattedNotes", "ownerInbo
 const RECENT_FILTERS: RecentFilter[] = ["all", "programs", "ai", "people", "tasks", "areas", "vault"];
 const BOOKMARK_FILTERS: BookmarkFilter[] = ["all", "file", "folder", "url"];
 const TASKBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
-const OPERATIONS_CACHE_TTL_MS = 30_000;
 let dashboardViewSequence = 0;
 
 interface PreviewOpenOptions {
@@ -170,39 +153,12 @@ export class VaultControlCenterView extends ItemView {
   private htmlCatalog = emptyCatalog("loading");
   private readonly htmlCatalogFeed: HtmlViewerCatalogFeed;
   private htmlCatalogPage = 0;
-  private disposeCatalogThumbnails?: () => void;
+  private disposeRoute?: () => void;
   private htmlThumbnailsGenerating = false;
   private fileReviewRefreshing = false;
   private reviewOrder: string[] = [];
   private reviewAnchor = "";
   private reviewFilters = { query: "", folder: "" };
-  private automations: AutomationSnapshot = {
-    status: "ready",
-    checkedAt: "",
-    isDesktopMac: false,
-    isExecutor: false,
-    executorState: "unsupported",
-    uid: null,
-    message: "Automation status has not been checked yet.",
-    items: [],
-  };
-  private memory: SystemMemorySnapshot = {
-    status: "unavailable",
-    checkedAt: "",
-    reason: "unsupported-platform",
-    message: "RAM status has not been checked yet.",
-  };
-  private remoteAutomation: RemoteAutomationSnapshot = emptyRemoteAutomationSnapshot();
-  private readonly automationStartingIds = new Set<string>();
-  private readonly automationRequestMessages = new Map<string, string>();
-  private remoteObsidianReloading = false;
-  private remoteObsidianReloadMessage = "";
-  private operationsRefreshing = false;
-  private operationsRefreshPromise: Promise<void> | null = null;
-  private operationsRefreshQueued = false;
-  private operationsRefreshQueuedNotice = false;
-  private operationsSnapshotRequests = 0;
-  private systemStatusTimer: number | null = null;
   private renderState: DashboardRenderState = {
     query: "",
     selectedAreaPath: "",
@@ -240,12 +196,8 @@ export class VaultControlCenterView extends ItemView {
   private refreshQueued = false;
   private refreshQueuedForce = false;
   private backgroundRefreshPending = false;
-  private automationSnapshotGeneration = 0;
-  private automationSnapshotAppliedGeneration = 0;
-  private memorySnapshotGeneration = 0;
   private taskboardFetchedAt = 0;
   private taskboardSettingsKey = "";
-  private operationsFetchedAt = 0;
   private readonly browserRegionId = `fjg-vcc-browser-${++dashboardViewSequence}`;
   private readonly folderRailId = `fjg-vcc-folder-rail-${dashboardViewSequence}`;
 
@@ -289,24 +241,17 @@ export class VaultControlCenterView extends ItemView {
     this.registerEvent(this.app.workspace.on("active-leaf-change", refreshWhenShown));
     this.registerEvent(this.app.workspace.on("layout-change", refreshWhenShown));
     await this.refreshWhenVisible();
-    this.systemStatusTimer = window.setInterval(() => {
-      if (this.route === "automations" && this.contentEl.isShown()) void this.refreshMemoryOnly();
-    }, 30_000);
   }
 
   async onClose(): Promise<void> {
     this.htmlCatalogFeed.stop();
-    this.disposeCatalogThumbnails?.();
-    this.disposeCatalogThumbnails = undefined;
+    this.disposeRoute?.();
+    this.disposeRoute = undefined;
     this.backgroundRefreshPending = false;
     if (this.templateSaveTimer !== null) {
       window.clearTimeout(this.templateSaveTimer);
       this.templateSaveTimer = null;
       await this.plugin.saveSettings();
-    }
-    if (this.systemStatusTimer !== null) {
-      window.clearInterval(this.systemStatusTimer);
-      this.systemStatusTimer = null;
     }
     this.htmlOpenRequestId += 1;
     this.previewRequestId += 1;
@@ -392,6 +337,7 @@ export class VaultControlCenterView extends ItemView {
       ? normalizeVaultPath(saved.previewPath)
       : "";
     this.pendingPreviewPath =
+      this.route !== "automations" &&
       savedPreviewPath &&
       !isExcludedPath(savedPreviewPath) &&
       !isSensitivePath(savedPreviewPath)
@@ -467,7 +413,7 @@ export class VaultControlCenterView extends ItemView {
 
   private async performRefresh(forceRemote: boolean): Promise<void> {
     this.rootEl?.setAttribute("data-refreshing", "true");
-    if (!this.data) this.renderLoading();
+    if (!this.data && this.route !== "automations") this.renderLoading();
     try {
       const taskboardSettingsKey = JSON.stringify({
         reuseTaskCaptureConnection: this.plugin.settings.reuseTaskCaptureConnection,
@@ -480,44 +426,18 @@ export class VaultControlCenterView extends ItemView {
         !this.taskboardFetchedAt ||
         this.taskboardSettingsKey !== taskboardSettingsKey ||
         Date.now() - this.taskboardFetchedAt >= TASKBOARD_CACHE_TTL_MS;
-      const shouldRefreshOperations =
-        forceRemote ||
-        !this.operationsFetchedAt ||
-        Date.now() - this.operationsFetchedAt >= OPERATIONS_CACHE_TTL_MS;
-      const isDesktopMac = Platform.isDesktopApp && Platform.isMacOS;
-      const automationGeneration = shouldRefreshOperations
-        ? ++this.automationSnapshotGeneration
-        : 0;
-      const memoryGeneration = shouldRefreshOperations
-        ? ++this.memorySnapshotGeneration
-        : 0;
-      const operationsPromise = shouldRefreshOperations
-        ? this.buildOperationsState(isDesktopMac)
-        : Promise.resolve(null);
-      const [data, taskboard, operations] = await Promise.all([
+      const [data, taskboard] = await Promise.all([
         buildDashboardData(this.app, this.plugin.settings, {
           recentFilePaths: this.previewHistory,
         }),
         shouldRefreshTaskboard
           ? fetchTaskboardSnapshot(this.app, this.plugin.settings)
           : Promise.resolve(this.taskboard),
-        operationsPromise,
       ]);
       await this.plugin.fileReview.refresh();
       const restoreTaskSelection = !this.data;
       this.data = data;
       this.taskboard = taskboard;
-      if (
-        operations &&
-        automationGeneration === this.automationSnapshotGeneration
-      ) {
-        this.automations = operations.automations;
-        this.automationSnapshotAppliedGeneration = automationGeneration;
-        this.operationsFetchedAt = Date.now();
-      }
-      if (operations && memoryGeneration === this.memorySnapshotGeneration) {
-        this.memory = operations.memory;
-      }
       if (shouldRefreshTaskboard) {
         this.taskboardFetchedAt = Date.now();
         this.taskboardSettingsKey = taskboardSettingsKey;
@@ -540,13 +460,15 @@ export class VaultControlCenterView extends ItemView {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Dashboard refresh failed.";
       new Notice(message);
-      this.renderFailure(message);
+      if (this.route !== "automations") this.renderFailure(message);
     } finally {
       this.rootEl?.removeAttribute("data-refreshing");
     }
   }
 
   private renderShell(): void {
+    this.disposeRoute?.();
+    this.disposeRoute = undefined;
     const previousFocus = this.contentEl.ownerDocument.activeElement === this.searchInputEl;
     this.previewRequestId += 1;
     this.disposePreviewComponent();
@@ -794,14 +716,28 @@ export class VaultControlCenterView extends ItemView {
   }
 
   private renderContent(): void {
-    if (!this.contentRegionEl) return;
+    const region = this.contentRegionEl;
+    if (!region) return;
+    this.rootEl?.setAttribute("data-current-route", this.route);
+    if (this.route === "automations") {
+      // Leave the live card mounted during general dashboard refresh and search;
+      // it owns its own status polling, request state, and keyboard targets.
+      if (region.firstElementChild?.getAttribute("data-route") !== "automations") {
+        this.syncFolderRailAttribute();
+        this.disposeRoute?.();
+        this.disposeRoute = renderRoute("automations", region, null,
+          desktopMailCacheBridge(Platform.isDesktopApp && Platform.isMacOS));
+      }
+      return;
+    }
+    this.disposeRoute?.();
+    this.disposeRoute = undefined;
     if (!this.data) {
       this.renderLoading();
       return;
     }
     this.syncFolderRailAttribute();
-    this.disposeCatalogThumbnails?.();
-    this.disposeCatalogThumbnails = renderRoute(this.route, this.contentRegionEl, this.renderContext());
+    this.disposeRoute = renderRoute(this.route, region, this.renderContext());
     this.syncPreviewSelection();
   }
 
@@ -929,7 +865,6 @@ export class VaultControlCenterView extends ItemView {
         },
         thumbnail: (path) => readLocalCatalogThumbnail(this.app, path, this.plugin.settings.htmlThumbnailFolder),
       },
-      automations: this.automations,
       fileReview: this.plugin.fileReview.snapshot,
       reviewFilters: this.reviewFilters,
       reviewFiltersChanged: () => this.updateReviewNextButton(),
@@ -944,14 +879,6 @@ export class VaultControlCenterView extends ItemView {
           }).open();
         }
       },
-      memory: this.memory,
-      automationStartingIds: this.automationStartingIds,
-      automationRequestMessages: this.automationRequestMessages,
-      remoteObsidianReloadAvailable: this.remoteAutomation.reachable && this.remoteAutomation.obsidianReloadAvailable,
-      remoteObsidianReloadCapabilityReported: this.remoteAutomation.reachable && this.remoteAutomation.obsidianReloadCapabilityReported,
-      remoteObsidianReloading: this.remoteObsidianReloading,
-      remoteObsidianReloadMessage: this.remoteObsidianReloadMessage,
-      operationsRefreshing: this.operationsRefreshing,
       settings: this.plugin.settings,
       state: this.renderState,
       activePreviewPath: this.activePreviewFile?.path ?? this.pendingPreviewPath,
@@ -977,9 +904,6 @@ export class VaultControlCenterView extends ItemView {
       },
       navigate: (route) => this.navigate(route),
       openFile: (path) => void this.openPreview(path),
-      refreshOperations: () => void this.refreshOperations(true),
-      runAutomation: (id) => void this.runAutomationNow(id),
-      reloadRemoteObsidian: () => void this.reloadRemoteObsidian(),
       openBookmark: (bookmark) => void this.openBookmark(bookmark),
       openExternal: (url) => this.openExternal(url),
       capture: (commandId, label) => this.plugin.executeCapture(commandId, label),
@@ -1136,153 +1060,6 @@ export class VaultControlCenterView extends ItemView {
     } finally {
       this.htmlThumbnailsGenerating = false;
       this.renderContent();
-    }
-  }
-
-  private async refreshOperations(showNotice: boolean): Promise<void> {
-    this.operationsRefreshQueued = true;
-    this.operationsRefreshQueuedNotice ||= showNotice;
-    if (!this.operationsRefreshPromise) {
-      this.operationsRefreshPromise = this.drainOperationsRefreshQueue();
-    }
-    return this.operationsRefreshPromise;
-  }
-
-  private async drainOperationsRefreshQueue(): Promise<void> {
-    this.operationsRefreshing = true;
-    if (this.route === "automations") this.renderContent();
-    try {
-      while (this.operationsRefreshQueued) {
-        const showNotice = this.operationsRefreshQueuedNotice;
-        this.operationsRefreshQueued = false;
-        this.operationsRefreshQueuedNotice = false;
-        await this.performOperationsRefresh(showNotice);
-      }
-    } finally {
-      this.operationsRefreshing = false;
-      this.operationsRefreshPromise = null;
-      if (this.route === "automations") this.renderContent();
-    }
-  }
-
-  private async performOperationsRefresh(showNotice: boolean): Promise<void> {
-    try {
-      const isDesktopMac = Platform.isDesktopApp && Platform.isMacOS;
-      const automationGeneration = ++this.automationSnapshotGeneration;
-      const memoryGeneration = ++this.memorySnapshotGeneration;
-      const operations = await this.buildOperationsState(isDesktopMac);
-      await this.plugin.fileReview.refresh();
-      if (automationGeneration === this.automationSnapshotGeneration) {
-        this.automations = operations.automations;
-        this.automationSnapshotAppliedGeneration = automationGeneration;
-        this.operationsFetchedAt = Date.now();
-      }
-      if (memoryGeneration === this.memorySnapshotGeneration) {
-        this.memory = operations.memory;
-      }
-      if (showNotice) new Notice("Automation and RAM status refreshed.");
-    } catch {
-      new Notice("Automation and RAM status could not be refreshed.");
-    }
-  }
-
-  private async refreshMemoryOnly(): Promise<void> {
-    if (!this.automations.isExecutor) {
-      await this.refreshOperations(false);
-      return;
-    }
-    if (
-      this.operationsRefreshing ||
-      this.operationsSnapshotRequests > 0 ||
-      this.automationSnapshotAppliedGeneration !== this.automationSnapshotGeneration
-    ) {
-      return;
-    }
-    const automationGeneration = this.automationSnapshotGeneration;
-    const memoryGeneration = ++this.memorySnapshotGeneration;
-    try {
-      const memory = await buildSystemMemorySnapshot({
-        isDesktopMac: Platform.isDesktopApp && Platform.isMacOS,
-        isExecutorEligible: this.automations.isExecutor,
-      });
-      if (
-        automationGeneration === this.automationSnapshotGeneration &&
-        memoryGeneration === this.memorySnapshotGeneration
-      ) {
-        this.memory = memory;
-        if (this.route === "automations") this.renderContent();
-      }
-    } catch {
-      // Keep the previous reading; the next timer or explicit refresh can retry.
-    }
-  }
-
-  private async buildOperationsState(
-    isDesktopMac: boolean
-  ): Promise<{ automations: AutomationSnapshot; memory: SystemMemorySnapshot }> {
-    this.operationsSnapshotRequests += 1;
-    try {
-      let automations = await buildAutomationSnapshot(this.app, {
-        isDesktopMac,
-      });
-      let memory: SystemMemorySnapshot;
-      if (automations.isExecutor) {
-        this.remoteAutomation = emptyRemoteAutomationSnapshot(
-          "disabled",
-          "Local executor controls are active on this Mac."
-        );
-        memory = await buildSystemMemorySnapshot({
-          isDesktopMac,
-          isExecutorEligible: true,
-        });
-      } else {
-        this.remoteAutomation = await fetchRemoteAutomationSnapshot(
-          this.app,
-          this.plugin.settings
-        );
-        automations = applyRemoteAutomationAvailability(
-          automations,
-          this.remoteAutomation
-        );
-        memory = this.remoteAutomation.memory;
-      }
-      return { automations, memory };
-    } finally {
-      this.operationsSnapshotRequests -= 1;
-    }
-  }
-
-  private async runAutomationNow(id: string): Promise<void> {
-    if (this.automationStartingIds.has(id)) return;
-    this.automationStartingIds.add(id);
-    if (this.route === "automations") this.renderContent();
-    try {
-      const item = this.automations.items.find((entry) => entry.id === id);
-      const result = item?.runTarget === "remote"
-        ? await submitRemoteAutomation(this.app, this.plugin.settings, id)
-        : await runAutomation(id, { snapshot: this.automations });
-      this.automationRequestMessages.set(id, result.message);
-      new Notice(result.message, result.status === "error" ? 8_000 : 6_000);
-    } catch {
-      this.automationRequestMessages.set(id, "The automation request failed.");
-      new Notice("The automation could not be started.", 8_000);
-    } finally {
-      this.automationStartingIds.delete(id);
-      await this.refreshOperations(false);
-    }
-  }
-
-  private async reloadRemoteObsidian(): Promise<void> {
-    if (this.remoteObsidianReloading || !this.remoteAutomation.reachable || !this.remoteAutomation.obsidianReloadAvailable) return;
-    this.remoteObsidianReloading = true;
-    if (this.route === "automations") this.renderContent();
-    try {
-      const result = await submitRemoteObsidianReload(this.app, this.plugin.settings);
-      this.remoteObsidianReloadMessage = result.message;
-      new Notice(result.message, result.status === "error" ? 8_000 : 6_000);
-    } finally {
-      this.remoteObsidianReloading = false;
-      await this.refreshOperations(false);
     }
   }
 
@@ -1458,7 +1235,7 @@ export class VaultControlCenterView extends ItemView {
       void this.closePreview();
       return;
     }
-    if (event.key === "/" && !isEditing) {
+    if (event.key === "/" && !isEditing && this.route !== "automations") {
       event.preventDefault();
       this.searchInputEl?.focus();
     }

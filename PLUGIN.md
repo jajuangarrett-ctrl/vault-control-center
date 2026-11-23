@@ -13,9 +13,8 @@ Vault Control Center is a standalone native Obsidian community plugin. It presen
 - `src/data.ts` builds the in-memory vault index and applies privacy filters.
 - `src/program-navigation.ts` owns recursive folder views and safe route-wide Areas/Programs file search.
 - `src/html-gallery.ts` intersects exact configured HTML home pages with safe gallery roots, caches concurrency-bounded metadata parsing, derives stable thumbnail paths, and performs explicitly requested Quick Look generation.
-- `src/automations.ts` owns the fixed automation inventory, synchronized status parsing, local launchd inspection, executor detection, and allowlisted local routine starts.
-- `src/remote-automation.ts` owns the fail-closed broker client, Secret Storage lookup, remote executor health, sanitized RAM parsing, and fixed-ID request submission.
-- `src/system-memory.ts` reads RAM only after the desktop-macOS and executor-host guards pass.
+- `src/mail-cache-bridge.ts` validates the fixed macOS local status/request contract, and `src/mail-cache-bridge-renderer.ts` owns the Automations card and its route-scoped polling.
+- The legacy automation inventory, broker, RAM helpers, and background runner sources remain for compatibility; the dashboard no longer calls them.
 - `src/file-review.ts` builds the recursive live inventory for the three watched AI Team inboxes and validates exact per-file moves.
 - `src/taskboard.ts` derives the Home task summary from local FJG Task Manager workspace notes; the older remote adapter remains inert compatibility code in v0.2.0.
 - `src/renderers.ts` renders all eleven routes with native DOM elements.
@@ -45,15 +44,13 @@ The Home task panel delegates its primary action to `fjg-task-manager:open-dashb
 
 ## Data and security boundary
 
-The plugin persists validated settings. Derived file lists, live File review membership, queue records, people records, bookmark results, task-workspace results, automation state, and RAM readings remain in memory. A capped safe-path preview history and the folder-rail disclosure state may remain in Obsidian workspace state. Explicitly generated HTML thumbnails are the intentional derived-file exception and are stored in the configured vault-relative runtime folder. The legacy File Review Records JSON is left untouched for backward evidence but is no longer read or written by the live queue.
+The plugin persists validated settings. Derived file lists, live File review membership, queue records, people records, bookmark results, task-workspace results, and Mail Cache Bridge status remain in memory. A capped safe-path preview history and the folder-rail disclosure state may remain in Obsidian workspace state. Explicitly generated HTML thumbnails are the intentional derived-file exception and are stored in the configured vault-relative runtime folder. The legacy File Review Records JSON is left untouched for backward evidence but is no longer read or written by the live queue.
 
 Vault content discovery stays inside the configured vault roots and applies the shared sensitive, hidden, and archived-path filters. HTML discovery additionally requires an exact `htmlHomePages` match inside `htmlRoots`, then applies mechanical exclusions for inbox/queue, development, build, test, template, and reusable-design-system paths. Metadata reads are capped, individual file errors fail open to a fallback card, and HTML source is never executed by the gallery.
 
 On desktop macOS, **Update previews** invokes `/usr/bin/qlmanage` with `execFile`, an argument vector, `shell: false`, bounded time/buffer/concurrency settings, and one temporary directory per artifact. The explicit UI action regenerates the current gallery so changes in linked assets are reflected. Temporary output is removed after each attempt, and final PNGs are written through Obsidian's vault API with shared-folder and duplicate-file race recovery.
 
-The Automations route uses only the compiled `FJG_AUTOMATION_ALLOWLIST`. Vault status notes can report results but cannot introduce a command or change a launchd label. Local checks and starts use `/bin/launchctl` through `execFile` with `shell: false`. On a non-executor device, the optional dedicated broker accepts only the ten compiled routine IDs plus one distinct fixed `reload-obsidian` application action, each with four bounded request fields. The reload action is not a processor or **Run now** job and invokes only Obsidian's bundled CLI with its fixed in-app `app:reload` command after the executor reports capability. The broker uses separate client/executor authentication, short expirations, replay protection, conditional claims, rate limits, and one in-flight lock per job. Its current-user runner freshly verifies `com.fjg.vault-automation-executor`, the exact mapped target, and the target's non-running state before the same no-shell `kickstart` vector. `-k`, sudo, shells, paths, arguments, environment input, scripts, prompts, and executable content are never accepted. Service, high-impact, disabled, external, missing, status-only, unknown, expired, replayed, unloaded, and already-running requests are rejected.
-
-RAM status uses the same proven-executor gate. It reads local counters on the executor Mac or a sanitized fresh authenticated heartbeat from the remote runner; it never substitutes the current device's RAM on a non-executor Mac, Windows/Linux desktop, or mobile device.
+The Automations tab uses a single same-user IPC folder outside the vault: `~/Library/Application Support/Mail Cache Bridge/Controls`. Only the companion app creates it after native opt-in. The tab accepts a bounded, owner-only aggregate status document with a 30-second heartbeat expiry. Clicking **Sync Now** publishes an owner-only versioned request with a UUID and UTC timestamp, atomically without replacing an existing request. The bridge independently authorizes, consumes, and expires requests. This is a same-user convenience channel, not process authentication. No Mail data, export contents, credential, network call, command execution, or sync-to-vault path is part of this tab.
 
 The v0.2.0 FJG Task Manager integration reads only `08 Tasks/Workspaces/*/task.md`, excludes completed and archived workspaces from the open count, sorts **Do First** tasks by due date, and renders at most eight task rows. It performs no taskboard network request. Retained remote-taskboard settings and adapter code do not supply the Home panel in this version.
 
@@ -63,26 +60,13 @@ The HTML route subscribes to the enabled HTML Viewer plugin’s metadata-only `g
 
 Thumbnail generation is intentionally unavailable outside desktop Obsidian on macOS or when the vault does not use a local `FileSystemAdapter`. Browsing the catalog and synchronized thumbnails remains available across devices. Selecting a card uses the existing device-specific viewer or safe source fallback; preview listings never invoke that reader.
 
-## Automation inventory and RAM
+## Mail Cache Bridge dashboard
 
-The Automations route displays scheduled vault processors and external/cloud entries. Services and repository-sync entries remain part of the internal safety-reviewed inventory but are intentionally omitted from the dashboard. Synchronized status notes are readable on every device. Desktop macOS additionally checks each verified launchd label with `launchctl print`. This produces an executor/non-executor/unsupported state that governs every manual control and the RAM card; hostname alone is never treated as proof of executor identity.
-
-The fixed inventory and manual policies are:
-
-- **Routine, eligible only after all executor/load checks:** Clippings inbox, Root inbox, iFLYTEK notes, YouTube transcript notes, FJG capture transcripts, and Weekly Codex learning review.
-- **Status only:** Mira email filing and Mira local sync; Outlook local exporter is also status-only and marked as an expected missing service.
-- **Continuous service:** Agent Mission Control runner.
-- **High impact, blocked:** Codex repository auto-commit.
-- **Disabled:** Plugin repository auto-pull and iOS repository auto-pull.
-- **External:** Gmail capture and Netlify retention cleanup.
-
-Only the routine vault processors with verified labels can expose **Run now**, either locally on the confirmed executor or remotely when a fresh broker heartbeat reports the fixed job ID ready. External cloud jobs remain visible but non-runnable; continuous services, repository-committing jobs, disabled legacy sync, and missing services are omitted from the visible dashboard. RAM refreshes every 30 seconds while this route is open and can also be refreshed with the route status action.
-
-The dedicated broker lives under `netlify/functions/`, and the current-user runner and LaunchAgent templates live under `scripts/` and `runner/`. See `docs/REMOTE_AUTOMATION.md` for installation, credential, validation, and pairing procedures.
+Use macOS desktop Obsidian on the same Mac running Mail Cache Bridge. Enable exports and **Allow Vault Control Center** in Mail Cache Bridge. The tab shows live status, last sync, indexed count, schedule and **Sync Now**; mobile shows the Mac-only explanation. Disconnected or invalid status and pending requests are not treated as completed. Existing jobs, preferences, and the legacy broker/runner files are untouched; they are not controlled by this tab.
 
 ## Automation file review
 
-Version 0.3.17 adds **Move** at the upper right of an opened item's preview, beside Edit, Open in tab, and Hide files. Choose an existing destination folder in the searchable picker; Escape or tapping outside cancels. It moves only the opened file, never the entire inbox. At narrow widths the folder-input icon keeps a 44 px minimum touch target and an accessible “Move [filename] to another folder” label. The preview path and File review queue refresh after a move. Collisions never overwrite, stale/deleted/replaced selections are rejected, and repeated taps cannot launch overlapping moves. Existing File review row actions and automation controls remain available.
+Version 0.3.17 adds **Move** at the upper right of an opened item's preview, beside Edit, Open in tab, and Hide files. Choose an existing destination folder in the searchable picker; Escape or tapping outside cancels. It moves only the opened file, never the entire inbox. At narrow widths the folder-input icon keeps a 44 px minimum touch target and an accessible “Move [filename] to another folder” label. The preview path and File review queue refresh after a move. Collisions never overwrite, stale/deleted/replaced selections are rejected, and repeated taps cannot launch overlapping moves. Existing File review row actions remain available.
 
 Version 0.3.16 makes **Automations → File review** a live recursive queue for exactly `AI Team/Formatted_Notes/`, `AI Team/Team_Inbox/`, and `AI Team/owner_inbox/`. Every file currently known to Obsidian below those roots appears once, including files in subfolders and files never recorded by a processor. Search matches current filenames and paths, and the inbox filter groups current membership rather than historical workflows. A dedicated **Refresh files** button rescans only these three roots without starting or refreshing automations.
 
@@ -112,7 +96,7 @@ npm run check
 Before a release:
 
 1. Confirm both theme modes and coordinated-shell cleanup in Obsidian.
-2. Verify all eleven routes, route-wide Areas/Programs search and clearing, no-results recovery, search-result preview/Back, native Markdown Edit/Preview saving and cursor stability, HTML discovery/search/opening and Quick Look fallbacks, cross-device automation status, executor-only routine starts and RAM, FJG Task Manager counts/rows/command delegation, refresh, the root-rail disclosure, compact preview actions, reusable native editor-tab behavior, wrapped paths, split-pane responsiveness, and mobile-width layout.
+2. Verify all eleven routes, route-wide Areas/Programs search and clearing, no-results recovery, search-result preview/Back, native Markdown Edit/Preview saving and cursor stability, HTML discovery/search/opening and Quick Look fallbacks, the Mail Cache Bridge ready/busy/completed/stale states and Mac-only fallback, FJG Task Manager counts/rows/command delegation, refresh, the root-rail disclosure, compact preview actions, reusable native editor-tab behavior, wrapped paths, split-pane responsiveness, and mobile-width layout.
 3. Run a credential and machine-path scan across source, generated runtime paths, and `main.js`.
 4. Confirm `npm audit` reports no known vulnerabilities.
 5. Update `package.json`, `package-lock.json`, `manifest.json`, `versions.json`, and `CHANGELOG.md` together.

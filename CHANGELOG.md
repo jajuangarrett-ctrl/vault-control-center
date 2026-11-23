@@ -1,3 +1,9 @@
+## 0.3.37
+
+- Replace the Automations tab with a dedicated Mail Cache Bridge Inbox sync dashboard. It shows local status, last sync, indexed count and **Sync Now** on the Mac running the opted-in companion app.
+- On other devices, explain how to use the dashboard on the Mac without reading or forwarding mailbox information.
+- Remove the scheduled processor, RAM, and remote Obsidian reload controls from this tab. Existing automations and saved preferences are untouched.
+
 ## 0.3.36
 
 - Source the HTML tab from HTML Viewer 0.2.3+ rather than maintaining a separate vault-wide list. Viewer exclusions and updates carry through; if the plugin is disabled or too old, the tab explains what to do.

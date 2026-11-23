@@ -26,15 +26,10 @@ import {
   searchProgramFiles,
 } from "./program-navigation";
 import { renderHtmlCatalog, type HtmlCatalogControls } from "./html-catalog-renderer";
-import type {
-  AutomationGroup,
-  AutomationItemSnapshot,
-  AutomationSnapshot,
-} from "./automations";
-import { VISIBLE_AUTOMATION_GROUPS } from "./automations";
+import { renderMailCacheBridge } from "./mail-cache-bridge-renderer";
+import type { MailCacheBridgeTransport } from "./mail-cache-bridge";
 import { reviewPath, filterReviewRows, type FileReviewSnapshot, type ReviewRow } from "./file-review";
 import { renderReviewPath } from "./file-review-path";
-import type { SystemMemorySnapshot } from "./system-memory";
 import type { TaskboardSnapshot } from "./taskboard";
 import {
   DEFAULT_SETTINGS,
@@ -66,7 +61,6 @@ export interface DashboardRenderContext {
   data: DashboardData;
   taskboard: TaskboardSnapshot;
   htmlCatalog: HtmlCatalogControls;
-  automations: AutomationSnapshot;
   fileReview: FileReviewSnapshot;
   reviewFilters: { query: string; folder: string };
   reviewFiltersChanged: () => void;
@@ -74,14 +68,6 @@ export interface DashboardRenderContext {
   refreshReviewFiles: () => void;
   moveReviewFile: (row: ReviewRow) => void;
   openReviewFile: (row: ReviewRow) => void;
-  memory: SystemMemorySnapshot;
-  automationStartingIds: ReadonlySet<string>;
-  automationRequestMessages: ReadonlyMap<string, string>;
-  remoteObsidianReloadAvailable: boolean;
-  remoteObsidianReloadCapabilityReported: boolean;
-  remoteObsidianReloading: boolean;
-  remoteObsidianReloadMessage: string;
-  operationsRefreshing: boolean;
   settings: DashboardSettings;
   state: DashboardRenderState;
   activePreviewPath: string;
@@ -96,9 +82,6 @@ export interface DashboardRenderContext {
   clearSearch: () => void;
   navigate: (route: DashboardRoute) => void;
   openFile: (path: string) => void;
-  refreshOperations: () => void;
-  runAutomation: (id: string) => void;
-  reloadRemoteObsidian: () => void;
   openBookmark: (bookmark: DashboardBookmark) => void;
   openExternal: (url: string) => void;
   capture: (commandId: string, label: string) => void;
@@ -138,10 +121,14 @@ const AI_QUEUE_ORDER: AiFolderKey[] = [
 export function renderRoute(
   route: DashboardRoute,
   parent: HTMLElement,
-  context: DashboardRenderContext
+  context: DashboardRenderContext | null,
+  mailCacheBridge: MailCacheBridgeTransport | null = null,
 ): (() => void) | undefined {
   parent.empty();
   const view = parent.createDiv({ cls: "fjg-vcc-route-view", attr: { "data-route": route } });
+
+  if (route === "automations") return renderMailCacheBridge(view, mailCacheBridge);
+  if (!context) return;
 
   switch (route) {
     case "home":
@@ -164,9 +151,6 @@ export function renderRoute(
     case "ai-team":
       renderAiTeam(view, context);
       break;
-    case "automations":
-      renderAutomations(view, context);
-      break;
     case "file-review":
       renderFileReview(view, context);
       break;
@@ -185,89 +169,6 @@ export function renderRoute(
     case "settings":
       renderSettings(view, context);
       break;
-  }
-}
-
-function renderAutomations(parent: HTMLElement, context: DashboardRenderContext): void {
-  const toolbar = parent.createDiv({ cls: "fjg-vcc-operations-toolbar" });
-  const copy = toolbar.createDiv({ cls: "fjg-vcc-operations-toolbar-copy" });
-  copy.createEl("h2", { text: "Automation control center" });
-  copy.createEl("p", {
-    text:
-      "See synchronized results on any device. Run controls unlock only on the Mac that owns the loaded vault-processing jobs.",
-  });
-  createButton(toolbar, {
-    label: context.operationsRefreshing ? "Refreshing…" : "Refresh status",
-    icon: "refresh-cw",
-    className: "fjg-vcc-button",
-    disabled: context.operationsRefreshing,
-    onClick: context.refreshOperations,
-  });
-
-  const hostNote = parent.createDiv({ cls: "fjg-vcc-automation-host-note" });
-  createIcon(
-    hostNote,
-    context.automations.isExecutor ? "server-cog" : "monitor-dot"
-  );
-  hostNote.createSpan({ text: context.automations.message });
-
-  if (!context.automations.isExecutor) {
-    const remoteControl = parent.createDiv({ cls: "fjg-vcc-automation-host-note" });
-    createIcon(remoteControl, "rotate-cw");
-    const remoteCopy = remoteControl.createDiv();
-    remoteCopy.createSpan({ text: "Always-on Mac · Obsidian application" });
-    if (context.remoteObsidianReloadMessage) {
-      remoteCopy.createDiv({ cls: "fjg-vcc-automation-request-result", text: context.remoteObsidianReloadMessage });
-    }
-    createButton(remoteControl, {
-      label: context.remoteObsidianReloading ? "Reloading…" : "Reload Obsidian",
-      icon: context.remoteObsidianReloading ? "loader-circle" : "rotate-cw",
-      className: "fjg-vcc-button is-primary",
-      disabled: context.remoteObsidianReloading || !context.remoteObsidianReloadAvailable,
-      title: context.remoteObsidianReloadAvailable
-        ? "Reload Obsidian on the always-on Mac. This does not confirm Obsidian Sync completion."
-        : context.remoteObsidianReloadCapabilityReported
-          ? "The always-on Mac has Obsidian reload support installed, but its bundled Obsidian CLI is unavailable."
-          : "The always-on Mac has not yet reported the updated remote Obsidian reload runner.",
-      onClick: context.reloadRemoteObsidian,
-    });
-  }
-
-  renderMemoryCard(parent, context);
-
-  const groupLabels: Record<(typeof VISIBLE_AUTOMATION_GROUPS)[number], string> = {
-    "routine-vault": "Scheduled vault processors",
-  };
-  const groups: Array<{ id: AutomationGroup; label: string }> =
-    VISIBLE_AUTOMATION_GROUPS.map((id) => ({ id, label: groupLabels[id] }));
-  for (const group of groups) {
-    const visible = context.automations.items.filter(
-      (item) =>
-        item.group === group.id &&
-        matchesQuery(
-          context.state.query,
-          item.label,
-          item.description,
-          item.schedule,
-          item.lastResult ?? "",
-          item.runMessage
-        )
-    );
-    if (!visible.length && context.state.query) continue;
-    const panel = createPanel(parent, `${group.label} · ${visible.length}`, {
-      className: "fjg-vcc-automation-section",
-    });
-    if (!visible.length) {
-      createEmptyState(
-        panel.body,
-        "No automations match",
-        "Clear search to restore this automation group.",
-        "workflow"
-      );
-      continue;
-    }
-    const grid = panel.body.createDiv({ cls: "fjg-vcc-automation-grid" });
-    for (const item of visible) renderAutomationCard(grid, item, context);
   }
 }
 
@@ -345,136 +246,6 @@ export function renderFileReview(parent: HTMLElement, context: DashboardRenderCo
   coverage.createEl("summary", { text: "Review folders" });
   coverage.createEl("p", { text: snapshot.message });
   for (const source of snapshot.coverage) coverage.createDiv({ text: `${source.path}: ${source.message}` });
-}
-
-function renderMemoryCard(parent: HTMLElement, context: DashboardRenderContext): void {
-  const memory = context.memory;
-  const tone = memory.status === "ready" ? memory.tone : "attention";
-  const card = parent.createEl("section", {
-    cls: "fjg-vcc-memory-card",
-    attr: { "data-tone": tone, "aria-label": "Always-on Mac RAM usage" },
-  });
-  const copy = card.createDiv({ cls: "fjg-vcc-memory-copy" });
-  copy.createSpan({ cls: "fjg-vcc-memory-kicker", text: "Always-on Mac RAM" });
-  const value = copy.createDiv({ cls: "fjg-vcc-memory-value" });
-  if (memory.status === "ready") {
-    value.createEl("strong", { text: `${formatNumber(memory.usedPercent)}%` });
-    value.createSpan({ text: "in use" });
-    copy.createDiv({
-      cls: "fjg-vcc-memory-detail",
-      text: `${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)} · ${formatNumber(memory.freePercent)}% available`,
-    });
-  } else {
-    value.createEl("strong", { text: "Unavailable" });
-    copy.createDiv({ cls: "fjg-vcc-memory-detail", text: memory.message });
-  }
-
-  const meter = card.createDiv({ cls: "fjg-vcc-memory-meter" });
-  const track = meter.createDiv({
-    cls: "fjg-vcc-memory-track",
-    attr: {
-      role: "progressbar",
-      "aria-label": "RAM in use",
-      "aria-valuemin": "0",
-      "aria-valuemax": "100",
-      "aria-valuenow": String(memory.status === "ready" ? memory.usedPercent : 0),
-    },
-  });
-  const fill = track.createSpan({ cls: "fjg-vcc-memory-fill" });
-  fill.style.width = `${memory.status === "ready" ? memory.usedPercent : 0}%`;
-  meter.createDiv({
-    cls: "fjg-vcc-memory-detail",
-    text: memory.checkedAt
-      ? `Checked ${formatRelativeTime(Date.parse(memory.checkedAt))}`
-      : "Waiting for the first status check",
-  });
-  createButton(meter, {
-    label: context.operationsRefreshing ? "Refreshing…" : "Refresh RAM",
-    icon: "refresh-cw",
-    className: "fjg-vcc-button",
-    disabled: context.operationsRefreshing,
-    onClick: context.refreshOperations,
-  });
-}
-
-function renderAutomationCard(
-  parent: HTMLElement,
-  item: AutomationItemSnapshot,
-  context: DashboardRenderContext
-): void {
-  const starting = context.automationStartingIds.has(item.id);
-  const state = starting
-    ? "running"
-    : item.statusReadState === "error" || item.healthTone === "critical"
-      ? "error"
-      : "idle";
-  const card = parent.createEl("article", {
-    cls: "fjg-vcc-automation-card",
-    attr: { "data-state": state },
-  });
-  const header = card.createDiv({ cls: "fjg-vcc-automation-card-header" });
-  header.createSpan({ cls: "fjg-vcc-automation-card-title", text: item.label });
-  header.createSpan({ cls: "fjg-vcc-badge", text: item.schedule });
-  card.createEl("p", { text: item.description });
-  card.createEl("p", {
-    text: item.lastResult
-      ? `${item.lastResult}${item.lastCompletedAt ? ` · ${item.lastCompletedAt}` : ""}`
-      : item.statusMessage,
-  });
-  const footer = card.createDiv({ cls: "fjg-vcc-automation-card-footer" });
-  const statusTone = starting ? "attention" : automationStatusTone(item);
-  footer.createSpan({
-    cls: "fjg-vcc-automation-status",
-    text: starting ? "Starting with launchd…" : item.healthMessage,
-    attr: { "data-tone": statusTone },
-  });
-  const requestMessage = context.automationRequestMessages.get(item.id);
-  if (requestMessage) {
-    card.createDiv({
-      cls: "fjg-vcc-automation-request-result",
-      text: requestMessage,
-    });
-  }
-  const actions = footer.createDiv({ cls: "fjg-vcc-form-actions" });
-  if (item.resolvedStatusPath) {
-    createButton(actions, {
-      label: "View",
-      icon: "file-clock",
-      className: "fjg-vcc-button",
-      ariaLabel: `View the latest status for ${item.label}`,
-      title: "View latest status",
-      onClick: () => context.openFile(item.resolvedStatusPath ?? ""),
-    });
-  }
-  createButton(actions, {
-    label: starting ? "Starting…" : "Run now",
-    icon: starting ? "loader-circle" : "play",
-    className: "fjg-vcc-button is-primary",
-    disabled: starting || !item.canRun,
-    ariaLabel: item.canRun
-      ? `Run ${item.label} now`
-      : `${item.label}: ${item.runMessage}`,
-    title: item.canRun ? "Run now" : item.runMessage,
-    onClick: () => context.runAutomation(item.id),
-  });
-}
-
-function automationStatusTone(
-  item: AutomationItemSnapshot
-): "positive" | "attention" | "critical" | "neutral" {
-  return item.healthTone;
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "Unknown";
-  const gib = bytes / 1_073_741_824;
-  if (gib >= 1) return `${gib.toFixed(gib >= 10 ? 1 : 2)} GB`;
-  const mib = bytes / 1_048_576;
-  return `${mib.toFixed(mib >= 10 ? 0 : 1)} MB`;
-}
-
-function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function renderHome(parent: HTMLElement, context: DashboardRenderContext): void {
