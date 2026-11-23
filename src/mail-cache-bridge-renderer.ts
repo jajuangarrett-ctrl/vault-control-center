@@ -48,7 +48,7 @@ export function renderMailCacheBridge(
   const schedule = metric("Automatic sync");
   const receipt = panel.createEl("p", { cls: "fjg-vcc-mail-bridge-receipt", attr: { role: "status", "aria-live": "polite" } });
   receipt.hidden = true;
-  panel.createEl("p", { cls: "fjg-vcc-mail-bridge-privacy", text: "This dashboard shows status only. It does not read your mail or send anything through Obsidian Sync." });
+  panel.createEl("p", { cls: "fjg-vcc-mail-bridge-privacy", text: "The desktop control is local. Optional Mobile Mail Cache Sync shares only a refresh request and status, not your email or exported files." });
 
   let observation: BridgeObservation | undefined;
   let waiting: { id: string; sentAt: number } | undefined;

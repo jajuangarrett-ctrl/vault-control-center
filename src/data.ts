@@ -1,3 +1,4 @@
+import { isRemoteMailPath } from "./mail-cache-remote";
 import type { App, TFile } from "obsidian";
 
 export const AI_FOLDER_KEYS = [
@@ -285,7 +286,9 @@ export function isSensitivePath(path: string): boolean {
 }
 
 export function isExcludedPath(path: string): boolean {
-  const segments = normalizeVaultPath(path)
+  const normalized = normalizeVaultPath(path);
+  if (isRemoteMailPath(normalized)) return true;
+  const segments = normalized
     .split("/")
     .filter(Boolean)
     .map((segment) => segment.toLocaleLowerCase());

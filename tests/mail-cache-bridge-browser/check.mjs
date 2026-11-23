@@ -107,13 +107,30 @@ try {
   for (const width of [375, 756]) {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 720, mobile: true, deviceScaleFactor: 1 }, sessionId);
     await call("Page.navigate", { url: url + "?mobile=" + width }, sessionId);
-    await ready(`document.querySelector('${state}')?.innerText.includes("Available on Mac")`);
+    await ready(`document.querySelector('${state}')?.innerText.includes("Mac not connected")`);
     assert.equal(await evaluate(`document.querySelector('${sync}').disabled`), true);
-    assert.equal(await evaluate("fixture.reads() + fixture.requests()"), 0);
-    assert.equal(await evaluate(`document.querySelector('.fjg-vcc-mail-bridge-summary').hidden`), true);
+    assert.equal(await evaluate("fixture.requests()"), 0);
+    await evaluate("fixture.connectMobile()");
+    await click(refresh);
+    await ready(`document.querySelector('${state}')?.innerText.includes("Ready to sync")`);
+    await evaluate(`document.querySelector('${sync}').click()`);
+    assert.equal(await evaluate("fixture.mobileRequest()"), false, "untrusted mobile click");
+    await click(sync);
+    await ready(`document.body.innerText.includes("Requested · waiting for the Mac to receive it")`);
+    assert.equal(await evaluate("fixture.mobileRequest()"), true);
+    assert.equal(await evaluate("fixture.requests()"), 0, "mobile cannot invoke the native app");
+    await evaluate("fixture.syncToMac()");
+    await click(refresh);
+    await ready(`document.body.innerText.includes("Requested · waiting for Mail Cache Bridge")`);
+    assert.equal(await evaluate("fixture.requests()"), 1, "the Mac forwards the observer's request");
+    const phase = width === 375 ? 'completed' : 'failed';
+    await evaluate(`fixture.reportRemote(${JSON.stringify(phase)})`);
+    await click(refresh);
+    await ready(`document.body.innerText.includes("Sync ${phase}")`);
+    assert.equal(await evaluate(`document.body.innerText.includes("Indexed messages")`), false);
     assert.equal(await evaluate(`document.querySelector('.fjg-vcc-mail-bridge').getBoundingClientRect().right <= innerWidth`), true);
   }
-  console.log("VCC Mail Cache Bridge browser: trusted Sync Now, duplicate guard, matching receipt, completion, stale state, compact and unfolded mobile passed.");
+  console.log("VCC Mail Cache Bridge browser: trusted Sync Now, duplicate guard, matching receipt, completion, stale state, isolated request delivery and matching completed/failed status on compact and unfolded mobile passed.");
 } finally {
   clearTimeout(watchdog);
   child.kill();

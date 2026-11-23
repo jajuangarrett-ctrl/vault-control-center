@@ -26,6 +26,8 @@ import {
   searchProgramFiles,
 } from "./program-navigation";
 import { renderHtmlCatalog, type HtmlCatalogControls } from "./html-catalog-renderer";
+import { renderMobileMailCacheBridge } from "./mail-cache-remote-renderer";
+import type { createRemoteMailClient } from "./mail-cache-remote";
 import { renderMailCacheBridge } from "./mail-cache-bridge-renderer";
 import type { MailCacheBridgeTransport } from "./mail-cache-bridge";
 import { reviewPath, filterReviewRows, type FileReviewSnapshot, type ReviewRow } from "./file-review";
@@ -123,11 +125,12 @@ export function renderRoute(
   parent: HTMLElement,
   context: DashboardRenderContext | null,
   mailCacheBridge: MailCacheBridgeTransport | null = null,
+  mobileMailClient: ReturnType<typeof createRemoteMailClient> | null = null,
 ): (() => void) | undefined {
   parent.empty();
   const view = parent.createDiv({ cls: "fjg-vcc-route-view", attr: { "data-route": route } });
 
-  if (route === "automations") return renderMailCacheBridge(view, mailCacheBridge);
+  if (route === "automations") return mobileMailClient ? renderMobileMailCacheBridge(view, mobileMailClient) : renderMailCacheBridge(view, mailCacheBridge);
   if (!context) return;
 
   switch (route) {

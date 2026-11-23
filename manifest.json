@@ -1,9 +1,9 @@
 {
   "id": "vault-control-center",
   "name": "Vault Control Center",
-  "version": "0.3.37",
+  "version": "0.3.38",
   "minAppVersion": "1.12.7",
-  "description": "A native dashboard for vault files, tasks, AI queues, and local Mail Cache Bridge sync status.",
+  "description": "A native dashboard for vault files, tasks, AI queues, and Mail Cache Bridge sync controls.",
   "author": "Franklin Garrett",
   "authorUrl": "https://github.com/jajuangarrett-ctrl",
   "isDesktopOnly": false

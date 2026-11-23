@@ -726,7 +726,7 @@ export class VaultControlCenterView extends ItemView {
         this.syncFolderRailAttribute();
         this.disposeRoute?.();
         this.disposeRoute = renderRoute("automations", region, null,
-          desktopMailCacheBridge(Platform.isDesktopApp && Platform.isMacOS));
+          desktopMailCacheBridge(Platform.isDesktopApp && Platform.isMacOS), this.plugin.mobileMailClient());
       }
       return;
     }

@@ -1,3 +1,8 @@
+## 0.3.38
+
+- Add **Automations → Mail Cache Bridge → Sync Now** on iPhone and iPad. Obsidian Sync carries only an expiring refresh request and coarse status, no mail or export files.
+- Enable **Mobile Mail Cache Sync** in Vault Control Center on one trusted Mac. Keep desktop Obsidian and the existing Mail Cache Bridge app running there. Desktop local controls still work as before.
+
 ## 0.3.37
 
 - Replace the Automations tab with a dedicated Mail Cache Bridge Inbox sync dashboard. It shows local status, last sync, indexed count and **Sync Now** on the Mac running the opted-in companion app.

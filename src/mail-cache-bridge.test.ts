@@ -6,6 +6,10 @@ import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { canRequestBridgeSync, makeMailCacheBridgeTransport, parseBridgeStatus, type BridgeStatus } from "./mail-cache-bridge";
 
+import {
+  createRemoteMailClient, createRemoteMailRelay, remoteReceipt, type HostState, type RemoteMailStore,
+} from "./mail-cache-remote";
+
 const NOW = 1_791_000_000_123;
 const now = new Date(NOW).toISOString();
 const standard: BridgeStatus = { schema_version: 1, state: "ready", updated_at: now, exports_enabled: true };
@@ -163,5 +167,47 @@ describe("Mail Cache Bridge sync request", () => {
     expect(await f.transport.requestSync()).toEqual({ kind: "pending" });
     expect(await fsPromises.readlink(f.request)).toBe(neverTouched);
     expect(await fsPromises.readFile(neverTouched, "utf8")).toBe("untouched");
+  });
+});
+
+
+describe("mobile request forwards into the real Mac control-file transport", () => {
+  it("writes one private native request and correlates the resulting status", async () => {
+    const f = await fixture();
+    await f.write(standard);
+    const host = randomUUID();
+    let journal: HostState = { host, active: null };
+    let time = NOW;
+    const files = new Map<string, string>();
+    const store: RemoteMailStore = {
+      async read(path) { return files.get(path) ?? null; },
+      async write(path, old, value) {
+        if ((files.get(path) ?? null) !== old) throw new Error("Changed note");
+        files.set(path, value);
+      },
+    };
+    const phone = createRemoteMailClient(store, () => time, randomUUID);
+    const mac = createRemoteMailRelay({ store, transport: f.transport,
+      state: () => journal, save: (value) => { journal = value; }, now: () => time });
+    await mac.tick();
+    const request = await phone.requestSync();
+    expect(request).not.toBeNull();
+    await mac.tick();
+    const onDisk = JSON.parse(await fsPromises.readFile(f.request, "utf8"));
+    expect(Object.keys(onDisk).sort()).toEqual(["id", "requested_at", "schema_version"]);
+    expect((await fsPromises.stat(f.request)).mode & 0o777).toBe(0o600);
+    expect(onDisk.id).not.toBe(request?.id);
+    expect(remoteReceipt(await phone.observe())?.phase).toBe("requested");
+
+    // At the native boundary, simulate app consumption with a correlated receipt.
+    // No native process, real mail, or actual vault is accessed.
+    await fsPromises.unlink(f.request);
+    time += 1;
+    await f.write({ ...standard, state: "completed", updated_at: new Date(time).toISOString(),
+      last_sync_at: new Date(time).toISOString(), last_request_id: onDisk.id, indexed_count: 7111 });
+    await mac.tick();
+    expect(remoteReceipt(await phone.observe())?.phase).toBe("completed");
+    expect([...files.values()].join("\n")).not.toMatch(/7111|last_request_id|indexed_count|exports_enabled/);
+    expect(await fsPromises.readdir(f.directory)).toEqual(["status.json"]);
   });
 });

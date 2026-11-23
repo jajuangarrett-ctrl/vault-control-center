@@ -9,6 +9,11 @@ import { VaultControlCenterSettingTab } from "./settings";
 import { applyDashboardTheme, clearDashboardTheme } from "./theme";
 import { DASHBOARD_VIEW_TYPE, DEFAULT_SETTINGS, type DashboardSettings } from "./types";
 import { VaultControlCenterView } from "./view";
+import { desktopMailCacheBridge } from "./mail-cache-bridge";
+import { createRemoteMailClient, createRemoteMailRelay, isRemoteMailPath, parseHostState, type HostState } from "./mail-cache-remote";
+import { makeRemoteMailVaultStore } from "./mail-cache-remote-vault";
+
+const MOBILE_MAIL_HOST_KEY = "vault-control-center:mobile-mail-host:v1";
 
 import { FileReviewStore, affectsFileReview, getLiveReviewFile, type ReviewRow } from "./file-review";
 
@@ -36,6 +41,56 @@ export default class VaultControlCenterPlugin extends Plugin {
   private refreshTimer: number | null = null;
   private reusableFileLeafController: ReusableFileLeafController | null = null;
   private talkToVault!: TalkToVaultHome<WorkspaceLeaf>;
+  private mailRelay?: ReturnType<typeof createRemoteMailRelay>;
+
+  get mobileMailHostAvailable(): boolean { return Platform.isDesktopApp && Platform.isMacOS; }
+
+  private get mobileMailHostState(): HostState | null {
+    try { return parseHostState(this.app.loadLocalStorage(MOBILE_MAIL_HOST_KEY)); }
+    catch { return null; }
+  }
+
+  get mobileMailHostEnabled(): boolean { return this.mobileMailHostState !== null; }
+
+  enableMobileMailHost(enabled: boolean): boolean {
+    if (!this.mobileMailHostAvailable) return false;
+    try {
+      const previous = this.mobileMailHostState;
+      this.app.saveLocalStorage(MOBILE_MAIL_HOST_KEY, enabled
+        ? (previous ?? { host: globalThis.crypto.randomUUID().toLowerCase(), active: null })
+        : null);
+      if (enabled !== this.mobileMailHostEnabled) return false;
+      if (enabled) void this.mailRelay?.tick();
+      else if (previous) void this.mailRelay?.revoke(previous.host);
+      return true;
+    } catch { return false; }
+  }
+
+  mobileMailClient(): ReturnType<typeof createRemoteMailClient> | null {
+    return Platform.isMobile ? createRemoteMailClient(makeRemoteMailVaultStore(this.app.vault)) : null;
+  }
+
+  private startMobileMailRelay(): void {
+    const transport = desktopMailCacheBridge(this.mobileMailHostAvailable);
+    if (!transport) return;
+    const relay = createRemoteMailRelay({
+      transport,
+      store: makeRemoteMailVaultStore(this.app.vault),
+      state: () => this.mobileMailHostState,
+      save: (state) => {
+        this.app.saveLocalStorage(MOBILE_MAIL_HOST_KEY, state);
+        const readBack = this.mobileMailHostState;
+        if (JSON.stringify(readBack) !== JSON.stringify(state)) throw new Error("Could not persist mail request receipt");
+      },
+    });
+    this.mailRelay = relay;
+    const tick = () => void relay.tick();
+    const onControlNote = (file: { path: string }) => { if (isRemoteMailPath(file.path)) tick(); };
+    this.registerEvent(this.app.vault.on("create", onControlNote));
+    this.registerEvent(this.app.vault.on("modify", onControlNote));
+    this.registerInterval(window.setInterval(tick, 5_000));
+    tick();
+  }
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -76,9 +131,11 @@ export default class VaultControlCenterPlugin extends Plugin {
     this.addSettingTab(new VaultControlCenterSettingTab(this.app, this));
 
     this.app.workspace.onLayoutReady(() => {
+      this.startMobileMailRelay();
       this.talkToVault.rememberActiveLeaf(this.app.workspace.activeLeaf);
       this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => this.talkToVault.rememberActiveLeaf(leaf)));
       const updateReview = (file: { path: string }, oldPath?: string) => {
+        if (isRemoteMailPath(file.path) && (!oldPath || isRemoteMailPath(oldPath))) return;
         this.scheduleRefresh();
         if (!affectsFileReview(file.path) && !(oldPath && affectsFileReview(oldPath))) return;
         // Includes file and folder events; repaint only after the inventory is current.
@@ -90,7 +147,7 @@ export default class VaultControlCenterPlugin extends Plugin {
       };
       const schedule = () => this.scheduleRefresh();
       this.registerEvent(this.app.vault.on("create", updateReview));
-      this.registerEvent(this.app.vault.on("modify", schedule));
+      this.registerEvent(this.app.vault.on("modify", (file) => { if (!isRemoteMailPath(file.path)) schedule(); }));
       this.registerEvent(this.app.vault.on("delete", updateReview));
       this.registerEvent(this.app.vault.on("rename", updateReview));
       this.registerEvent(this.app.workspace.on("file-open", () => schedule()));
@@ -98,6 +155,7 @@ export default class VaultControlCenterPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.mailRelay?.stop();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     this.talkToVault?.dispose();
     this.reusableFileLeafController?.reset();

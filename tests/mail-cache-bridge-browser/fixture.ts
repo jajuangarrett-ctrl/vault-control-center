@@ -1,3 +1,4 @@
+import { createRemoteMailClient, createRemoteMailRelay, REQUEST_PATH, STATUS_PATH, type HostState, type RemoteMailStore } from "../../src/mail-cache-remote";
 import { renderRoute } from "../../src/renderers";
 import type { BridgeObservation, BridgeStatus, MailCacheBridgeTransport } from "../../src/mail-cache-bridge";
 
@@ -24,8 +25,42 @@ const transport: MailCacheBridgeTransport = {
     return { kind: "requested", id, sentAt: Date.now() };
   },
 };
-let dispose = renderRoute("automations", display, null, location.search.includes("mobile") ? null : transport);
+const host = "7b38d21f-7f14-4c70-94aa-41a147404b67";
+let hostState: HostState = { host, active: null };
+let now = Date.now();
+const createStore = () => {
+  const files = new Map<string, string>();
+  const store: RemoteMailStore = {
+    async read(path) { return files.get(path) ?? null; },
+    async write(path, previous, next) {
+      if ((files.get(path) ?? null) !== previous) throw Error("collision");
+      files.set(path, next);
+    },
+  };
+  return { files, store };
+};
+const mac = createStore(), phone = createStore();
+const mobile = location.search.includes("mobile");
+const client = mobile ? createRemoteMailClient(phone.store) : null;
+const relay = createRemoteMailRelay({ store: mac.store, transport, now: () => now,
+  state: () => hostState, save: (value) => { hostState = value; } });
+let dispose = renderRoute("automations", display, null, mobile ? null : transport, client);
 Object.assign(window, { fixture: {
   setStatus, reads: () => reads, requests: () => requests,
+  mobileRequest: () => phone.files.has(REQUEST_PATH),
+  async connectMobile() {
+    await relay.tick();
+    phone.files.set(STATUS_PATH, mac.files.get(STATUS_PATH)!);
+  },
+  async syncToMac() {
+    mac.files.set(REQUEST_PATH, phone.files.get(REQUEST_PATH)!);
+    await this.connectMobile();
+  },
+  async reportRemote(state: BridgeStatus["state"]) {
+    now = Date.now();
+    setStatus(state, false, true);
+    if (observation.kind === "current") observation.status.last_sync_at = new Date(now).toISOString();
+    await this.connectMobile();
+  },
   navigateAway() { dispose?.(); dispose = undefined; renderRoute("home", display, null); },
 } });

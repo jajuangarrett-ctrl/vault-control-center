@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, SecretComponent, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, SecretComponent, Setting } from "obsidian";
 import type VaultControlCenterPlugin from "./plugin";
 import type { DashboardTheme } from "./types";
 
@@ -44,6 +44,18 @@ export class VaultControlCenterSettingTab extends PluginSettingTab {
           this.plugin.applyTheme();
         })
       );
+
+    if (this.plugin.mobileMailHostAvailable) {
+      new Setting(containerEl)
+        .setName("Mobile Mail Cache Sync")
+        .setDesc("Enable on just the Mac running Mail Cache Bridge, in a private vault you trust. Keep both apps open. Obsidian Sync carries only a refresh request and status; mail and exports stay on the Mac.")
+        .addToggle((toggle) => toggle.setValue(this.plugin.mobileMailHostEnabled).onChange((value) => {
+          if (!this.plugin.enableMobileMailHost(value)) {
+            toggle.setValue(this.plugin.mobileMailHostEnabled);
+            new Notice("Mobile Mail Cache Sync could not update its local setting.");
+          }
+        }));
+    }
 
     new Setting(containerEl).setName("Vault sources").setHeading();
     this.addPathSetting("Areas folder", "Top-level folders become Area records with recursive navigation.", "areasFolder");
