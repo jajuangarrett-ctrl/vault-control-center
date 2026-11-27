@@ -281,6 +281,24 @@ async function main() {
       const activate=locator=>mobile?locator.tap():locator.click();
       const tabs=page.getByRole("tablist",{name:"Dashboard views"});
       const tasks=tabs.getByRole("tab",{name:"Tasks",exact:true});
+      if (mobile && width <= 759) {
+        const dock=page.locator(".fjg-vcc-mobile-dock");
+        const dashboard=page.locator(".fjg-vcc");
+        assert.equal(await dock.isVisible(),false,"portrait shows only the top navigation");
+        assert.equal(await tabs.isVisible(),true);
+        assert.equal(await page.getByRole("navigation",{name:"Mobile dashboard navigation"}).count(),0);
+        assert.equal(await dashboard.evaluate(el=>getComputedStyle(el).paddingBottom),"0px","no unused portrait dock space");
+        const programs=tabs.getByRole("tab",{name:"Programs",exact:true});
+        await activate(programs);
+        assert.equal(await programs.getAttribute("aria-selected"),"true");
+        await page.setViewportSize({width:700,height:386});
+        assert.equal(await dock.isVisible(),true,"compact landscape retains the dock");
+        assert.equal(await dock.getByRole("button",{name:"Programs",exact:true}).getAttribute("aria-current"),"page");
+        await page.setViewportSize({width,height:700});
+        assert.equal(await dock.isVisible(),false,"returning to portrait hides the dock again");
+        assert.equal(await programs.getAttribute("aria-selected"),"true","rotation preserves the route");
+        await activate(tabs.getByRole("tab",{name:"Home",exact:true}));
+      }
       assert.deepEqual((await tabs.getByRole("tab").allTextContents()).slice(0,5),["Home","Areas","Programs","Tasks","HTML"]);
       const capture=page.locator(".fjg-vcc-capture-grid");
       assert.deepEqual(await capture.locator(".fjg-vcc-capture-label").allTextContents(),["Thought","Email","Agenda item","All Files"]);

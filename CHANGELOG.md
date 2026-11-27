@@ -1,3 +1,7 @@
+## 0.3.39
+
+- Show only the top navigation tabs in phone portrait and reclaim the bottom dock space. Keep the existing landscape dock and Home capture controls.
+
 ## 0.3.38
 
 - Add **Automations → Mail Cache Bridge → Sync Now** on iPhone and iPad. Obsidian Sync carries only an expiring refresh request and coarse status, no mail or export files.
